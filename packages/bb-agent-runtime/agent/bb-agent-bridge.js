@@ -41,6 +41,7 @@
     counters: { edits: 0, renders: 0, saves: 0, exports: 0, restores: 0 },
     limits: { edits: 60, renders: 40, restores: 2 },
     lastRender: null,
+    loop: { pendingEdits: 0, unchangedStreak: 0, lastRenderRevision: null },
     dirtyTextures: new Set(),
     dirtyAnimations: new Set(),
     dirtyControllers: new Set(),
@@ -98,6 +99,7 @@
   }
   const bump = (source, changed = []) => {
     state.revision += 1
+    if (state.loop && ['agent', 'user', 'restore'].includes(source)) state.loop.pendingEdits += 1
     notify('event.project_changed', { revision: state.revision, source, changed })
     return state.revision
   }
@@ -680,6 +682,7 @@
     },
     last_error: state.lastError,
     last_render: state.lastRender,
+    loop: state.loop,
   })
 
   handlers['project.create_ysm'] = async (params = {}) => {
@@ -727,6 +730,7 @@
     state.dirtyControllers = new Set()
     state.lastRenderHashes = null
     state.lastRenderSignatures = null
+    state.loop = { pendingEdits: 0, unchangedStreak: 0, lastRenderRevision: null }
     bump('agent')
     return {
       project_id: state.project.project_id,
@@ -1233,6 +1237,29 @@
     }
   }
 
+  function elementBounds(ref) {
+    Canvas.scene.updateMatrixWorld(true)
+    const group = findGroup(ref)
+    const direct = findCube(ref)
+    const cubes = group
+      ? Cube.all.filter((cube) => {
+        let node = cube.parent
+        while (node) { if (node === group) return true; node = node.parent }
+        return false
+      })
+      : (direct ? [direct] : [])
+    if (!cubes.length) return null
+    const box = new THREE.Box3()
+    for (const cube of cubes) if (cube.mesh) box.expandByObject(cube.mesh)
+    if (box.isEmpty()) return null
+    box.expandByScalar(Math.max(0.25, box.getSize(new THREE.Vector3()).length() * 0.05))
+    return {
+      center: box.getCenter(new THREE.Vector3()).toArray(),
+      size: box.getSize(new THREE.Vector3()).toArray(),
+      elements: cubes.length,
+    }
+  }
+
   function fitCamera(preview, view, bounds) {
     const [cx, cy, cz] = bounds.center
     const [sx, sy, sz] = bounds.size
@@ -1283,6 +1310,11 @@
     ensureProject()
     const views = Array.isArray(params.views) && params.views.length ? params.views : ['front', 'right', 'iso_fr']
     const size = Array.isArray(params.size) ? params.size : [768, 768]
+    const ssaa = params.antialias === 'ssaa' ? 2 : 1
+    const renderSize = [size[0] * ssaa, size[1] * ssaa]
+    const focusRef = params.focus?.element ?? (views.includes('closeup') ? 'Head' : null)
+    const focusBounds = focusRef ? elementBounds(focusRef) : null
+    if (focusRef && !focusBounds) throw err('INVALID_REFERENCE', `focus element not found: ${focusRef}`, { code: 'INVALID_REFERENCE' })
     const preview = window.MediaPreview ?? window.Screencam?.NoAAPreview
     if (!preview) throw err('ENGINE_DEGRADED', 'offscreen preview unavailable', { code: 'ENGINE_DEGRADED' })
     const bounds = modelBounds()
@@ -1297,16 +1329,27 @@
     const cryptoLib = (() => { try { return require('crypto') } catch { return null } })()
     try {
       // 首次离屏渲染存在一次空帧（矩阵/着色器惰性初始化），warm-up 丢弃
-      preview.resize(size[0], size[1])
-      fitCamera(preview, 'front', bounds)
+      preview.resize(renderSize[0], renderSize[1])
+      fitCamera(preview, 'front', focusBounds ?? bounds)
       preview.render()
       for (const view of views) {
-        if (!VIEW_DIRS[view]) throw err('INVALID_PARAMS', `unknown view: ${view}`, { code: 'INVALID_PARAMS' })
-        preview.resize(size[0], size[1])
-        fitCamera(preview, view, bounds)
+        const camView = view === 'closeup' ? 'iso_fr' : view
+        if (!VIEW_DIRS[camView]) throw err('INVALID_PARAMS', `unknown view: ${view}`, { code: 'INVALID_PARAMS' })
+        preview.resize(renderSize[0], renderSize[1])
+        fitCamera(preview, camView, (view === 'closeup' || focusRef) ? (focusBounds ?? bounds) : bounds)
         preview.renderer?.setClearAlpha?.(0)
         Canvas.withoutGizmos(() => preview.render())
-        const dataUrl = preview.canvas.toDataURL('image/png')
+        let finalCanvas = preview.canvas
+        if (ssaa > 1) {
+          const scaled = document.createElement('canvas')
+          scaled.width = size[0]; scaled.height = size[1]
+          const sctx = scaled.getContext('2d')
+          sctx.imageSmoothingEnabled = true
+          sctx.imageSmoothingQuality = 'high'
+          sctx.drawImage(preview.canvas, 0, 0, renderSize[0], renderSize[1], 0, 0, size[0], size[1])
+          finalCanvas = scaled
+        }
+        const dataUrl = finalCanvas.toDataURL('image/png')
         const file = `${dir}${dir.includes('\\') ? '\\' : '/'}${view}_${size[0]}.png`
         writeBlockbenchFile(file, dataUrl, 'image')
         const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
@@ -1335,7 +1378,7 @@
           view, path: `artifacts/renders/r${String(revision).padStart(4, '0')}/${view}_${size[0]}.png`,
           workspace_path: file, sha256, bytes: Math.round(base64.length * 0.75), width: size[0], height: size[1],
           alpha_ratio: alphaRatio, empty: alphaRatio !== null && alphaRatio < 0.001,
-          changed, diff_ratio: diffRatio,
+          changed, diff_ratio: diffRatio, antialias: params.antialias ?? 'msaa', focus: focusRef ?? null,
           previous_sha256: state.lastRenderHashes?.[view] ?? null,
         }
         // 模型附件用 512px 缩略图（GPU 渲染仍按 size 保留原图）
@@ -1348,7 +1391,7 @@
             const tctx = thumb.getContext('2d')
             tctx.imageSmoothingEnabled = true
             tctx.imageSmoothingQuality = 'high'
-            tctx.drawImage(preview.canvas, 0, 0, size[0], size[1], 0, 0, attachSize, attachSize)
+            tctx.drawImage(finalCanvas, 0, 0, size[0], size[1], 0, 0, attachSize, attachSize)
             const thumbUrl = thumb.toDataURL('image/png')
             const thumbFile = `${dir}${dir.includes('\\') ? '\\' : '/'}${view}_attach${attachSize}.png`
             writeBlockbenchFile(thumbFile, thumbUrl, 'image')
@@ -1381,9 +1424,26 @@
     if (images.length && !changedAny && images.every((image) => image.diff_ratio !== null)) {
       warnings.push({ code: 'NO_VISIBLE_CHANGE', message: 'render is visually identical to the previous render for all views; the last edit may not affect visible geometry/UV/texture', fix_hint: 'check revision, UVs and texture binding with bb_scene include_uv' })
     }
+    // 简化闭环 watchdog：记录“编辑后渲染是否可见变化”，连续无变化时建议回滚/换策略
+    const pendingBefore = state.loop?.pendingEdits ?? 0
+    if (state.loop) {
+      state.loop.pendingEdits = 0
+      state.loop.lastRenderRevision = revision
+      if (!changedAny && pendingBefore > 0) state.loop.unchangedStreak += 1
+      else if (changedAny) state.loop.unchangedStreak = 0
+    }
+    const unchangedStreak = state.loop?.unchangedStreak ?? 0
+    const review = {
+      verdict: changedAny ? 'visible_change' : (pendingBefore > 0 ? 'no_visible_change' : 'no_change_expected'),
+      pending_edits_before_render: pendingBefore,
+      unchanged_streak: unchangedStreak,
+      suggestion: !changedAny && pendingBefore > 0
+        ? (unchangedStreak >= 3 ? '连续多次编辑无可见变化：建议 bb_restore 回滚到最近检查点，换策略后再试' : '上次编辑未改变可见像素：检查 UV/纹理绑定/骨骼层级，不要继续叠加同类修改')
+        : null,
+    }
     return {
       revision, render_id: `render-${revision}`, images, cache_hit: false, elapsed_ms: 0,
-      bounds: bounds, changed_any: changedAny, warnings,
+      bounds: bounds, changed_any: changedAny, warnings, review,
     }
   }
 
@@ -1539,6 +1599,7 @@
     state.dirtyControllers = new Set()
     state.lastRenderHashes = null
     state.lastRenderSignatures = null
+    state.loop = { pendingEdits: 0, unchangedStreak: 0, lastRenderRevision: null }
     bump('agent')
     return {
       project_id: state.project.project_id,
@@ -1594,6 +1655,7 @@
 
   // ---- animation ---------------------------------------------------------
   const findAnimation = (ref) => Animation.all.find((a) => a.uuid === ref || a.name === ref) ?? null
+  const findController = (ref) => (window.AnimationController?.all ?? []).find((c) => c.uuid === ref || c.name === ref) ?? null
   const defaultAnimationPath = () => packAbsolute(
     state.project?.pack_dir || workspacePath('pack'),
     state.project?.ysmJson?.files?.player?.animation?.main ?? 'animations/main.animation.json',
@@ -1605,7 +1667,12 @@
       path: a.path ? pathModule.relative(state.project?.pack_dir || workspacePath('pack'), a.path).replace(/\\/g, '/') : null,
       keyframes: Object.values(a.animators ?? {}).reduce((sum, an) => sum + Object.values(an.channels ?? {}).reduce((s, ch) => s + (Array.isArray(an[ch]) ? an[ch].length : 0), 0), 0),
     })),
-    controllers: (window.AnimationController?.all ?? []).map((c) => c.name),
+    controllers: (window.AnimationController?.all ?? []).map((c) => ({
+      controller: c.name, id: c.uuid,
+      path: c.path ? pathModule.relative(state.project?.pack_dir || workspacePath('pack'), c.path).replace(/\\/g, '/') : null,
+      initial_state: c.states?.find((s) => s.uuid === c.initial_state)?.name ?? null,
+      states: (c.states ?? []).map((s) => ({ name: s.name, animations: (s.animations ?? []).map((a) => a.key) })),
+    })),
   })
 
   function createAnimation(params = {}) {
@@ -1719,7 +1786,18 @@
             break
           }
           case 'bind_controller': {
-            throw err('UNSUPPORTED', 'controller binding is not implemented yet', { code: 'UNSUPPORTED' })
+            const anim = findAnimation(op.animation)
+            if (!anim) throw err('INVALID_REFERENCE', `animation not found: ${op.animation}`, { code: 'INVALID_REFERENCE' })
+            const controller = findController(op.controller)
+            if (!controller) throw err('INVALID_REFERENCE', `controller not found: ${op.controller}`, { code: 'INVALID_REFERENCE' })
+            const controllerState = (controller.states ?? []).find((s) => s.name === op.state || s.uuid === op.state)
+            if (!controllerState) throw err('INVALID_REFERENCE', `controller state not found: ${op.state}`, { code: 'INVALID_REFERENCE' })
+            const key = op.key || anim.getShortName?.() || anim.name.replace(/^animation\./, '')
+            controllerState.animations = (controllerState.animations ?? []).filter((a) => a.key !== key)
+            controllerState.animations.push({ uuid: (typeof guid === 'function' ? guid() : `${Date.now()}-${Math.random()}`), key, animation: anim.uuid, blend_value: op.blend_value ?? '' })
+            if (controller.path) state.dirtyControllers.add(controller.path)
+            changed.push({ animation: anim.name, controller: controller.name, state: controllerState.name, op: 'bind_controller' })
+            break
           }
           default:
             throw err('INVALID_OPERATION', `unsupported animation op: ${op.op}`, { code: 'INVALID_OPERATION' })
@@ -1798,6 +1876,147 @@
     } finally {
       if (success) { try { Undo.finishEdit('Agent import png') } catch { /* ignore */ } }
     }
+  }
+
+  // ---- texture layers / PBR ----------------------------------------------
+  const ensureTexture = (ref) => {
+    const tex = findTexture(ref)
+    if (!tex) throw err('INVALID_REFERENCE', `texture not found: ${ref}`, { code: 'INVALID_REFERENCE' })
+    return tex
+  }
+  handlers['texture.layer_list'] = (params = {}) => {
+    ensureProject()
+    const tex = ensureTexture(params.texture)
+    return {
+      texture: tex.name,
+      layers_enabled: !!tex.layers_enabled,
+      selected: tex.selected_layer?.name ?? null,
+      layers: (tex.layers ?? []).map((layer, index) => ({
+        index, layer: layer.name, id: layer.uuid, type: layer.type,
+        visible: layer.visible !== false, opacity: layer.opacity,
+        blend_mode: layer.blend_mode, size: layer.size ?? [layer.width, layer.height],
+      })),
+    }
+  }
+  handlers['texture.layer_create'] = (params = {}) => {
+    ensureProject()
+    const tex = ensureTexture(params.texture)
+    Undo.initEdit({ textures: [tex], bitmap: true })
+    let success = false
+    try {
+      if (!tex.layers_enabled) tex.activateLayers?.(false)
+      const LayerClass = window.TextureLayer ?? (typeof TextureLayer !== 'undefined' ? TextureLayer : null)
+      if (!LayerClass) throw err('UNSUPPORTED', 'TextureLayer unavailable', { code: 'UNSUPPORTED' })
+      const layer = new LayerClass({ name: String(params.name || `layer_${(tex.layers?.length ?? 0) + 1}`) }, tex)
+      layer.setSize(tex.width, tex.height)
+      const fill = colorOk(params.fill) ? params.fill : null
+      if (fill) { layer.ctx.fillStyle = fill; layer.ctx.fillRect(0, 0, tex.width, tex.height) }
+      tex.layers.push(layer)
+      layer.select?.()
+      tex.updateLayerChanges?.(true)
+      state.counters.edits += 1
+      state.dirtyTextures.add(tex.uuid)
+      const revision = bump('agent', [{ kind: 'texture', id: tex.uuid, op: 'layer_create' }])
+      success = true
+      return { ok: true, revision, texture: tex.name, layer: layer.name, id: layer.uuid, layers: tex.layers.length }
+    } finally {
+      if (success) { try { Undo.finishEdit('Agent create texture layer') } catch { /* ignore */ } }
+    }
+  }
+  handlers['texture.layer_select'] = (params = {}) => {
+    ensureProject()
+    const tex = ensureTexture(params.texture)
+    if (!tex.layers_enabled) throw err('INVALID_OPERATION', 'texture layers not enabled', { code: 'INVALID_OPERATION' })
+    const layer = (tex.layers ?? []).find((l) => l.uuid === params.layer || l.name === params.layer)
+    if (!layer) throw err('INVALID_REFERENCE', `layer not found: ${params.layer}`, { code: 'INVALID_REFERENCE' })
+    layer.select?.()
+    tex.selected_layer = layer
+    return { texture: tex.name, layer: layer.name, revision: state.revision }
+  }
+  handlers['texture.layer_delete'] = (params = {}) => {
+    ensureProject()
+    const tex = ensureTexture(params.texture)
+    const index = (tex.layers ?? []).findIndex((l) => l.uuid === params.layer || l.name === params.layer)
+    if (index < 0) throw err('INVALID_REFERENCE', `layer not found: ${params.layer}`, { code: 'INVALID_REFERENCE' })
+    Undo.initEdit({ textures: [tex], bitmap: true })
+    let success = false
+    try {
+      const [removed] = tex.layers.splice(index, 1)
+      tex.selected_layer = tex.layers[index] ?? tex.layers[index - 1] ?? null
+      tex.updateLayerChanges?.(true)
+      state.counters.edits += 1
+      state.dirtyTextures.add(tex.uuid)
+      const revision = bump('agent', [{ kind: 'texture', id: tex.uuid, op: 'layer_delete' }])
+      success = true
+      return { ok: true, revision, texture: tex.name, removed: removed.name, layers: tex.layers.length }
+    } finally {
+      if (success) { try { Undo.finishEdit('Agent delete texture layer') } catch { /* ignore */ } }
+    }
+  }
+  handlers['texture.layer_flatten'] = (params = {}) => {
+    ensureProject()
+    const tex = ensureTexture(params.texture)
+    if (!tex.layers_enabled) return { ok: true, texture: tex.name, layers_enabled: false, revision: state.revision }
+    Undo.initEdit({ textures: [tex], bitmap: true })
+    let success = false
+    try {
+      tex.updateLayerChanges?.(true)
+      tex.layers_enabled = false
+      tex.selected_layer = null
+      tex.layers = []
+      tex.updateChangesAfterEdit?.()
+      state.counters.edits += 1
+      state.dirtyTextures.add(tex.uuid)
+      const revision = bump('agent', [{ kind: 'texture', id: tex.uuid, op: 'layer_flatten' }])
+      success = true
+      return { ok: true, revision, texture: tex.name, layers_enabled: false }
+    } finally {
+      if (success) { try { Undo.finishEdit('Agent flatten texture layers') } catch { /* ignore */ } }
+    }
+  }
+  handlers['texture.pbr_list'] = (params = {}) => {
+    ensureProject()
+    return {
+      pbr_textures: Texture.all
+        .filter((t) => t.pbr_channel || /_(n|s)\.png$/i.test(t.name) || /_[ns]$/i.test(t.name))
+        .map((t) => ({ texture: t.name, id: t.uuid, channel: t.pbr_channel ?? (/_[ns]$/i.test(t.name) ? (/_n$/i.test(t.name) ? 'normal' : 'specular') : null), path: t.path ?? null, size: [t.width, t.height] })),
+    }
+  }
+  handlers['texture.pbr_create'] = async (params = {}) => {
+    ensureProject()
+    const base = params.texture ? ensureTexture(params.texture) : (Texture.selected ?? null)
+    if (!base) throw err('INVALID_REFERENCE', 'base texture required', { code: 'INVALID_REFERENCE' })
+    const channel = params.channel === 'specular' ? 'specular' : 'normal'
+    const suffix = channel === 'normal' ? '_n' : '_s'
+    const baseName = String(base.name || 'texture').replace(/\.png$/i, '')
+    const name = `${baseName}${suffix}`
+    if (findTexture(name)) throw err('INVALID_OPERATION', `PBR texture already exists: ${name}`, { code: 'INVALID_OPERATION' })
+    const fill = colorOk(params.fill) ? params.fill : (channel === 'normal' ? '#8080ff' : '#ffffff')
+    const canvas = document.createElement('canvas')
+    canvas.width = base.width; canvas.height = base.height
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = fill; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    const tex = new Texture({ name })
+    tex.fromDataURL(canvas.toDataURL('image/png'))
+    tex.add(false)
+    {
+      const started = Date.now()
+      while ((!tex.width || !tex.height) && Date.now() - started < 2000) await new Promise((r) => setTimeout(r, 20))
+      if (!tex.width || !tex.height) {
+        tex.canvas.width = canvas.width; tex.canvas.height = canvas.height
+        tex.ctx.drawImage(canvas, 0, 0); tex.width = canvas.width; tex.height = canvas.height
+        tex.source = tex.canvas.toDataURL('image/png')
+      }
+    }
+    tex.name = name
+    tex.pbr_channel = channel
+    const packDir = state.project?.pack_dir || workspacePath('pack')
+    tex.path = packAbsolute(packDir, `textures/${name}.png`)
+    tex.updateChangesAfterEdit?.()
+    state.counters.edits += 1
+    state.dirtyTextures.add(tex.uuid)
+    const revision = bump('agent', [{ kind: 'texture', id: tex.uuid, op: 'pbr_create' }])
+    return { ok: true, revision, texture: tex.name, channel, size: [tex.width, tex.height], path: tex.path, note: 'Iris/YSM PBR 约定：基础贴图同目录使用 _n/_s 后缀；需支持 PBR 的光影环境才会显示' }
   }
 
   // ---- checkpoint restore ------------------------------------------------

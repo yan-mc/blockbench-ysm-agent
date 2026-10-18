@@ -168,6 +168,43 @@ try {
   if (afterRestore.counts.cubes >= beforeRestore.counts.cubes) throw new Error('restore did not roll back cube count')
   step('checkpoint/restore', { from: beforeRestore.counts.cubes, to: afterRestore.counts.cubes, revision: restored.revision })
 
+  const controllerInfo = (animList.controllers ?? []).find((c) => c.states?.length)
+  if (!controllerInfo) throw new Error('no controller states to bind')
+  const bound = await exec('bb_animation_patch', {
+    ops: [{ op: 'bind_controller', animation: 'hosttest_wave', controller: controllerInfo.controller, state: controllerInfo.states[0].name }],
+  })
+  if (!bound?.changed?.some((c) => c.op === 'bind_controller')) throw new Error(`bind_controller failed: ${JSON.stringify(bound)}`)
+  step('controller bind', { controller: controllerInfo.controller, state: controllerInfo.states[0].name })
+
+  const layer = await exec('bb_texture_layer', { op: 'create', texture: 'default', name: 'agent_layer', fill: '#ff0000' })
+  if (!layer?.ok) throw new Error(`layer create failed: ${JSON.stringify(layer)}`)
+  const layers = await exec('bb_texture_layer', { op: 'list', texture: 'default' })
+  if (!layers.layers?.some((l) => l.layer === 'agent_layer')) throw new Error(`layer list missing: ${JSON.stringify(layers)}`)
+  const flattened = await exec('bb_texture_layer', { op: 'flatten', texture: 'default' })
+  if (flattened.layers_enabled !== false) throw new Error('layer flatten failed')
+  step('texture layers', { layers: layers.layers.length, flattened: flattened.layers_enabled })
+
+  const pbr = await exec('bb_texture_pbr', { op: 'create', texture: 'default', channel: 'normal' })
+  if (!pbr?.texture?.endsWith('_n')) throw new Error(`pbr create failed: ${JSON.stringify(pbr)}`)
+  const pbrList = await exec('bb_texture_pbr', { op: 'list' })
+  if (!pbrList.pbr_textures?.some((t) => t.texture === pbr.texture)) throw new Error('pbr list missing')
+  const savedAfterPbr = await exec('bb_save_project', {})
+  const pbrAbs = path.join(testRoot, 'workspaces', 'demo', 'pack', 'textures', `${pbr.texture}.png`)
+  if (!fs.existsSync(pbrAbs)) throw new Error(`PBR file not saved: ${pbrAbs}`)
+  step('texture PBR', { texture: pbr.texture, saved_files: savedAfterPbr.files?.length })
+
+  // 隐藏方块：先以相同尺寸建基线，再编辑并渲染，应判定 no_visible_change
+  await exec('bb_render_views', { views: ['front'], size: [256, 256] })
+  await exec('bb_apply_model_patch', { ops: [{ op: 'add_cube', bone: 'Head', name: 'hidden_edit', origin: [-1, 34, -1], size: [1, 1, 1] }] })
+  const noVisible = await exec('bb_render_views', { views: ['front'], size: [256, 256] })
+  if (noVisible?.review?.verdict !== 'no_visible_change') throw new Error(`watchdog verdict: ${JSON.stringify(noVisible?.review)}`)
+  step('render watchdog', { verdict: noVisible.review.verdict, streak: noVisible.review.unchanged_streak })
+
+  const closeup = await exec('bb_render_views', { views: ['closeup'], size: [256, 256], antialias: 'ssaa' })
+  const closeImage = closeup.images?.[0]
+  if (!closeImage || closeImage.width !== 256 || closeImage.antialias !== 'ssaa') throw new Error(`closeup/ssaa failed: ${JSON.stringify(closeImage)}`)
+  step('closeup + SSAA', { width: closeImage.width, antialias: closeImage.antialias, focus: closeImage.focus })
+
   const batch = await exec('bb_batch', { calls: [{ tool: 'bb_scene', args: { scope: 'summary' } }, { tool: 'bb_validate', args: {} }] })
   if (!batch?.results?.length || batch.results.length !== 2) throw new Error(`bb_batch failed: ${JSON.stringify(batch)}`)
   step('bb_batch', { results: batch.results.length, ok: batch.ok })

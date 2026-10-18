@@ -299,7 +299,8 @@ export function apply(ctx, config = {}) {
 
   async function callTool(toolName, method, params = {}, opts = {}) {
     const { timeoutMs = cfg.defaultTimeoutMs, signal } = opts
-    if (MUTATING_TOOLS.has(toolName)) {
+    const mutating = opts.mutating ?? MUTATING_TOOLS.has(toolName)
+    if (mutating) {
       if (state.guiVisible) {
         return { ok: false, code: 'GUI_BUSY', message: 'user is inspecting Blockbench', hint: 'run /hide before mutating' }
       }
@@ -477,6 +478,47 @@ export function apply(ctx, config = {}) {
   })
 
   tool({
+    name: 'bb_texture_layer',
+    description: '纹理图层：list/create/select/delete/flatten。图层是编辑期便利，保存时合成回单张 PNG。',
+    parameters: {
+      op: { type: 'string', description: 'list|create|select|delete|flatten', required: true },
+      texture: { type: 'string' },
+      name: { type: 'string', description: 'create 时的图层名' },
+      layer: { type: 'string', description: 'select/delete 时的图层 id 或名字' },
+      fill: { type: 'string', description: 'create 时的填充色 #RRGGBB' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args, exec) {
+      try {
+        const method = { list: 'texture.layer_list', create: 'texture.layer_create', select: 'texture.layer_select', delete: 'texture.layer_delete', flatten: 'texture.layer_flatten' }[args.op]
+        if (!method) return { ok: false, code: 'INVALID_PARAMS', message: `unknown op: ${args.op}` }
+        const mutating = args.op === 'create' || args.op === 'delete' || args.op === 'flatten'
+        return await callTool('bb_texture_layer', method, args, { timeoutMs: 30000, signal: exec?.signal, mutating })
+          .then((result) => result)
+          .catch((error) => errorResult(error))
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_texture_pbr',
+    description: 'PBR 贴图：list 列出现有 _n/_s 贴图；create 创建 Iris/YSM 约定的 normal(_n)/specular(_s) 贴图并随包保存。',
+    parameters: {
+      op: { type: 'string', description: 'list|create', required: true },
+      texture: { type: 'string', description: '基础贴图名（create 时）' },
+      channel: { type: 'string', description: 'normal|specular' },
+      fill: { type: 'string', description: '可选填充色' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args, exec) {
+      try {
+        const method = args.op === 'create' ? 'texture.pbr_create' : 'texture.pbr_list'
+        return await callTool('bb_texture_pbr', method, args, { timeoutMs: 30000, signal: exec?.signal, mutating: args.op === 'create' })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
     name: 'bb_render_views',
     description: '用固定机位无头渲染当前模型；默认透明背景、768px、front/right/iso_fr 三视图，图片作为附件返回（最多 4 张）。结果含逐图 changed/alpha_ratio 与 NO_VISIBLE_CHANGE/EMPTY_RENDER 警告。',
     parameters: {
@@ -495,6 +537,7 @@ export function apply(ctx, config = {}) {
           revision: value.revision,
           changed_any: value.changed_any,
           warnings: value.warnings,
+          review: value.review,
           views: (value.images ?? []).map((i) => i.view),
           images: (value.images ?? []).map((i) => ({ view: i.view, path: i.path, bytes: i.bytes, changed: i.changed, alpha_ratio: i.alpha_ratio })),
         }
@@ -611,7 +654,7 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_animation_list',
-    description: '列出动画名、时长、循环方式、路径与关键帧数量、绑定的控制器。',
+    description: '列出动画名、时长、循环方式、路径与关键帧数量；含控制器/状态及已绑定动画。',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
     async execute() { try { return await call('animation.list', {}, 10000) } catch (error) { return errorResult(error) } },
@@ -632,7 +675,7 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_animation_patch',
-    description: '动画原子变更：update_animation/set_keyframes/delete_keyframes/delete_animation，一组 ops 一个 Undo。',
+    description: '动画原子变更：update_animation/set_keyframes/delete_keyframes/delete_animation/bind_controller，一组 ops 一个 Undo。',
     parameters: {
       note: { type: 'string' },
       ops: { type: 'array', description: '动画 ops 数组，见 docs/03 §3.10', required: true },
