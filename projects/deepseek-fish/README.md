@@ -59,7 +59,7 @@ projects/deepseek-fish/
 
 - ✅ 已完成建模：61 bones / 222 cubes（64 骨骼上限内），蓝发 + 鲸耳鳍 + 大鲸尾 + 女仆头饰/围裙 + 分层大眼 + 围裙小鲸鱼 logo
 - ✅ 已通过 `bb_validate`（仅 11 条 optional locator warning；required bones/texture/ysm.json/UV bounds 全 pass）
-- ✅ 已导出 zip：`dist/deepseek-fish-v0.1.zip`（32 文件，482,901 bytes）
+- ✅ 已导出 zip：`model-export/deepseek-fish-v0.1.zip`（32 文件，482,901 bytes）
 - ✅ 已在隔离 `game-test`（Forge 1.20.1-47.3.20 + YSM 2.6.5）加载：日志 `[YSM] Set 'deepseek_fish' models for player 'AgentTester'`，无 YSM/模型报错
 - 🖼 截图：`screenshots/render-*.png`（Blockbench 无头渲染）、`screenshots/ingame-*.png`（游戏内 1280×720）
 
@@ -73,4 +73,5 @@ projects/deepseek-fish/
 6. 游戏内截图里角色出现在屋顶/空中是当前测试世界位置，不是模型悬浮 bug。
 
 问题记录见 [BUGS.md](./BUGS.md)，迭代过程见 [notes/iterations.md](./notes/iterations.md)。
+
 
