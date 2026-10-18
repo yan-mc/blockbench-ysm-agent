@@ -174,7 +174,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 ## 5. 安装与使用
 
 - 已安装到当前 profile：entry `include:blockbench-agent`，配置见 `packages/dsh-blockbench-agent/cordis.patch.yml`。
-- **发布包**：`release/bb-agent-0.3.0-202610181348.zip`（207 个文件，9.3MB，含 `bb-agent-app/`、插件 bundle、文档、`INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`）；解包后按 `INSTALL.md` 安装。
+- **发布包**：`release/bb-agent-0.3.0-202610181349.zip`（207 个文件，9.3MB，含 `bb-agent-app/`、插件 bundle、文档、`INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`）；解包后按 `INSTALL.md` 安装。
 - 当前会话可直接调用 `bb_*` 工具；`/show` 显示隐藏的 Blockbench 窗口，`/hide` 回后台并同步用户改动，`/bb-status` 查看状态，`/bb-start` 启动运行时，`/bb-help` 列出工具。
 - 工作区：`F:\Deepseek_harness\blockbench\workspace\default\`；每次插件激活使用独立 `userdata-<pid>-<rand>`，避免实例锁冲突。
 - 关闭/重启 dsh 后插件会自动启动 BAE（autoStart=true）。如不想常驻，把 config 的 `autoStart` 改为 false。
@@ -200,5 +200,6 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 - 附件缩略图在 renderer 里生成（512px），因为 dsh Host 侧 `nativeImage` 不可用（见 `bb_diagnostics.image.nativeImage=false`）；原图仍按 768 落盘。
 - YSM 模板以 `templates/ysm_default` 随 BAE 分发（来自 YSM-Utils-Plugins assets/default，CC0 默认模型）。
 - 游戏内验证使用仓库内独立 `game-test/`（Forge/YSM/assets/world），不读写用户其他 Minecraft 实例；该目录已被 `.gitignore` 排除。
+
 
 

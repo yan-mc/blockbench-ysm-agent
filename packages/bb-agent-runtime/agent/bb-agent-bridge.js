@@ -2063,8 +2063,8 @@
     ensureProject()
     return {
       pbr_textures: Texture.all
-        .filter((t) => t.pbr_channel || /_(n|s)\.png$/i.test(t.name) || /_[ns]$/i.test(t.name))
-        .map((t) => ({ texture: t.name, id: t.uuid, channel: t.pbr_channel ?? (/_[ns]$/i.test(t.name) ? (/_n$/i.test(t.name) ? 'normal' : 'specular') : null), path: t.path ?? null, size: [t.width, t.height] })),
+        .filter((t) => (t.pbr_channel && t.pbr_channel !== 'color') || /_[ns]$/i.test(t.name))
+        .map((t) => ({ texture: t.name, id: t.uuid, channel: (t.pbr_channel && t.pbr_channel !== 'color') ? t.pbr_channel : (/_n$/i.test(t.name) ? 'normal' : 'specular'), path: t.path ?? null, size: [t.width, t.height] })),
     }
   }
   handlers['texture.pbr_create'] = async (params = {}) => {
