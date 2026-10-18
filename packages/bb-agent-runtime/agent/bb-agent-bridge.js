@@ -17,6 +17,15 @@
   const BRIDGE_ID = cfg.bridgeId || 'bb-agent-bridge'
   const WS_URL = cfg.rpcUrl
   const TOKEN = cfg.token
+  const TRANSPORT_PREF = cfg.transport || 'auto'
+  let httpMode = false
+  let eventSource = null
+  let httpBase = ''
+  try {
+    const u = new URL(WS_URL)
+    u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'
+    httpBase = u.origin
+  } catch { /* ignore */ }
   const remoteApi = (() => { try { return require('@electron/remote') } catch { return null } })()
   const currentWindow = () => {
     try { return remoteApi?.getCurrentWindow?.() ?? null } catch { return null }
@@ -513,29 +522,54 @@
   let heartbeatTimer = null
 
   function sendRaw(obj) {
-    if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(obj))
+    if (socket && socket.readyState === WebSocket.OPEN) { socket.send(JSON.stringify(obj)); return }
+    if (httpMode && httpBase) { void httpRpc(obj).catch(() => { /* SSE 通道仅需送达 */ }) }
   }
   function notify(method, params) {
     sendRaw({ jsonrpc: '2.0', method, params })
   }
-  function call(method, params = {}, timeoutMs = 120000) {
-    return new Promise((resolve, reject) => {
-      if (!connected) {
-        reject(err('PROJECT_NOT_OPEN', 'bridge not connected'))
-        return
-      }
-      const id = `bb-${nextId++}`
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(err('TIMEOUT', `${method} timeout`))
-      }, timeoutMs)
-      pending.set(id, { resolve, reject, timer })
-      sendRaw({ jsonrpc: '2.0', id, method, params, _meta: { deadline_ms: timeoutMs } })
+
+  function handleTransportMessage(msg) {
+    if (msg.id !== undefined && msg.method === undefined) {
+      const waiter = pending.get(msg.id)
+      if (!waiter) return
+      pending.delete(msg.id)
+      clearTimeout(waiter.timer)
+      if (msg.error) waiter.reject(Object.assign(new Error(msg.error.message), { rpc: msg.error }))
+      else waiter.resolve(msg.result)
+      return
+    }
+    if (typeof msg.method === 'string') void handleInbound(msg)
+  }
+
+  async function httpRpc(message) {
+    const response = await fetch(`${httpBase}/rpc`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-bb-token': TOKEN },
+      body: JSON.stringify(message),
     })
+    if (response.status === 204) return null
+    const text = await response.text()
+    return text ? JSON.parse(text) : null
+  }
+
+  function startHeartbeat() {
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+    notify('event.heartbeat', heartbeatPayload())
+    heartbeatTimer = setInterval(() => notify('event.heartbeat', heartbeatPayload()), 2000)
+  }
+
+  function handleDisconnect() {
+    connected = false
+    helloDone = false
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+    for (const [, waiter] of pending) { clearTimeout(waiter.timer); waiter.reject(err('DISCONNECTED', 'bridge disconnected')) }
+    pending.clear()
   }
 
   function connect() {
     if (disposed || !WS_URL) return
+    if (TRANSPORT_PREF === 'http' || httpMode) { void httpConnect(); return }
     try {
       socket = new WebSocket(WS_URL, ['bb-agent.v1'])
     } catch (error) {
@@ -554,7 +588,7 @@
             params: {
               protocol: 'bb-agent/1',
               auth: { token: TOKEN },
-              client: { name: 'bb-agent-bridge', version: '0.2.0' },
+              client: { name: 'bb-agent-bridge', version: '0.3.0' },
               requested_capabilities: ['render.offscreen', 'gui.show', 'ysm.v2'],
             },
             _meta: { deadline_ms: 5000 },
@@ -564,8 +598,7 @@
         helloDone = true
         state.state = 'idle'
         console.log('[bb-agent] connected', hello?.server?.version ?? '')
-        notify('event.heartbeat', heartbeatPayload())
-        heartbeatTimer = setInterval(() => notify('event.heartbeat', heartbeatPayload()), 2000)
+        startHeartbeat()
       } catch (error) {
         console.error('[bb-agent] hello failed', error)
         try { socket.close() } catch { /* ignore */ }
@@ -574,26 +607,78 @@
     socket.onmessage = (event) => {
       let msg
       try { msg = JSON.parse(event.data) } catch { return }
-      if (msg.id !== undefined && msg.method === undefined) {
-        const waiter = pending.get(msg.id)
-        if (!waiter) return
-        pending.delete(msg.id)
-        clearTimeout(waiter.timer)
-        if (msg.error) waiter.reject(Object.assign(new Error(msg.error.message), { rpc: msg.error }))
-        else waiter.resolve(msg.result)
-        return
-      }
-      if (typeof msg.method === 'string') void handleInbound(msg)
+      handleTransportMessage(msg)
     }
     socket.onclose = () => {
-      connected = false
-      helloDone = false
-      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
-      for (const [, waiter] of pending) { clearTimeout(waiter.timer); waiter.reject(err('DISCONNECTED', 'bridge disconnected')) }
-      pending.clear()
-      if (!disposed) scheduleReconnect()
+      handleDisconnect()
+      if (!disposed) {
+        if (TRANSPORT_PREF === 'auto' && reconnectAttempt >= 2) httpMode = true
+        scheduleReconnect()
+      }
     }
     socket.onerror = () => { /* onclose 会处理 */ }
+  }
+
+  async function httpConnect() {
+    if (disposed || !httpBase) return
+    httpMode = true
+    try {
+      try { eventSource?.close?.() } catch { /* ignore */ }
+      eventSource = new EventSource(`${httpBase}/events?token=${encodeURIComponent(TOKEN)}`)
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(err('TIMEOUT', 'sse timeout')), 6000)
+        eventSource.onopen = () => { clearTimeout(timer); resolve() }
+        eventSource.onerror = () => { clearTimeout(timer); reject(err('DISCONNECTED', 'sse failed')) }
+      })
+      eventSource.onmessage = (event) => {
+        let msg
+        try { msg = JSON.parse(event.data) } catch { return }
+        handleTransportMessage(msg)
+      }
+      eventSource.onerror = () => {
+        if (disposed) return
+        connected = false
+        helloDone = false
+        scheduleReconnect()
+      }
+      const id = `bb-${nextId++}`
+      const hello = await httpRpc({
+        jsonrpc: '2.0', id, method: 'system.hello',
+        params: {
+          protocol: 'bb-agent/1',
+          auth: { token: TOKEN },
+          client: { name: 'bb-agent-bridge', version: '0.3.0', transport: 'http-sse' },
+          requested_capabilities: ['render.offscreen', 'gui.show', 'ysm.v2'],
+        },
+        _meta: { deadline_ms: 5000 },
+      })
+      if (hello?.error) throw new Error(hello.error.message)
+      connected = true
+      helloDone = true
+      state.state = 'idle'
+      reconnectAttempt = 0
+      console.log('[bb-agent] connected via http-sse', hello?.result?.server?.version ?? '')
+      startHeartbeat()
+    } catch (error) {
+      connected = false
+      console.error('[bb-agent] http connect failed', error?.message ?? error)
+      scheduleReconnect()
+    }
+  }
+  function call(method, params = {}, timeoutMs = 120000) {
+    return new Promise((resolve, reject) => {
+      if (!connected) {
+        reject(err('PROJECT_NOT_OPEN', 'bridge not connected'))
+        return
+      }
+      const id = `bb-${nextId++}`
+      const timer = setTimeout(() => {
+        pending.delete(id)
+        reject(err('TIMEOUT', `${method} timeout`))
+      }, timeoutMs)
+      pending.set(id, { resolve, reject, timer })
+      sendRaw({ jsonrpc: '2.0', id, method, params, _meta: { deadline_ms: timeoutMs } })
+    })
   }
 
   function scheduleReconnect() {
@@ -2139,8 +2224,10 @@
     onunload() {
       disposed = true
       if (heartbeatTimer) clearInterval(heartbeatTimer)
+      try { eventSource?.close?.() } catch { /* ignore */ }
       try { socket?.close() } catch { /* ignore */ }
     },
   })
 })()
+
 

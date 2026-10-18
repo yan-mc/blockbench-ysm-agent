@@ -7,7 +7,7 @@
 | 包 | 作用 | 状态 |
 |---|---|---|
 | `bb-agent-runtime/` | BAE：隐藏 Blockbench Agent Runtime（Electron main/preload/bridge plugin/selftest/构建脚本） | M0 通过；YSM 项目创建/打开/保存/导出/动画/回滚可用 |
-| `dsh-blockbench-agent/` | dsh Host 插件 bundle：28 个 `bb_*` 工具（默认暴露 26）+ 5 个命令 + Skill + 进程监管 + 图片缩略图 | host-smoke 通过；**已安装并激活** |
+| `dsh-blockbench-agent/` | dsh Host 插件 bundle：30 个 `bb_*` 工具（默认暴露 28）+ 5 个命令 + Skill + 双传输（WS/HTTP+SSE）+ 进程监管 + 图片缩略图 | host-smoke 通过；**已安装并激活** |
 | `bb-protocol/` | 协议常量/错误码/共享类型（可选，当前 dsh 插件自包含 ws-server） | 骨架 |
 
 ## 常用命令（在仓库根目录执行）
@@ -44,17 +44,17 @@ $node = 'D:\dsh\resources\runtime\primary-runtime\dependencies\node\bin\node.exe
 - `workspace/_e2e/`：e2e 的 pack、renders、exports、`e2e-result.json`。
 - `workspace/_hosttest/`：Host 插件冒烟结果与真实 spawn 的 BAE 工作目录。
 - `docs/M0-report.md`、`docs/M0-report-safe.md`：自动生成的 M0 报告。
-- `release/bb-agent-<version>-<stamp>.zip`：可直接分发的发布包（0.2.0 为 207 文件 / 9.3MB；含 BAE、插件、文档、SHA256、GPL SOURCE）。
+- `release/bb-agent-<version>-<stamp>.zip`：可直接分发的发布包（0.3.0 为 207 文件 / 9.3MB；含 BAE、插件、文档、SHA256、GPL SOURCE）。
 - `game-test/`：独立 Forge 1.20.1 + YSM 游戏内验证环境（首次 `setup.ps1`，之后 `ingame.ps1`；体积大，已 gitignore）。
 
 ## 实现边界（当前）
 
-- WS（dsh 为 server）已实现；HTTP+SSE 回退未实现。
+- WS（dsh 为 server）与 HTTP+SSE 双传输已实现，共用 `/rpc`、`/events`；`--transport=auto|ws|http`。
 - YSM 默认包创建/打开/保存/导出已可用；main/arm 各自加载贴图；保存只从主项目写贴图，避免 arm 覆盖编辑。
-- 工具面已补齐：动画 CRUD、贴图导入/导出、checkpoint/restore、batch、diagnostics、project_open/close；GUI 工具默认不暴露给模型（命令负责）。
-- 写操作自动带 `expected_revision`；GUI 可见时返回 `GUI_BUSY`；编辑/渲染/restore 有预算。
-- 进程崩溃自动重启（最多 5 次）；渲染附件默认 512px 缩略图。
-- 渲染返回逐图 `changed`/`alpha_ratio`，并提供 `NO_VISIBLE_CHANGE`/`EMPTY_RENDER` 警告。
-- 保存为增量写盘（未编辑动画/贴图不重写），二次保存幂等；导出同时生成目录与 zip。
-- 仍未实现：PBR/图层、控制器绑定、HTTP+SSE、VLM critic 代码化、electron-builder 安装器。
+- 工具面已补齐：动画 CRUD/控制器绑定、贴图导入导出/图层/PBR、checkpoint/restore、batch、diagnostics、project_open/close、closeup/SSAA；GUI 工具默认不暴露给模型（命令负责）。
+- 写操作自动带 `expected_revision`；GUI 可见时返回 `GUI_BUSY`；编辑/渲染/restore 有预算；渲染返回 watchdog `review`。
+- 进程崩溃自动重启（最多 5 次）；渲染失败可自动切 safe-mode（SwiftShader）重试；渲染附件默认 512px 缩略图。
+- 增量保存（未编辑动画/贴图不重写），二次保存幂等；导出目录 + zip。
+- 仍未实现：动画文件语义 diff 自动校验、electron-builder 安装器/签名、dsh Client UI 面板、完整 VLM critic 模型。
 - 已安装到当前 profile（`include:blockbench-agent`，autoStart=true）；卸载用 `plugin_manager remove_bundle`。
+

@@ -15,3 +15,4 @@
         maxImagesPerCall: 4
         imageMaxDimension: 512
         exposeGuiTools: false
+        bridgeTransport: auto

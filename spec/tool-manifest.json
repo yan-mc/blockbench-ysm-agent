@@ -1085,6 +1085,99 @@
       }
     },
     {
+      "name": "bb_texture_layer",
+      "title_zh": "纹理图层",
+      "description": "纹理图层 list/create/select/delete/flatten；保存时合成回单张 PNG。",
+      "mutating": true,
+      "requires_project": true,
+      "concurrency_safe": false,
+      "protocol_method": "texture.layer_*",
+      "timeout_ms": 30000,
+      "returns": "TextureReadResult",
+      "errors": [
+        "PROJECT_NOT_OPEN",
+        "INVALID_REFERENCE",
+        "UNSUPPORTED"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "enum": [
+              "list",
+              "create",
+              "select",
+              "delete",
+              "flatten"
+            ]
+          },
+          "texture": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string"
+          },
+          "fill": {
+            "type": "string",
+            "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+            "description": "颜色：#RRGGBB 或 #RRGGBBAA（alpha=00 表示透明）"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "op"
+        ]
+      }
+    },
+    {
+      "name": "bb_texture_pbr",
+      "title_zh": "PBR 贴图",
+      "description": "创建/列出现代光影使用的 Iris/YSM 约定 PBR 贴图（_n normal / _s specular）。",
+      "mutating": true,
+      "requires_project": true,
+      "concurrency_safe": false,
+      "protocol_method": "texture.pbr_*",
+      "timeout_ms": 30000,
+      "returns": "TextureReadResult",
+      "errors": [
+        "PROJECT_NOT_OPEN",
+        "INVALID_REFERENCE",
+        "INVALID_OPERATION"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "enum": [
+              "list",
+              "create"
+            ]
+          },
+          "texture": {
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "normal",
+              "specular"
+            ]
+          },
+          "fill": {
+            "type": "string",
+            "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+            "description": "颜色：#RRGGBB 或 #RRGGBBAA（alpha=00 表示透明）"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "op"
+        ]
+      }
+    },
+    {
       "name": "bb_animation_patch",
       "title_zh": "动画/关键帧变更",
       "description": "创建/修改 YSM 动画与关键帧；避免覆盖内置语义动画名（idle/walk/run 等）。",
@@ -1230,21 +1323,6 @@
             ],
             "default": "msaa"
           },
-          "shading": {
-            "type": "boolean",
-            "default": true
-          },
-          "show_gizmos": {
-            "type": "boolean",
-            "default": false
-          },
-          "pose": {
-            "enum": [
-              "rest",
-              "current"
-            ],
-            "default": "rest"
-          },
           "focus": {
             "type": [
               "object",
@@ -1262,6 +1340,21 @@
               }
             },
             "additionalProperties": false
+          },
+          "shading": {
+            "type": "boolean",
+            "default": true
+          },
+          "show_gizmos": {
+            "type": "boolean",
+            "default": false
+          },
+          "pose": {
+            "enum": [
+              "rest",
+              "current"
+            ],
+            "default": "rest"
           },
           "inline": {
             "type": "boolean",

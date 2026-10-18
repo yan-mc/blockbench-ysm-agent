@@ -60,13 +60,113 @@ function sendJson(socket, value, trace = '') {
 export function createWsServer({ token, methods, logger = console, defaultTimeoutMs = 120000, onNotification, onConnection }) {
   if (!token) throw new Error('token required')
   const connections = new Set()
+  const httpClients = new Set()
   const pending = new Map()
   let nextRequestId = 1
   let active = null
+  const readBody = (req) => new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    req.on('data', (chunk) => {
+      size += chunk.length
+      if (size > MAX_MESSAGE) { reject(new RpcError(-32600, 'request too large')); req.destroy(); return }
+      chunks.push(chunk)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
+  })
+  const tokenFromRequest = (req) => {
+    const auth = String(req.headers.authorization || '')
+    if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim()
+    if (req.headers['x-bb-token']) return String(req.headers['x-bb-token'])
+    try { return new URL(req.url, 'http://127.0.0.1').searchParams.get('token') || '' } catch { return '' }
+  }
+  const writeSse = (client, value) => {
+    try { client.res.write(`data: ${JSON.stringify(value)}\n\n`) } catch { /* ignore */ }
+  }
   const server = http.createServer((req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ ok: true, connections: connections.size }))
+      res.end(JSON.stringify({ ok: true, connections: connections.size, http_clients: httpClients.size }))
+      return
+    }
+    if (req.url?.startsWith('/events') && req.method === 'GET') {
+      if (!safeEqual(tokenFromRequest(req), token)) {
+        res.writeHead(401, { 'content-type': 'text/plain' }); res.end('unauthorized'); return
+      }
+      res.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+        'x-accel-buffering': 'no',
+      })
+      res.write('retry: 1500\n\n')
+      const client = { kind: 'http', res, authed: true, sendEvent: null, sendMessage: null, ready: false }
+      client.sendEvent = (method, params) => writeSse(client, { jsonrpc: '2.0', method, params })
+      client.sendMessage = (msg) => writeSse(client, msg)
+      httpClients.add(client)
+      active = client
+      try { onConnection?.(client) } catch (error) { logger.warn?.('[bb-http] onConnection failed', error?.message) }
+      req.on('close', () => {
+        httpClients.delete(client)
+        if (active === client) active = null
+        for (const [id, waiter] of pending) {
+          clearTimeout(waiter.timer)
+          waiter.reject(new RpcError(-32010, 'connection closed', { code: 'DISCONNECTED', recoverable: true }))
+          pending.delete(id)
+        }
+      })
+      return
+    }
+    if (req.url === '/rpc' && req.method === 'POST') {
+      if (!safeEqual(tokenFromRequest(req), token)) {
+        res.writeHead(401, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: errPayload(new RpcError(-32001, 'unauthorized')) }))
+        return
+      }
+      void (async () => {
+        let reqMsg
+        try { reqMsg = JSON.parse(await readBody(req)) } catch {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: errPayload(new RpcError(-32700, 'parse error')) }))
+          return
+        }
+        // 客户端对服务端请求的响应
+        if (reqMsg && reqMsg.id !== undefined && reqMsg.method === undefined) {
+          const waiter = pending.get(reqMsg.id)
+          if (waiter) {
+            pending.delete(reqMsg.id)
+            clearTimeout(waiter.timer)
+            if (reqMsg.error) waiter.reject(Object.assign(new Error(reqMsg.error.message), { rpc: reqMsg.error }))
+            else waiter.resolve(reqMsg.result)
+          }
+          res.writeHead(204); res.end(); return
+        }
+        // 客户端通知
+        if (reqMsg && reqMsg.method && reqMsg.id === undefined) {
+          try { onNotification?.(reqMsg.method, reqMsg.params ?? {}, { kind: 'http' }) } catch (error) { logger.warn?.('[bb-http] notification failed', error?.message) }
+          res.writeHead(204); res.end(); return
+        }
+        const { id = null, method, params = {}, _meta = {} } = reqMsg ?? {}
+        const fn = methods[method]
+        if (typeof method !== 'string' || !fn) {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, error: errPayload(new RpcError(-32601, `method not found: ${method}`)) }))
+          return
+        }
+        const deadline = Math.min(defaultTimeoutMs, Number(_meta.deadline_ms) || defaultTimeoutMs)
+        try {
+          const result = await Promise.race([
+            Promise.resolve(fn(params, { traceId: _meta.trace_id, conn: { kind: 'http' }, meta: _meta })),
+            new Promise((_, reject) => { const timer = setTimeout(() => reject(new RpcError(-32015, `timeout after ${deadline}ms`)), deadline); timer.unref?.() }),
+          ])
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, result }))
+        } catch (error) {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, error: errPayload(error) }))
+        }
+      })()
       return
     }
     res.writeHead(426, { 'content-type': 'text/plain' })
@@ -93,6 +193,7 @@ export function createWsServer({ token, methods, logger = console, defaultTimeou
     const state = { socket, authed: false, sendEvent: null }
 
     state.sendEvent = (method, params) => sendJson(socket, { jsonrpc: '2.0', method, params })
+    state.sendMessage = (msg) => sendJson(socket, msg)
     connections.add(state)
 
     const closeWith = (code, reason = '') => {
@@ -238,6 +339,8 @@ export function createWsServer({ token, methods, logger = console, defaultTimeou
     },
     close() {
       for (const c of connections) { try { c.socket.destroy() } catch { /* ignore */ } }
+      for (const c of httpClients) { try { c.res.end() } catch { /* ignore */ } }
+      httpClients.clear()
       for (const [, waiter] of pending) { clearTimeout(waiter.timer); waiter.reject(new RpcError(-32800, 'server closed')) }
       pending.clear()
       return new Promise((resolve) => server.close(resolve))
@@ -258,13 +361,14 @@ export function createWsServer({ token, methods, logger = console, defaultTimeou
         }, timeoutMs)
         timer.unref?.()
         pending.set(id, { resolve, reject, timer, method })
-        sendJson(conn.socket, { jsonrpc: '2.0', id, method, params, _meta: { deadline_ms: timeoutMs } })
+        conn.sendMessage({ jsonrpc: '2.0', id, method, params, _meta: { deadline_ms: timeoutMs } })
       })
     },
     broadcast(method, params) {
       for (const c of connections) c.sendEvent?.(method, params)
+      for (const c of httpClients) c.sendEvent?.(method, params)
     },
     get connected() { return !!active?.authed },
-    get connectionCount() { return connections.size },
+    get connectionCount() { return connections.size + httpClients.size },
   }
 }

@@ -15,6 +15,7 @@ const REPO_ROOT = path.resolve(PACKAGE_ROOT, '..', '..')
 const has = (flag) => process.argv.includes(`--${flag}`)
 const safeMode = has('safe-mode')
 const keep = has('keep')
+const transport = process.argv.includes('--transport=http') ? 'http' : 'ws'
 
 const appDir = path.join(REPO_ROOT, 'dist', 'bb-agent-app')
 const workspace = path.join(REPO_ROOT, 'workspace', safeMode ? '_e2e-safe' : '_e2e')
@@ -69,6 +70,7 @@ const args = [
   `--user-data=${path.join(workspace, '.bb', 'userdata')}`,
   `--rpc-url=${rpcUrl}`,
   `--token=${token}`,
+  `--transport=${transport}`,
 ]
 if (safeMode) args.push('--safe-mode')
 const child = spawn(electronExe, args, { cwd: appDir, windowsHide: true, env: childEnv })

@@ -8,6 +8,7 @@
 - **小步修改**：一次 `bb_apply_model_patch` 只做一类事（加骨/加方块/改 UV）；大改前先 `bb_checkpoint`。
 - **每次可见改动后必须渲染**：`bb_render_views(["front","iso_fr"])`，看图确认；不要连续改 3 次才看一次。
 - **预算意识**：会话有 edit/render/restore 预算；查看用 `bb_session_status`。渲染次数少而准。
+- **不要空转**：渲染返回 `review.verdict`；连续多次 `no_visible_change` 时停止叠加，检查或回滚。
 - **导出前必校验**：`bb_validate` → `bb_save_project` → `bb_export_ysm`。
 - 不要直接读写 `ysm.json`/模型 JSON 让用户粘贴；用工具。需要看细节用 `bb_get_element`。
 
@@ -36,6 +37,8 @@
 - 涂色：`bb_texture_patch({texture:"default", ops:[{op:"rect"...},{op:"line"...},{op:"pixel"...}]})`，坐标是纹理像素（默认 128×128）。
 - UV 与像素对应：`set_uv` 的 `uv` 是纹理左上角像素；方块面尺寸决定 `uv_size`（工具会自动设）。要改哪块面，就改对应 UV 区域并渲染确认。
 - 新贴图：`bb_texture_create({name, width, height, fill})`；绑定/选择默认用 `texture` 参数或 `texture.select`。
+- 图层（编辑期便利）：`bb_texture_layer({op:"create"|"list"|"select"|"delete"|"flatten", texture, name/layer, fill})`；保存时合成回单张 PNG。
+- PBR（现代光影）：`bb_texture_pbr({op:"create", texture:"default", channel:"normal"|"specular"})` 生成 `_n`/`_s` 贴图并随包保存；`op:"list"` 查看。只有支持 PBR 的光影/环境才会显示效果。
 - 需要外部图：先放进 workspace，再 `bb_texture_import_png({texture, path, at})`；导出检查用 `bb_texture_export_png` + `bb_render_texture`。
 
 ## 4. 动画
@@ -46,13 +49,16 @@
   `bb_animation_patch({ops:[{op:"set_keyframes", animation:"animation.main.wave", bone:"Head", channel:"rotation", keys:[{time:0,value:[0,0,0]},{time:0.5,value:[0,45,0]}]}]})`
   - channel: rotation/position/scale；value 单位分别度/像素/倍率。
   - 一个 patch 内多个 op 共享一个 Undo；失败整体回滚。
-- 删除：`bb_animation_delete` 或 `delete_animation` op；`bind_controller` 暂不支持，别假装能绑。
+- 删除：`bb_animation_delete` 或 `delete_animation` op。
+- 绑定控制器：`bb_animation_patch({ops:[{op:"bind_controller", animation:"animation.main.wave", controller:"player.pre_main", state:"default"}]})`；`bb_animation_list` 返回控制器/状态与已绑定动画。
 
 ## 5. 渲染自检
 
 - 标准两视图：`bb_render_views({views:["front","iso_fr"], size:[768,768]})`。
-- 局部细节：`iso_fl`、`iso_br`、`top`；贴图细节：`bb_render_texture({texture:"default", scale:8, region:[x1,y1,x2,y2]})`。
-- 判断：颜色/形状/位置是否与意图一致；如果 `changed_any=false` 或出现 `NO_VISIBLE_CHANGE`，先查 revision 是否增加、UV 是否真的指到涂色区域（渲染结果带逐图 `changed`/`alpha_ratio`）。
+- 局部细节：`bb_render_views({views:["closeup"], focus:{element:"Head"}, antialias:"ssaa", size:[512,512]})`；`iso_fl`、`iso_br`、`top` 也可用。
+- 贴图细节：`bb_render_texture({texture:"default", scale:8, region:[x1,y1,x2,y2]})`。
+- 结果带 `changed_any` 与 `review`（verdict / unchanged_streak / suggestion）：连续多次编辑后仍 `NO_VISIBLE_CHANGE`，先查 UV/绑定/层级，必要时 `bb_restore` 回滚，不要继续叠加同类修改。
+- 判断：颜色/形状/位置是否与意图一致；如果 `changed_any=false` 或出现 `NO_VISIBLE_CHANGE`，先查 revision 是否增加、UV 是否真的指到涂色区域。
 - 背景透明，不要用“背景色没变”判断失败；`EMPTY_RENDER` 表示整张图全透明，通常是相机/几何/GPU 问题。
 
 ## 6. 保存/导出/回滚

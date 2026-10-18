@@ -39,6 +39,7 @@ const DEFAULTS = {
   imageMaxBytes: 8 * 1024 * 1024,
   imageMaxDimension: 512,
   exposeGuiTools: false,
+  bridgeTransport: 'auto',
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -63,7 +64,7 @@ export function apply(ctx, config = {}) {
     hello: null, workspace, lastHeartbeat: null, startedAt: null, lastError: null,
     starting: null, runtimeTag, serverStarted: false,
     revision: 0, guiVisible: false, disposed: false, restartAttempts: 0, reconnectTimer: null,
-    revisionSynced: false, lastChange: null,
+    revisionSynced: false, lastChange: null, safeMode: false,
     ready: null, readyResolve: null, readyReject: null,
   }
   state.ready = new Promise((resolve, reject) => { state.readyResolve = resolve; state.readyReject = reject })
@@ -80,7 +81,7 @@ export function apply(ctx, config = {}) {
         return {
           protocol: 'bb-agent/1',
           transport: 'ws',
-          server: { name: 'bb-agent-runtime', version: '0.2.0', blockbench: '5.2.2' },
+          server: { name: 'bb-agent-runtime', version: '0.3.0', blockbench: '5.2.2' },
           capabilities: {
             render: { offscreen: true, transparent: true, max_size: 4096, antialias: ['off', 'msaa'] },
             texture: { layers: true, max_size: 8192 },
@@ -173,7 +174,9 @@ export function apply(ctx, config = {}) {
         `--user-data=${userDataDir}`,
         `--rpc-url=${state.rpcUrl}`,
         `--token=${server.token}`,
+        `--transport=${cfg.bridgeTransport || 'auto'}`,
       ]
+      if (state.safeMode) args.push('--safe-mode')
       const childEnv = { ...process.env, BB_AGENT_WORKSPACE: workspace }
       delete childEnv.ELECTRON_RUN_AS_NODE
       state.child = spawn(cfg.executable, args, {
@@ -230,6 +233,24 @@ export function apply(ctx, config = {}) {
       })
     }, delay)
     state.reconnectTimer.unref?.()
+  }
+
+  // GPU 降级链：渲染失败/引擎降级时重启 BAE 到 SwiftShader safe-mode，再重试一次
+  async function restartInSafeMode() {
+    if (state.safeMode) return false
+    log('restarting runtime in safe-mode (software rendering)')
+    state.safeMode = true
+    if (state.child && !state.child.killed) killTree(state.child.pid)
+    state.child = null
+    state.connected = false
+    state.revisionSynced = false
+    try {
+      await startRuntime()
+      return true
+    } catch (error) {
+      log('safe-mode restart failed:', error?.message)
+      return false
+    }
   }
 
   if (cfg.autoStart) {
@@ -522,10 +543,11 @@ export function apply(ctx, config = {}) {
     name: 'bb_render_views',
     description: '用固定机位无头渲染当前模型；默认透明背景、768px、front/right/iso_fr 三视图，图片作为附件返回（最多 4 张）。结果含逐图 changed/alpha_ratio 与 NO_VISIBLE_CHANGE/EMPTY_RENDER 警告。',
     parameters: {
-      views: { type: 'array', description: 'front/back/left/right/top/bottom/iso_fr/iso_fl/iso_br/iso_bl' },
+      views: { type: 'array', description: 'front/back/left/right/top/bottom/iso_fr/iso_fl/iso_br/iso_bl/closeup' },
       size: { type: 'array', description: '[w,h]，默认 [768,768]' },
       transparent: { type: 'boolean' },
-      antialias: { type: 'string', description: 'off|msaa' },
+      antialias: { type: 'string', description: 'off|msaa|ssaa（ssaa 为 2x 超采样后缩小）' },
+      focus: { type: 'object', description: '{element:"Head", padding?} 局部特写；closeup 默认 Head', properties: { element: { type: 'string' }, padding: { type: 'number' } }, additionalProperties: false },
       attach_images: { type: 'boolean', description: '是否附图（默认 true）' },
       attach_size: { type: 'number', description: '附件缩略图边长，默认 512' },
     },
@@ -548,7 +570,20 @@ export function apply(ctx, config = {}) {
     },
     async execute(args, exec) {
       try {
-        const result = await raceAbort(call('render.views', args, 120000), exec?.signal)
+        let result
+        try {
+          result = await raceAbort(call('render.views', args, 120000), exec?.signal)
+        } catch (error) {
+          const code = error?.rpc?.data?.code ?? error?.code
+          if (['ENGINE_DEGRADED', 'RENDER_FAILED', 'TIMEOUT'].includes(code) && !state.safeMode && cfg.executable && cfg.appPath) {
+            const restarted = await restartInSafeMode()
+            if (!restarted) return errorResult(error)
+            result = await raceAbort(call('render.views', args, 120000), exec?.signal)
+            result.safe_mode_fallback = true
+          } else {
+            return errorResult(error)
+          }
+        }
         if (!attachments || args.attach_images === false) return result
         const images = []
         for (const img of (result.images ?? []).slice(0, cfg.maxImagesPerCall)) {
@@ -770,6 +805,7 @@ export function apply(ctx, config = {}) {
       return {
         ok: true, dsh: { pid: process.pid, platform: process.platform, node: process.version },
         image: { nativeImage: !!nativeImage, maxDimension: cfg.imageMaxDimension, maxBytes: cfg.imageMaxBytes },
+        transport: cfg.bridgeTransport || 'auto', safeMode: state.safeMode,
         runtime: {
           connected: state.connected, rpcUrl: state.rpcUrl, childPid: state.child?.pid ?? null,
           restartAttempts: state.restartAttempts, lastHeartbeat: state.lastHeartbeat, lastError: state.lastError,
@@ -874,4 +910,5 @@ export function apply(ctx, config = {}) {
     for (const dispose of registered) { try { dispose?.() } catch { /* ignore */ } }
   })
 }
+
 

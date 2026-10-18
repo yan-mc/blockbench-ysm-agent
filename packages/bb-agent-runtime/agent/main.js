@@ -33,6 +33,7 @@ const flag = (name) => process.argv.includes(`--${name}`)
 const workspace = path.resolve(arg('workspace', path.join(APP_ROOT, 'workspace')))
 const rpcUrl = arg('rpc-url', '')
 const token = arg('token', '')
+const transport = arg('transport', 'auto')
 const userData = path.resolve(arg('user-data', path.join(workspace, '.bb', 'userdata')))
 const pluginPath = path.resolve(arg('plugin', path.join(APP_ROOT, 'agent', 'bb-agent-bridge.js')))
 const selftest = flag('self-test')
@@ -131,6 +132,7 @@ function createWindow() {
       additionalArguments: [`--bb-agent-config=${encodeURIComponent(JSON.stringify({
         rpcUrl,
         token,
+        transport,
         workspace,
         pluginPath,
         bridgeId: 'bb-agent-bridge',

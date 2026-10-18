@@ -4,7 +4,7 @@
 
 ## 工程状态
 
-**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge、28 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/检查点/回滚、增量保存与幂等、渲染变化/空图检测、512px 附件、游戏内加载验证、发布打包。当前版本 **v0.2.0**。
+**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、30 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚、增量保存与幂等、渲染变化/空图检测、closeup/SSAA、渲染 watchdog、512px 附件、GPU 降级、游戏内加载验证、发布打包。当前版本 **v0.3.0**。
 
 - 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
 - 从零搭建：[SETUP.md](SETUP.md)

@@ -435,6 +435,111 @@
       "description": ""
     },
     {
+      "name": "texture.layer_list",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.layer_create",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.layer_select",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.layer_delete",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.layer_flatten",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.pbr_list",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.pbr_create",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
       "name": "system.diagnostics",
       "direction": "client_to_server",
       "kind": "read",
