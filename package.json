@@ -13,6 +13,7 @@
     "e2e": "node packages/bb-agent-runtime/scripts/e2e.mjs",
     "hosttest": "node packages/dsh-blockbench-agent/test/host-smoke.mjs",
     "release": "node packages/bb-agent-runtime/scripts/package-release.mjs",
+    "verify:anim": "node packages/bb-agent-runtime/scripts/verify-animation-diff.mjs",
     "spec": "python spec/generate_spec.py"
   }
 }

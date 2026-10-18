@@ -64,7 +64,8 @@ v0.3.0 新增能力（hosttest 覆盖并通过）：
 - 纹理图层：`create/list/select/delete/flatten`；
 - PBR：`texture.pbr_create` 生成 `_n` 贴图并写盘；
 - closeup + SSAA：`views:["closeup"], focus:{element:"Head"}, antialias:"ssaa"`，输出 256×256；
-- 渲染 watchdog：隐藏编辑后渲染返回 `review.verdict="no_visible_change"`，带 `unchanged_streak` 与回滚建议。
+- 渲染 watchdog：隐藏编辑后渲染返回 `review.verdict="no_visible_change"`，带 `unchanged_streak` 与回滚建议；
+- 动画语义 diff：`verify-animation-diff.mjs` 对比模板/工作包 → 302 个动画、added/removed/changed 全 0（`EQUAL`）。
 
 ### 2.4 游戏内加载验证（独立环境）
 
@@ -182,7 +183,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 ## 6. 已知限制（下一步）
 
 1. **YSM 规范化仍是 v0**：只补必填/默认、保留未知字段；未逐条移植 YSM-Utils `saveNormalization`，未保证字节级幂等。已实现**增量保存**（未编辑的动画/贴图不重写）与二次保存幂等测试；动画重排/膨胀问题只对"被编辑文件"存在。
-2. **动画文件语义 diff**：尚无自动脚本对比"原始文件 vs 保存后文件"的动画名/关键帧语义（只做了字节幂等与文件级脏标记）。
+2. **动画文件语义 diff**：已提供 `verify-animation-diff.mjs`（当前模板/工作包 302 动画 EQUAL），但尚未接入 CI，也未对"被编辑过的动画文件"做逐动画回归。
 3. **VLM critic 仍是简化版**：已实现 `review.verdict`/`unchanged_streak`/回滚建议与 `NO_VISIBLE_CHANGE`，但不是独立 VLM 评审模型；`docs/04` 的完整状态机仍需模型侧执行。
 4. **游戏内验证范围有限**：已完成单模型装载/渲染验证；未做多人同步、服务端校验、动画全量、长时间游玩。
 5. **PBR 只在支持 Iris/光影时可见**：工具会生成/保存 `_n`/`_s` 贴图，但 Blockbench 离屏渲染不展示 PBR 效果。
