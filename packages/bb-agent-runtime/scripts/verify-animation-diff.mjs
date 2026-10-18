@@ -9,7 +9,8 @@ const arg = (name, fallback) => {
   return idx >= 0 ? process.argv[idx + 1] : fallback
 }
 const aDir = path.resolve(arg('a', 'dist/bb-agent-app/templates/ysm_default'))
-const bDir = path.resolve(arg('b', 'workspace/default/live_gold3'))
+const bDir = path.resolve(arg('b', 'projects/deepseek-fish/pack'))
+const allowAdded = process.argv.includes('--allow-added')
 
 function collectAnimations(root) {
   const out = new Map()
@@ -53,11 +54,13 @@ const b = collectAnimations(bDir)
 const added = [...b.keys()].filter((k) => !a.has(k))
 const removed = [...a.keys()].filter((k) => !b.has(k))
 const changed = []
+const round = (value) => typeof value === 'number' ? Math.round(value * 10000) / 10000 : value
+const normalizedBones = (bones) => JSON.stringify(bones, (key, value) => typeof value === 'number' ? Math.round(value * 10000) / 10000 : value)
 for (const [name, av] of a) {
   const bv = b.get(name)
   if (!bv) continue
-  const same = av.loop === bv.loop && av.length === bv.length &&
-    JSON.stringify(av.bones) === JSON.stringify(bv.bones)
+  const same = av.loop === bv.loop && round(av.length) === round(bv.length) &&
+    normalizedBones(av.bones) === normalizedBones(bv.bones)
   if (!same) changed.push({ name, loop: [av.loop, bv.loop], length: [av.length, bv.length] })
 }
 
@@ -65,7 +68,9 @@ const report = {
   a: aDir, b: bDir,
   animations: { a: a.size, b: b.size },
   added, removed, changed,
-  equal: added.length === 0 && removed.length === 0 && changed.length === 0,
+  strict_equal: added.length === 0 && removed.length === 0 && changed.length === 0,
+  equal: removed.length === 0 && changed.length === 0 && (allowAdded || added.length === 0),
+  allow_added: allowAdded,
 }
 const outPath = path.join('workspace', '_logs', 'animation-diff.json')
 fs.mkdirSync(path.dirname(outPath), { recursive: true })

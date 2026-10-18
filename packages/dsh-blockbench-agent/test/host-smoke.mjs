@@ -137,6 +137,9 @@ try {
   if (conflict?.code !== 'REVISION_CONFLICT') throw new Error(`expected REVISION_CONFLICT, got ${JSON.stringify(conflict)}`)
   step('revision conflict', { code: conflict.code })
 
+  const mainAnimAbs = path.join(testRoot, 'workspaces', 'demo', 'pack', 'animations', 'main.animation.json')
+  const baselineAnimCount = fs.existsSync(mainAnimAbs) ? Object.keys(JSON.parse(fs.readFileSync(mainAnimAbs, 'utf8')).animations ?? {}).length : 0
+
   const animation = await exec('bb_animation_create', { name: 'hosttest_wave', length: 1, loop: 'once' })
   if (!animation?.animation) throw new Error(`bb_animation_create failed: ${JSON.stringify(animation)}`)
   const animPatch = await exec('bb_animation_patch', {
@@ -156,17 +159,55 @@ try {
   if (!importedTexture?.ok) throw new Error(`bb_texture_import_png failed: ${JSON.stringify(importedTexture)}`)
   step('texture export/import', { path: exportedTexture.path, size: exportedTexture.bytes })
 
+  // B1 回归：checkpoint 必须保存贴图快照；restore 后画布应回到 checkpoint 状态
+  // 用独立名字避免模板里已有 default 造成同名歧义
+  await exec('bb_texture_create', { name: 'restore_tex', width: 64, height: 64, fill: '#112233' })
+  await exec('bb_texture_patch', { texture: 'restore_tex', ops: [{ op: 'pixel', x: 1, y: 1, color: '#00ff00' }] })
+  const paletteBefore = await exec('bb_texture_read', { texture: 'restore_tex', format: 'palette', region: [0, 0, 2, 2], max_colors: 8 })
+  if (!JSON.stringify(paletteBefore).includes('#00ff00')) throw new Error(`checkpoint baseline pixel missing: ${JSON.stringify(paletteBefore)}`)
   const checkpoint2 = await exec('bb_checkpoint', { label: 'before-restore' })
+  const checkpointAbs = path.join(testRoot, 'workspaces', 'demo', checkpoint2.checkpoint)
+  const metaAbs = checkpointAbs.replace(/\.bbmodel$/, '.meta.json')
+  if (!fs.existsSync(metaAbs)) throw new Error(`checkpoint meta missing: ${metaAbs}`)
+  const checkpointMeta = JSON.parse(fs.readFileSync(metaAbs, 'utf8'))
+  if (!checkpointMeta.texture_snapshots?.length) throw new Error('checkpoint did not save texture snapshots')
   const extraPatch = await exec('bb_apply_model_patch', {
     ops: [{ op: 'add_cube', bone: 'Head', name: 'after_checkpoint', origin: [-1, 42, -1], size: [2, 1, 2] }],
   })
   if (!extraPatch?.changed?.length) throw new Error('extra edit failed')
+  await exec('bb_texture_patch', { texture: 'restore_tex', ops: [{ op: 'pixel', x: 1, y: 1, color: '#ff0000' }] })
   const beforeRestore = await exec('bb_scene', { scope: 'summary' })
   const restored = await exec('bb_restore', { revision: checkpoint2.revision, confirm: true })
   if (!restored?.revision) throw new Error(`bb_restore failed: ${JSON.stringify(restored)}`)
+  const paletteAfter = await exec('bb_texture_read', { texture: 'restore_tex', format: 'palette', region: [0, 0, 2, 2], max_colors: 8 })
+  if (!JSON.stringify(paletteAfter).includes('#00ff00')) throw new Error(`checkpoint texture restore mismatch: ${JSON.stringify(paletteAfter)}`)
   const afterRestore = await exec('bb_scene', { scope: 'summary' })
   if (afterRestore.counts.cubes >= beforeRestore.counts.cubes) throw new Error('restore did not roll back cube count')
-  step('checkpoint/restore', { from: beforeRestore.counts.cubes, to: afterRestore.counts.cubes, revision: restored.revision })
+  if (checkpointMeta.arm_checkpoint && !restored.arm_from_checkpoint) throw new Error(`arm snapshot not restored: ${JSON.stringify(restored)}`)
+  step('checkpoint/restore', {
+    from: beforeRestore.counts.cubes, to: afterRestore.counts.cubes, revision: restored.revision,
+    textures: checkpointMeta.texture_snapshots.length, restored_textures: restored.textures_restored,
+    arm_from_checkpoint: restored.arm_from_checkpoint,
+  })
+
+  // B5/B7 回归：add_cube 支持 inflate/rotation/uv.sizes；update_bone 接受 bone_id 别名
+  const advanced = await exec('bb_apply_model_patch', {
+    ops: [
+      {
+        op: 'add_cube', bone: 'Head', name: 'inflated_cube', origin: [0, 42, 0], size: [2, 2, 2],
+        inflate: 1.5, rotation: [10, 20, 30],
+        uv: { mode: 'faces', faces: { north: [0, 0] }, sizes: { north: [6, 6] } },
+      },
+      { op: 'update_bone', bone_id: 'Head', rotation: [0, 1, 0] },
+    ],
+  })
+  if (!advanced?.changed?.length) throw new Error(`advanced model patch failed: ${JSON.stringify(advanced)}`)
+  const cubeInfo = await exec('bb_scene', { scope: 'cube', id: 'inflated_cube', include_uv: true })
+  if (Number(cubeInfo?.inflate) !== 1.5) throw new Error(`inflate not applied: ${JSON.stringify(cubeInfo)}`)
+  if (!cubeInfo?.rotation?.some((v) => v !== 0)) throw new Error(`rotation not applied: ${JSON.stringify(cubeInfo)}`)
+  if (JSON.stringify(cubeInfo?.uv?.faces?.north?.uv_size) !== JSON.stringify([6, 6])) throw new Error(`uv_size override failed: ${JSON.stringify(cubeInfo?.uv)}`)
+  await exec('bb_apply_model_patch', { ops: [{ op: 'update_bone', bone_id: 'Head', rotation: [0, 0, 0] }] })
+  step('model patch inflate/rotation/uv_size/alias', { inflate: cubeInfo.inflate, uv_size: cubeInfo.uv.faces.north.uv_size })
 
   const controllerInfo = (animList.controllers ?? []).find((c) => c.states?.length)
   if (!controllerInfo) throw new Error('no controller states to bind')
@@ -190,8 +231,15 @@ try {
   if (!pbrList.pbr_textures?.some((t) => t.texture === pbr.texture)) throw new Error('pbr list missing')
   const savedAfterPbr = await exec('bb_save_project', {})
   const pbrAbs = path.join(testRoot, 'workspaces', 'demo', 'pack', 'textures', `${pbr.texture}.png`)
-  if (!fs.existsSync(pbrAbs)) throw new Error(`PBR file not saved: ${pbrAbs}`)
+  if (!fs.existsSync(pbrAbs)) throw new Error(`PBR file not saved: ${pbrAbs}; save=${JSON.stringify(savedAfterPbr)}`)
+  if (fs.existsSync(mainAnimAbs)) {
+    const mergedJson = JSON.parse(fs.readFileSync(mainAnimAbs, 'utf8'))
+    const anims = mergedJson.animations ?? {}
+    if (!anims.hosttest_wave) throw new Error('animation merge-back lost hosttest_wave')
+    if (Object.keys(anims).length < baselineAnimCount + 1) throw new Error(`animation merge-back lost original animations: ${Object.keys(anims).length} < ${baselineAnimCount + 1}`)
+  }
   step('texture PBR', { texture: pbr.texture, saved_files: savedAfterPbr.files?.length })
+  step('animation merge-back', { baseline: baselineAnimCount, after: fs.existsSync(mainAnimAbs) ? Object.keys(JSON.parse(fs.readFileSync(mainAnimAbs, 'utf8')).animations ?? {}).length : 0 })
 
   // 隐藏方块：先以相同尺寸建基线，再编辑并渲染，应判定 no_visible_change
   await exec('bb_render_views', { views: ['front'], size: [256, 256] })

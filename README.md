@@ -4,7 +4,7 @@
 
 ## 工程状态
 
-**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、30 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚、增量保存与幂等、渲染变化/空图检测、closeup/SSAA、渲染 watchdog、512px 附件、GPU 降级、游戏内加载验证、发布打包。当前版本 **v0.3.0**。
+**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、30 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、closeup/SSAA、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill、游戏内加载验证、发布打包。当前版本 **v0.4.0**。
 
 - 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
 - 从零搭建：[SETUP.md](SETUP.md)
@@ -148,3 +148,4 @@ F:\Deepseek_harness\blockbench\
 - **YSM-Utils-Plugins**：MIT；复用其规范化规则/代码需保留版权与许可声明。
 - **YSM 默认模型**：官方文档注明以 CC 0 发布（可修改分发）；用户提供的参考图/皮肤版权由用户负责。
 - **Minecraft**：遵守 Mojang EULA，不分发原始游戏资产。
+

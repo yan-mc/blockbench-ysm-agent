@@ -35,7 +35,8 @@
 
 - 先 `bb_texture_read({format:"palette", region:[...]})` 看主色，避免覆盖重要区域。
 - 涂色：`bb_texture_patch({texture:"default", ops:[{op:"rect"...},{op:"line"...},{op:"pixel"...}]})`，坐标是纹理像素（默认 128×128）。
-- UV 与像素对应：`set_uv` 的 `uv` 是纹理左上角像素；方块面尺寸决定 `uv_size`（工具会自动设）。要改哪块面，就改对应 UV 区域并渲染确认。
+- UV 与像素对应：`set_uv` 的 `uv` 是纹理左上角像素；默认 `uv_size` 由方块面尺寸决定，也可显式传 `uv_size:[w,h]`（或每面 `sizes`）把任意设计图压到指定面。add_cube 也可直接带 `uv:{mode:"faces",faces:{...},sizes:{...}}`。
+- 新几何：add_cube/update_cube 支持 `inflate`、`rotation`、`pivot`；做圆角/倾斜的鳍、尾巴时优先用这三项，而不是堆大量小方块。
 - 新贴图：`bb_texture_create({name, width, height, fill})`；绑定/选择默认用 `texture` 参数或 `texture.select`。
 - 图层（编辑期便利）：`bb_texture_layer({op:"create"|"list"|"select"|"delete"|"flatten", texture, name/layer, fill})`；保存时合成回单张 PNG。
 - PBR（现代光影）：`bb_texture_pbr({op:"create", texture:"default", channel:"normal"|"specular"})` 生成 `_n`/`_s` 贴图并随包保存；`op:"list"` 查看。只有支持 PBR 的光影/环境才会显示效果。
@@ -57,13 +58,16 @@
 - 标准两视图：`bb_render_views({views:["front","iso_fr"], size:[768,768]})`。
 - 局部细节：`bb_render_views({views:["closeup"], focus:{element:"Head"}, antialias:"ssaa", size:[512,512]})`；`iso_fl`、`iso_br`、`top` 也可用。
 - 贴图细节：`bb_render_texture({texture:"default", scale:8, region:[x1,y1,x2,y2]})`。
-- 结果带 `changed_any` 与 `review`（verdict / unchanged_streak / suggestion）：连续多次编辑后仍 `NO_VISIBLE_CHANGE`，先查 UV/绑定/层级，必要时 `bb_restore` 回滚，不要继续叠加同类修改。
+- 结果带 `changed_any` 与 `review`（watchdog-v2）：`verdict` 可能是 `visible_change` / `visible_change_clipped` / `no_visible_change` / `no_change_expected` / `empty_render`；`metrics` 有逐图 alpha/bbox/diff；`checks`/`suggestions` 给结构化建议。连续 3 次 no-visible-change 会触发 no-progress，先 `bb_restore` 或换策略。
+- 画面触边（`edge_touch=true`）说明可能被裁切，用 `focus` 或缩小模型/调整机位。
 - 判断：颜色/形状/位置是否与意图一致；如果 `changed_any=false` 或出现 `NO_VISIBLE_CHANGE`，先查 revision 是否增加、UV 是否真的指到涂色区域。
-- 背景透明，不要用“背景色没变”判断失败；`EMPTY_RENDER` 表示整张图全透明，通常是相机/几何/GPU 问题。
+- 背景透明，不要用“背景色没变”判断失败；`EMPTY_RENDER` 表示整张图全透明，通常是相机/几何/GPU 问题。规则判定不是 VLM：造型/配色/意图仍要模型看图自己判断。
 
 ## 6. 保存/导出/回滚
 
-- 检查点：`bb_checkpoint({label:"..."})`；列表 `bb_revisions`；回滚 `bb_restore({revision:n, confirm:true})`（会丢弃当前未保存改动）。
+- 检查点：`bb_checkpoint({label:"..."})` 会内嵌贴图当前像素，并在 arm tab 打开时快照 arm；列表 `bb_revisions`；回滚 `bb_restore({revision:n, confirm:true})`（会丢弃当前未保存改动，但贴图/arm 从快照恢复）。
+- 保存时动画文件会“合并回写”：未修改的动画条目/顺序保留，只替换语义变化的动画，避免整文件重排/膨胀；hosttest 会验证。
+- 全量回归：`npm run test`；快速回归（只 hosttest + 动画 diff）：`npm run test:quick`。
 - 保存：`bb_save_project`（写回 pack：模型/动画/控制器/贴图/ysm.json）。
 - 导出：`bb_export_ysm`（先 validate；产物含 export-manifest.json 与 zip；`zip:false` 可关闭 zip）。
 - 批量只读/小操作可用 `bb_batch`；它不是事务，失败了不会自动回滚。

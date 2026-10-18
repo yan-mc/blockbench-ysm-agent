@@ -5,7 +5,7 @@
 
 ## 1. 当前结论
 
-**DSH 端已完整可用（v0.3.0）：插件已安装并激活，工具/命令/Skill/状态机/图像链路/双传输/回归测试全部就位；BAE、YSM 与游戏内加载验证均通过。**
+**DSH 端已完整可用（v0.4.0）：插件已安装并激活，工具/命令/Skill/状态机/图像链路/双传输/回归测试全部就位；BAE、YSM 与游戏内加载验证均通过；新增 Client UI 状态 pill、checkpoint 贴图/arm、动画合并回写与 watchdog-v2。**
 
 - **M0 通过（Go）**：隐藏窗口离屏 WebGL 渲染稳定；GPU（RTX 4080 / ANGLE D3D11）与 SwiftShader 两条路径都通过；show/hide 往返后仍可渲染。
 - **BAE 可用**：`dist/bb-agent-app` 由上游 Blockbench 5.2.2 构建产物 + agent 三件套 + YSM 默认模板组装而成。
@@ -57,6 +57,16 @@ e2e 关键结果：`project.create_ysm` 返回 70 bones / 182 cubes / 2 textures
 - 二次保存幂等：首次保存的 4 个文件第二次保存后内容 0 变化；
 - `project.export_ysm` 生成 32 文件目录 + `export-manifest.json` + **32 文件 zip（约 475KB）**，zip 头与文件数校验通过。
 - **HTTP+SSE 传输**：`e2e.mjs --transport=http` 与默认 WS 两条链路均 PASSED（同一套 20+ 调用）。
+
+v0.4.0 新增能力（hosttest / e2e / test:all 覆盖）：
+
+- B1 修复：checkpoint 前同步 `texture.source = canvas.toDataURL()`，贴图内嵌；hosttest “绿点→checkpoint→改红→restore→仍绿”通过；
+- arm checkpoint：checkpoint 保存 `.arm.bbmodel`，restore 从快照加载并绑定贴图；e2e `arm_loaded=true`；
+- 模型 patch：add_cube/update_cube 支持 `inflate`/`rotation`/`pivot`；set_uv 支持每面 `uv_size`；update_bone 接受 `bone_id`；
+- 动画保存：合并回写，保留原文件中未修改的动画条目/顺序，只替换语义变化、追加新增、移除删除；hosttest baseline 50→51；
+- watchdog-v2：逐图 `bbox/edge_touch`，review 增加 verdict（visible_change_clipped/empty_render）、metrics、checks、suggestions、vlm_hint；
+- Client UI：composer dock 的 `Blockbench` 状态 pill 轮询同源 `/bb-agent/status`（Host 注册的只读 JSON 路由），显示连接/状态/revision/GUI/verdict；
+- `npm run test`（全量）/`npm run test:quick`（hosttest + 动画语义 diff）。
 
 v0.3.0 新增能力（hosttest 覆盖并通过）：
 
@@ -174,7 +184,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 ## 5. 安装与使用
 
 - 已安装到当前 profile：entry `include:blockbench-agent`，配置见 `packages/dsh-blockbench-agent/cordis.patch.yml`。
-- **发布包**：`release/bb-agent-0.3.0-202610181349.zip`（207 个文件，9.3MB，含 `bb-agent-app/`、插件 bundle、文档、`INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`）；解包后按 `INSTALL.md` 安装。
+- **发布包**：`release/bb-agent-0.4.0-202610181503.zip`（208 个文件，9.3MB，含 `bb-agent-app/`、插件 bundle、文档、`INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`）；解包后按 `INSTALL.md` 安装。
 - 当前会话可直接调用 `bb_*` 工具；`/show` 显示隐藏的 Blockbench 窗口，`/hide` 回后台并同步用户改动，`/bb-status` 查看状态，`/bb-start` 启动运行时，`/bb-help` 列出工具。
 - 工作区：`F:\Deepseek_harness\blockbench\workspace\default\`；每次插件激活使用独立 `userdata-<pid>-<rand>`，避免实例锁冲突。
 - 关闭/重启 dsh 后插件会自动启动 BAE（autoStart=true）。如不想常驻，把 config 的 `autoStart` 改为 false。
@@ -182,15 +192,14 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 
 ## 6. 已知限制（下一步）
 
-1. **YSM 规范化仍是 v0**：只补必填/默认、保留未知字段；未逐条移植 YSM-Utils `saveNormalization`，未保证字节级幂等。已实现**增量保存**（未编辑的动画/贴图不重写）与二次保存幂等测试；动画重排/膨胀问题只对"被编辑文件"存在。
-2. **动画文件语义 diff**：已提供 `verify-animation-diff.mjs`（当前模板/工作包 302 动画 EQUAL），但尚未接入 CI，也未对"被编辑过的动画文件"做逐动画回归。
-3. **VLM critic 仍是简化版**：已实现 `review.verdict`/`unchanged_streak`/回滚建议与 `NO_VISIBLE_CHANGE`，但不是独立 VLM 评审模型；`docs/04` 的完整状态机仍需模型侧执行。
+1. **YSM 规范化是 v1**：动画文件已合并回写（保留未修改条目/顺序），但仍不是 YSM-Utils `saveNormalization` 的逐条移植；`ysm.json`/控制器文件的字节级规范化未做。
+2. **动画语义 diff**：已接入 `npm run test`（hosttest 产物 vs 模板，允许新增动画），并覆盖“新增 1 个动画、原 50 个保留”；对“修改已有动画”的逐动画回归仍靠人工/模型评审。
+3. **VLM critic 是规则 watchdog-v2 + 外部 VLM**：结构化 bbox/edge/alpha/no-progress 判定已实现，但没有内置视觉评审模型；造型/配色是否符合意图仍由 dsh 模型看图判断。
 4. **游戏内验证范围有限**：已完成单模型装载/渲染验证；未做多人同步、服务端校验、动画全量、长时间游玩。
 5. **PBR 只在支持 Iris/光影时可见**：工具会生成/保存 `_n`/`_s` 贴图，但 Blockbench 离屏渲染不展示 PBR 效果。
-6. **安全/分发**：已提供 `package-release.mjs` 发布包（BAE/插件/文档/SHA256/GPL SOURCE），但未做 electron-builder 安装器与代码签名。
-7. **`project.restore` 的 arm 从磁盘重载**（非 checkpoint 状态）；checkpoint 目前只保存当前 tab（主模型），arm 的 checkpoint 语义需后续补齐。
-8. **未提供 dsh Client UI 面板**：状态查询走 `bb_session_status` / `/bb-status`，没有独立侧边栏或按钮。
-
+6. **安全/分发**：已提供 `package-release.mjs` 发布包（BAE/插件/文档/SHA256/GPL SOURCE），但未做 electron-builder 安装器与代码签名（无签名证书；zip 便携分发为当前正式方式）。
+7. **Client UI 验证**：composer dock 状态 pill 已随 bundle 提供，Host `/bb-agent/status` 已用 HTTP 验证；当前页面需刷新后由 boot graph 加载 client half，尚未做浏览器自动化截图确认视觉细节。
+8. **PBR 预览 / 完整 VLM 状态机 / 多人游戏验证** 属于后续增强，不阻塞当前工具链与发布。
 ## 7. 与设计文档的工程偏差（不修改方案）
 
 - BAE 采用**独立 dist 组装**（复制上游构建产物 + agent 三件套 + @electron/remote + YSM 模板），等价于方案中的"最小主进程 patch"。
@@ -200,6 +209,8 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 - 附件缩略图在 renderer 里生成（512px），因为 dsh Host 侧 `nativeImage` 不可用（见 `bb_diagnostics.image.nativeImage=false`）；原图仍按 768 落盘。
 - YSM 模板以 `templates/ysm_default` 随 BAE 分发（来自 YSM-Utils-Plugins assets/default，CC0 默认模型）。
 - 游戏内验证使用仓库内独立 `game-test/`（Forge/YSM/assets/world），不读写用户其他 Minecraft 实例；该目录已被 `.gitignore` 排除。
+
+
 
 
 

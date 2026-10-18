@@ -44,7 +44,7 @@ $node = 'D:\dsh\resources\runtime\primary-runtime\dependencies\node\bin\node.exe
 - `workspace/_e2e/`：e2e 的 pack、renders、exports、`e2e-result.json`。
 - `workspace/_hosttest/`：Host 插件冒烟结果与真实 spawn 的 BAE 工作目录。
 - `docs/M0-report.md`、`docs/M0-report-safe.md`：自动生成的 M0 报告。
-- `release/bb-agent-<version>-<stamp>.zip`：可直接分发的发布包（0.3.0 为 207 文件 / 9.3MB；含 BAE、插件、文档、SHA256、GPL SOURCE）。
+- `release/bb-agent-<version>-<stamp>.zip`：可直接分发的发布包（0.4.0 为 208 文件 / 9.3MB；含 BAE、插件、文档、SHA256、GPL SOURCE）。
 - `game-test/`：独立 Forge 1.20.1 + YSM 游戏内验证环境（首次 `setup.ps1`，之后 `ingame.ps1`；体积大，已 gitignore）。
 
 ## 实现边界（当前）
@@ -55,6 +55,9 @@ $node = 'D:\dsh\resources\runtime\primary-runtime\dependencies\node\bin\node.exe
 - 写操作自动带 `expected_revision`；GUI 可见时返回 `GUI_BUSY`；编辑/渲染/restore 有预算；渲染返回 watchdog `review`。
 - 进程崩溃自动重启（最多 5 次）；渲染失败可自动切 safe-mode（SwiftShader）重试；渲染附件默认 512px 缩略图。
 - 增量保存（未编辑动画/贴图不重写），二次保存幂等；导出目录 + zip。
-- 仍未实现：动画文件语义 diff 自动校验、electron-builder 安装器/签名、dsh Client UI 面板、完整 VLM critic 模型。
+- 新增：checkpoint 贴图/arm 快照、动画合并回写、watchdog-v2、`npm run test`/`test:quick`、composer dock Client UI 状态 pill + Host `/bb-agent/status`。
+- 剩余：electron-builder 安装器/签名（无证书，zip 为正式分发）、完整内置 VLM critic、PBR 预览、浏览器自动化 UI 截图验证。
 - 已安装到当前 profile（`include:blockbench-agent`，autoStart=true）；卸载用 `plugin_manager remove_bundle`。
+
+
 

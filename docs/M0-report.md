@@ -1,6 +1,6 @@
 # M0 · 可行性 Spike 报告（自动生成）
 
-- 执行时间：2026-10-18T12:27:07.499Z
+- 执行时间：2026-10-18T15:02:26.534Z
 - 模式：正常 GPU
 - Electron：`F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe`
 - 结论：**Go**（exit=0）
@@ -20,16 +20,16 @@
 
 ```json
 {
-  "load_ms": 425,
-  "render_views_ms": 46,
+  "load_ms": 396,
+  "render_views_ms": 48,
   "loop_50": {
     "count": 50,
-    "p50_ms": 4,
+    "p50_ms": 5,
     "p95_ms": 5,
     "max_ms": 6
   },
   "show_hide_ms": 516,
-  "total_ms": 1393
+  "total_ms": 1385
 }
 ```
 

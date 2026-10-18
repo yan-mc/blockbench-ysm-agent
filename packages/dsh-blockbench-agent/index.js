@@ -81,7 +81,7 @@ export function apply(ctx, config = {}) {
         return {
           protocol: 'bb-agent/1',
           transport: 'ws',
-          server: { name: 'bb-agent-runtime', version: '0.3.0', blockbench: '5.2.2' },
+          server: { name: 'bb-agent-runtime', version: '0.4.0', blockbench: '5.2.2' },
           capabilities: {
             render: { offscreen: true, transparent: true, max_size: 4096, antialias: ['off', 'msaa'] },
             texture: { layers: true, max_size: 8192 },
@@ -449,7 +449,7 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_apply_model_patch',
-    description: '模型原子变更：add_bone/add_cube/update_cube/update_bone/delete/rename 等一组 ops，一个 Undo 与一个 revision。',
+    description: '模型原子变更：add_bone/add_cube/update_cube/update_bone/delete/rename 等一组 ops，一个 Undo 与一个 revision。add_cube/update_cube 支持 inflate、rotation、pivot；set_uv 支持每面 uv_size（可把设计图指定到任意面）。',
     parameters: {
       note: { type: 'string', description: '写入 Undo 标签的说明' },
       ops: { type: 'array', description: 'ops 数组，见 docs/03 §3.6', required: true },
@@ -541,7 +541,7 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_render_views',
-    description: '用固定机位无头渲染当前模型；默认透明背景、768px、front/right/iso_fr 三视图，图片作为附件返回（最多 4 张）。结果含逐图 changed/alpha_ratio 与 NO_VISIBLE_CHANGE/EMPTY_RENDER 警告。',
+    description: '用固定机位无头渲染当前模型；默认透明背景、768px、front/right/iso_fr 三视图，图片作为附件返回（最多 4 张）。结果含逐图 changed/alpha_ratio/bbox/edge_touch 与 review（watchdog-v2：empty/clipped/no-visible-change/no-progress 判定与建议）。',
     parameters: {
       views: { type: 'array', description: 'front/back/left/right/top/bottom/iso_fr/iso_fl/iso_br/iso_bl/closeup' },
       size: { type: 'array', description: '[w,h]，默认 [768,768]' },
@@ -634,7 +634,7 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_checkpoint',
-    description: '把当前项目保存为 .bbmodel 检查点，便于回滚/对比；大改或导出前调用。',
+    description: '把当前项目保存为 .bbmodel 检查点，并同步内嵌当前贴图像素；若 arm tab 打开也一并快照。大改或导出前调用。',
     parameters: { label: { type: 'string' }, note: { type: 'string' } },
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
     async execute(args, exec) { try { return await callTool('bb_checkpoint', 'project.checkpoint', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
@@ -650,7 +650,7 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_restore',
-    description: '恢复到指定 revision 的 .bbmodel 检查点（破坏性：丢弃当前未保存改动，需 confirm:true）。',
+    description: '恢复到指定 revision 的 .bbmodel 检查点（破坏性：丢弃当前未保存改动，需 confirm:true）。内嵌贴图会一起恢复；arm 有快照时从快照加载，否则从磁盘重载。',
     parameters: {
       revision: { type: 'number', required: true },
       confirm: { type: 'boolean', description: '必须为 true' },
@@ -899,6 +899,46 @@ export function apply(ctx, config = {}) {
     ].join('\n'),
   }))
 
+  // ------------------------------------------------------------ Web UI status endpoint
+  // Client 插件（client.js）通过同源 GET /bb-agent/status 读取实时状态，避免额外 IPC。
+  ctx.effect(() => {
+    const webServer = ctx.get?.('webServer')
+    if (!webServer?.register) return undefined
+    return webServer.register({
+      kind: 'exact',
+      path: '/bb-agent/status',
+      handler: async (req, res) => {
+        let remote = null
+        try {
+          if (state.connected) remote = await call('session.status', {}, 2000)
+        } catch { /* runtime busy */ }
+        const payload = {
+          ok: true,
+          version: '0.4.0',
+          connected: !!state.connected,
+          state: remote?.state ?? (state.connected ? 'idle' : 'offline'),
+          revision: remote?.revision ?? state.revision,
+          gui_visible: remote?.gui_visible ?? state.guiVisible,
+          budgets: remote?.budgets ?? null,
+          loop: remote?.loop ?? null,
+          last_render: remote?.last_render ?? null,
+          review: remote?.last_render?.review ?? null,
+          runtime: {
+            child_pid: state.child?.pid ?? null,
+            workspace: state.workspace,
+            safe_mode: state.safeMode,
+            last_error: state.lastError,
+          },
+          updated_at: new Date().toISOString(),
+        }
+        try {
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(payload))
+        } catch { /* client closed */ }
+      },
+    })
+  })
+
   // ------------------------------------------------------------ cleanup
   ctx.effect(() => () => {
     log('disposing blockbench-agent')
@@ -910,5 +950,6 @@ export function apply(ctx, config = {}) {
     for (const dispose of registered) { try { dispose?.() } catch { /* ignore */ } }
   })
 }
+
 
 

@@ -35,7 +35,7 @@ copyDir(distApp, path.join(bundleDir, 'bb-agent-app'), (src) => {
 
 const pluginBundle = path.join(bundleDir, 'dsh-blockbench-agent')
 fs.mkdirSync(pluginBundle, { recursive: true })
-for (const entry of ['package.json', 'index.js', 'cordis.patch.yml', 'icon.svg', 'README.md']) {
+for (const entry of ['package.json', 'index.js', 'client.js', 'cordis.patch.yml', 'icon.svg', 'README.md']) {
   const src = path.join(pluginRoot, entry)
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(pluginBundle, entry))
 }
@@ -58,7 +58,7 @@ const installMd = `# BB-Agent 发布包 ${version}
 包含：
 
 - \`bb-agent-app/\`：BAE（隐藏 Blockbench Agent Runtime，含 agent 插件、YSM 默认模板、GPL SOURCE.txt）。
-- \`dsh-blockbench-agent/\`：dsh Host 插件 bundle（28 个 bb_* 工具、命令、Skill）。
+- \`dsh-blockbench-agent/\`：dsh Host 插件 bundle（30 个 bb_* 工具、命令、Skill、Client UI 状态 pill）。
 - \`docs/\`：工程状态、M0 报告、契约文件。
 
 ## 安装（dsh）
@@ -111,3 +111,4 @@ const summary = {
 }
 fs.writeFileSync(path.join(releaseRoot, 'release-result.json'), JSON.stringify(summary, null, 2) + '\n', 'utf8')
 console.log(JSON.stringify(summary, null, 2))
+

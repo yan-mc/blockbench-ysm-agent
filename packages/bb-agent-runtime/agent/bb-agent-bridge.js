@@ -45,6 +45,7 @@
     guiVisible: false,
     userEditing: false,
     agentEditing: false,
+    suppressUserEdit: false,
     startedAt: Date.now(),
     lastError: null,
     counters: { edits: 0, renders: 0, saves: 0, exports: 0, restores: 0 },
@@ -53,6 +54,8 @@
     loop: { pendingEdits: 0, unchangedStreak: 0, lastRenderRevision: null },
     dirtyTextures: new Set(),
     dirtyAnimations: new Set(),
+    dirtyAnimationNames: new Set(),
+    deletedAnimations: new Map(),
     dirtyControllers: new Set(),
   }
 
@@ -323,6 +326,93 @@
     return { armProject, armTextureMap }
   }
 
+  async function loadArmFromSnapshot(snapshotAbs, packDir, ysmJson) {
+    if (!nodeFs?.existsSync?.(snapshotAbs)) return null
+    loadModelFile({ path: snapshotAbs, content: readTextSync(snapshotAbs), name: pathModule.basename(snapshotAbs) })
+    const armProject = Project
+    const armTextureMap = addTexturesToCurrentProject(packDir, ysmJson)
+    await waitForTextureSize(armTextureMap)
+    const defaultName = ysmJson?.properties?.default_texture
+    const tex = armTextureMap.get(defaultName) ?? [...armTextureMap.values()][0] ?? null
+    if (tex) {
+      tex.select?.()
+      const texUuid = tex.uuid
+      for (const cube of Cube.all) {
+        for (const faceName of Object.keys(cube.faces ?? {})) if (cube.faces[faceName]) cube.faces[faceName].texture = texUuid
+      }
+      Canvas.updateAllFaces?.()
+    }
+    return { armProject, armTextureMap }
+  }
+
+  async function loadArmFromContent(packDir, ysmJson, content, name) {
+    const rel = ysmJson?.files?.player?.model?.arm
+    const abs = rel ? packAbsolute(packDir, rel) : joinPath(packDir, 'models', 'arm.json')
+    loadModelFile({ path: abs, content, name: name || pathModule.basename(abs) })
+    const armProject = Project
+    const armTextureMap = addTexturesToCurrentProject(packDir, ysmJson)
+    await waitForTextureSize(armTextureMap)
+    const defaultName = ysmJson?.properties?.default_texture
+    const tex = armTextureMap.get(defaultName) ?? [...armTextureMap.values()][0] ?? null
+    if (tex) {
+      tex.select?.()
+      const texUuid = tex.uuid
+      for (const cube of Cube.all) {
+        for (const faceName of Object.keys(cube.faces ?? {})) if (cube.faces[faceName]) cube.faces[faceName].texture = texUuid
+      }
+      Canvas.updateAllFaces?.()
+    }
+    return { armProject, armTextureMap }
+  }
+
+  async function drawTextureDataUrl(tex, dataUrl) {
+    const image = new Image()
+    await new Promise((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error('image load failed'))
+      image.src = dataUrl
+    })
+    const canvas = tex.canvas ?? document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    tex.canvas = canvas
+    tex.ctx = canvas.getContext('2d')
+    tex.ctx.clearRect(0, 0, canvas.width, canvas.height)
+    tex.ctx.drawImage(image, 0, 0)
+    tex.width = image.width
+    tex.height = image.height
+    tex.img = image
+    tex.source = dataUrl
+    tex.updateChangesAfterEdit?.()
+  }
+
+  // checkpoint 的贴图快照：只覆盖 .bbmodel 里已经存在的 Texture（按 uuid/ordinal 对齐），
+  // 不新建 Texture、不改写 Project.textures，避免 restore 破坏项目状态。
+  async function applyCheckpointTextures(base, snapshots = [], targetProject = null) {
+    if (!snapshots.length) return { restored: 0, created: 0, missing: 0 }
+    const dir = joinPath(workspacePath('checkpoints'), `${base}.textures`)
+    let restored = 0, missing = 0
+    for (const snap of snapshots) {
+      if (targetProject && snap.project && snap.project !== targetProject.name) continue
+      const abs = joinPath(dir, snap.file)
+      if (!nodeFs?.existsSync?.(abs)) { missing += 1; continue }
+      const wanted = String(snap.name || '').replace(/\.png$/i, '').toLowerCase()
+      let target = snap.id ? Texture.all.find((t) => t.uuid === snap.id) : null
+      if (!target) {
+        const candidates = Texture.all.filter((t) => String(t.name || '').replace(/\.png$/i, '').toLowerCase() === wanted)
+        target = candidates[Number(snap.ordinal) || 0] ?? candidates[0] ?? null
+      }
+      if (!target) { missing += 1; continue }
+      try {
+        const dataUrl = `data:image/png;base64,${nodeFs.readFileSync(abs).toString('base64')}`
+        await drawTextureDataUrl(target, dataUrl)
+        state.dirtyTextures.add(target.uuid)
+        restored += 1
+      } catch (error) { console.warn('[bb-agent] restore texture failed', snap.name, error?.message) }
+    }
+    return { restored, created: 0, missing }
+  }
+
   async function loadYsmPack(packDir, ysmJson) {
     const mainPath = packAbsolute(packDir, ysmJson.files?.player?.model?.main ?? 'models/main.json')
     const armPath = packAbsolute(packDir, ysmJson.files?.player?.model?.arm ?? 'models/arm.json')
@@ -390,6 +480,32 @@
   }
 
   /** 显式保存回 pack：模型/动画/控制器/贴图/ysm.json（不依赖 ysm-utils 或 export_over） */
+  function stableJson(value) {
+    if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+    if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(',')}}`
+    return JSON.stringify(value)
+  }
+
+  // 动画文件合并：保留原文件中未被修改的动画条目与顺序，只替换发生语义变化的动画、追加新增、移除删除。
+  // 这解决 Blockbench 整文件导出导致的动画重排/膨胀，是“YSM 保存规范化 v1”的核心。
+  function mergeAnimationJson(original, exported, dirtyNames = new Set(), deletedNames = new Set()) {
+    if (!original || typeof original !== 'object' || !original.animations) return exported
+    const origAnims = original.animations ?? {}
+    const newAnims = exported?.animations ?? {}
+    const mergedAnims = {}
+    for (const [name, origAnim] of Object.entries(origAnims)) {
+      if (deletedNames.has(name)) continue
+      const next = newAnims[name]
+      // 未编辑的动画一律保留原始对象/顺序，避免 codec 的时间量化/字段重排污染整个文件
+      mergedAnims[name] = dirtyNames.has(name) && next !== undefined ? next : origAnim
+    }
+    for (const [name, next] of Object.entries(newAnims)) {
+      if (name in mergedAnims) continue
+      if (dirtyNames.size === 0 || dirtyNames.has(name)) mergedAnims[name] = next
+    }
+    return { ...original, animations: mergedAnims }
+  }
+
   function saveYsmPack(packDir, ysmJson) {
     const files = []
     try { Settings.set('export_empty_groups', true) } catch { /* ignore */ }
@@ -410,14 +526,21 @@
       const dirty = state.dirtyAnimations.has(animPath)
       if (!dirty && nodeFs?.existsSync?.(animPath)) continue
       try {
+        const original = nodeFs?.existsSync?.(animPath) ? readJsonSync(animPath) : null
         AnimationCodec.codecs.bedrock.exportFile(animPath)
+        const exported = readJsonSync(animPath)
+        const deleted = state.deletedAnimations.get(animPath) ?? new Set()
+        const merged = mergeAnimationJson(original, exported, state.dirtyAnimationNames, deleted)
+        writeBlockbenchFile(animPath, JSON.stringify(merged, null, '\t'), 'text')
         state.dirtyAnimations.delete(animPath)
+        state.deletedAnimations.delete(animPath)
         files.push({ path: animPath })
       } catch (error) {
         console.warn('[bb-agent] animation save failed', animPath, error?.message)
         files.push({ path: animPath, error: error?.message ?? String(error) })
       }
     }
+    state.dirtyAnimationNames.clear()
     const controllerPaths = [...new Set((window.AnimationController?.all ?? []).map((c) => c.path).filter(Boolean))]
     for (const controllerPath of controllerPaths) {
       const dirty = state.dirtyControllers.has(controllerPath)
@@ -588,7 +711,7 @@
             params: {
               protocol: 'bb-agent/1',
               auth: { token: TOKEN },
-              client: { name: 'bb-agent-bridge', version: '0.3.0' },
+              client: { name: 'bb-agent-bridge', version: '0.4.0' },
               requested_capabilities: ['render.offscreen', 'gui.show', 'ysm.v2'],
             },
             _meta: { deadline_ms: 5000 },
@@ -647,7 +770,7 @@
         params: {
           protocol: 'bb-agent/1',
           auth: { token: TOKEN },
-          client: { name: 'bb-agent-bridge', version: '0.3.0', transport: 'http-sse' },
+          client: { name: 'bb-agent-bridge', version: '0.4.0', transport: 'http-sse' },
           requested_capabilities: ['render.offscreen', 'gui.show', 'ysm.v2'],
         },
         _meta: { deadline_ms: 5000 },
@@ -733,7 +856,12 @@
         error: {
           code: error?.rpc?.code ?? -32603,
           message: error?.message ?? 'internal error',
-          data: { code: error?.bbCode ?? 'INTERNAL_ERROR', ...(error?.bbData ?? {}), recoverable: true },
+          data: {
+            code: error?.bbCode ?? 'INTERNAL_ERROR',
+            ...(error?.bbData ?? {}),
+            ...(error?.stack ? { stack: String(error.stack).split('\n').slice(0, 6).join('\n') } : {}),
+            recoverable: true,
+          },
         },
       })
     } finally {
@@ -948,11 +1076,13 @@
             const cube = new Cube({
               from: origin,
               to: [origin[0] + size[0], origin[1] + size[1], origin[2] + size[2]],
-              origin: [0, 0, 0],
+              origin: op.pivot ? vec(op.pivot) : [0, 0, 0],
               uv_offset: [0, 0],
-              autouv: 1,
+              autouv: op.autouv === false ? 0 : 1,
             })
             if (op.name) cube.name = op.name
+            if (op.rotation) cube.rotation = vec(op.rotation)
+            if (op.inflate !== undefined) cube.inflate = Math.max(0, Math.min(16, Number(op.inflate) || 0))
             cube.init()
             if (!cube.box_uv) cube.mapAutoUV?.()
             if (Texture.all.length && Format?.single_texture) {
@@ -965,10 +1095,16 @@
             Canvas.updateView?.({ elements: [cube], element_aspects: { transform: true, geometry: true, faces: true } })
             if (op.uv?.mode === 'faces' && op.uv.faces) {
               cube.box_uv = false
+              const faceSize = {
+                north: [size[0], size[1]], south: [size[0], size[1]],
+                east: [size[2], size[1]], west: [size[2], size[1]],
+                up: [size[0], size[2]], down: [size[0], size[2]],
+              }
               for (const [face, uv] of Object.entries(op.uv.faces)) {
                 if (cube.faces?.[face] && Array.isArray(uv)) {
+                  const override = op.uv.sizes?.[face] ?? op.uv_size
                   cube.faces[face].uv = [uv[0], uv[1]]
-                  cube.faces[face].uv_size = [size[0], size[2]]
+                  cube.faces[face].uv_size = Array.isArray(override) ? override.slice(0, 2) : faceSize[face]
                 }
               }
             }
@@ -976,8 +1112,8 @@
             break
           }
           case 'update_cube': {
-            const cube = findCube(op.cube_id ?? op.id)
-            if (!cube) throw err('INVALID_REFERENCE', `cube not found: ${op.cube_id ?? op.id}`, { code: 'INVALID_REFERENCE' })
+            const cube = findCube(op.cube_id ?? op.id ?? op.cube)
+            if (!cube) throw err('INVALID_REFERENCE', `cube not found: ${op.cube_id ?? op.id ?? op.cube}`, { code: 'INVALID_REFERENCE' })
             if (op.origin) cube.from = vec(op.origin)
             if (op.size) {
               const from = vec(cube.from)
@@ -985,6 +1121,7 @@
             }
             if (op.rotation) cube.rotation = vec(op.rotation)
             if (op.pivot) cube.origin = vec(op.pivot)
+            if (op.inflate !== undefined) cube.inflate = Math.max(0, Math.min(16, Number(op.inflate) || 0))
             if (op.texture) {
               const tex = findTexture(op.texture)
               if (tex) for (const faceName of Object.keys(cube.faces ?? {})) if (cube.faces[faceName]) cube.faces[faceName].texture = tex.uuid
@@ -993,8 +1130,8 @@
             break
           }
           case 'update_bone': {
-            const bone = findGroup(op.bone ?? op.id)
-            if (!bone) throw err('INVALID_REFERENCE', `bone not found: ${op.bone ?? op.id}`, { code: 'INVALID_REFERENCE' })
+            const bone = findGroup(op.bone ?? op.bone_id ?? op.id)
+            if (!bone) throw err('INVALID_REFERENCE', `bone not found: ${op.bone ?? op.bone_id ?? op.id}`, { code: 'INVALID_REFERENCE' })
             if (op.pivot) bone.origin = vec(op.pivot)
             if (op.rotation) bone.rotation = vec(op.rotation)
             if (op.name) bone.name = op.name
@@ -1002,7 +1139,7 @@
             break
           }
           case 'set_uv': {
-            const ids = Array.isArray(op.ids) ? op.ids : [op.id]
+            const ids = Array.isArray(op.ids) ? op.ids : [op.id ?? op.cube_id]
             for (const id of ids.filter(Boolean)) {
               const cube = findCube(id)
               if (!cube) throw err('INVALID_REFERENCE', `cube not found: ${id}`, { code: 'INVALID_REFERENCE' })
@@ -1018,12 +1155,18 @@
                   east: [size[2], size[1]], west: [size[2], size[1]],
                   up: [size[0], size[2]], down: [size[0], size[2]],
                 }
+                const sizeOverrides = op.uv_size ?? op.sizes ?? {}
                 for (const [faceName, uv] of Object.entries(op.faces)) {
                   if (!cube.faces?.[faceName] || !Array.isArray(uv)) continue
                   cube.faces[faceName].uv = [uv[0], uv[1]]
-                  cube.faces[faceName].uv_size = faceSize[faceName] ?? [size[0], size[1]]
-                  // up/down 的内部约定：Y 方向取负（与默认模型一致）
-                  if (faceName === 'up' || faceName === 'down') cube.faces[faceName].uv_size = [size[0], -size[2]]
+                  const override = sizeOverrides[faceName] ?? (Array.isArray(sizeOverrides) ? sizeOverrides : null)
+                  if (Array.isArray(override)) {
+                    cube.faces[faceName].uv_size = override.slice(0, 2)
+                  } else {
+                    cube.faces[faceName].uv_size = faceSize[faceName] ?? [size[0], size[1]]
+                    // up/down 的内部约定：Y 方向取负（与默认模型一致）
+                    if (faceName === 'up' || faceName === 'down') cube.faces[faceName].uv_size = [size[0], -size[2]]
+                  }
                 }
               }
               changed.push({ kind: 'cube', id: cube.uuid, op: 'set_uv' })
@@ -1376,7 +1519,22 @@
       ctx.drawImage(image, 0, 0)
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
       let opaque = 0
-      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) opaque += 1
+      let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const alpha = data[(y * canvas.width + x) * 4 + 3]
+          if (alpha === 0) continue
+          opaque += 1
+          if (x < minX) minX = x
+          if (y < minY) minY = y
+          if (x > maxX) maxX = x
+          if (y > maxY) maxY = y
+        }
+      }
+      const bbox = maxX >= minX && maxY >= minY
+        ? [minX / canvas.width, minY / canvas.height, maxX / canvas.width, maxY / canvas.height].map((v) => Math.round(v * 10000) / 10000)
+        : null
+      const edgeTouch = bbox ? (bbox[0] <= 0.002 || bbox[1] <= 0.002 || bbox[2] >= 0.998 || bbox[3] >= 0.998) : false
       // 64x64 粗粒度签名：避免 GPU 抗锯齿/编码的微小抖动造成误报
       const thumb = document.createElement('canvas')
       thumb.width = 64
@@ -1386,6 +1544,8 @@
       const thumbData = tctx.getImageData(0, 0, 64, 64).data
       return {
         alpha_ratio: Math.round((opaque / (canvas.width * canvas.height)) * 10000) / 10000,
+        bbox,
+        edge_touch: edgeTouch,
         thumb: Array.from(thumbData),
       }
     } catch { return null }
@@ -1462,7 +1622,8 @@
         const image = {
           view, path: `artifacts/renders/r${String(revision).padStart(4, '0')}/${view}_${size[0]}.png`,
           workspace_path: file, sha256, bytes: Math.round(base64.length * 0.75), width: size[0], height: size[1],
-          alpha_ratio: alphaRatio, empty: alphaRatio !== null && alphaRatio < 0.001,
+          alpha_ratio: alphaRatio, bbox: stats?.bbox ?? null, edge_touch: !!stats?.edge_touch,
+          empty: alphaRatio !== null && alphaRatio < 0.001,
           changed, diff_ratio: diffRatio, antialias: params.antialias ?? 'msaa', focus: focusRef ?? null,
           previous_sha256: state.lastRenderHashes?.[view] ?? null,
         }
@@ -1518,13 +1679,45 @@
       else if (changedAny) state.loop.unchangedStreak = 0
     }
     const unchangedStreak = state.loop?.unchangedStreak ?? 0
+    const allEmpty = images.length > 0 && images.every((image) => image.empty === true)
+    const edgeViews = images.filter((image) => image.edge_touch && image.empty !== true).map((image) => image.view)
+    const changedCount = images.filter((image) => image.changed).length
+    const verdict = allEmpty ? 'empty_render'
+      : (!changedAny && pendingBefore > 0 ? 'no_visible_change'
+        : (changedAny && edgeViews.length ? 'visible_change_clipped'
+          : (changedAny ? 'visible_change' : 'no_change_expected')))
+    const suggestions = []
+    if (verdict === 'empty_render') suggestions.push('整张渲染全透明：检查相机 bounds/模型可见性；必要时 GPU safe-mode 重试')
+    if (verdict === 'no_visible_change') {
+      suggestions.push(unchangedStreak >= 3
+        ? '连续多次编辑无可见变化：建议 bb_restore 回滚到最近检查点，换策略后再试'
+        : '上次编辑未改变可见像素：检查 UV/纹理绑定/骨骼层级，不要继续叠加同类修改')
+    }
+    if (edgeViews.length) suggestions.push(`画面可能被裁切：${edgeViews.join(', ')} 触到画布边缘；用 bb_render_views({focus}) 或缩小 zoom`)
+    if (unchangedStreak >= 3) suggestions.push('unchanged_streak >= 3，触发 no-progress watchdog：停止同类编辑，回滚或换方案')
     const review = {
-      verdict: changedAny ? 'visible_change' : (pendingBefore > 0 ? 'no_visible_change' : 'no_change_expected'),
+      schema_version: 'watchdog-v2',
+      mode: 'rule-based-v1 + external VLM image review',
+      verdict,
       pending_edits_before_render: pendingBefore,
       unchanged_streak: unchangedStreak,
-      suggestion: !changedAny && pendingBefore > 0
-        ? (unchangedStreak >= 3 ? '连续多次编辑无可见变化：建议 bb_restore 回滚到最近检查点，换策略后再试' : '上次编辑未改变可见像素：检查 UV/纹理绑定/骨骼层级，不要继续叠加同类修改')
-        : null,
+      changed_views: changedCount,
+      metrics: {
+        views: images.length,
+        empty_views: images.filter((image) => image.empty).length,
+        edge_touch_views: edgeViews,
+        alpha_ratios: Object.fromEntries(images.map((image) => [image.view, image.alpha_ratio])),
+        bboxes: Object.fromEntries(images.map((image) => [image.view, image.bbox])),
+        diff_ratios: Object.fromEntries(images.map((image) => [image.view, image.diff_ratio])),
+      },
+      checks: [
+        { id: 'not_empty', status: allEmpty ? 'fail' : 'pass' },
+        { id: 'not_clipped', status: edgeViews.length ? 'warn' : 'pass' },
+        { id: 'edit_visible', status: (!changedAny && pendingBefore > 0) ? 'fail' : 'pass' },
+      ],
+      suggestion: suggestions[0] ?? null,
+      suggestions,
+      vlm_hint: '把 images 附件交给视觉模型时，只判断造型/配色/纹理是否符合用户意图；结构错误优先看 bbox/alpha_ratio/edge_touch。',
     }
     return {
       revision, render_id: `render-${revision}`, images, cache_hit: false, elapsed_ms: 0,
@@ -1609,12 +1802,55 @@
   handlers['project.checkpoint'] = (params = {}) => {
     ensureProject()
     const revision = state.revision
-    const fileName = `r${String(revision).padStart(4, '0')}.bbmodel`
+    const base = `r${String(revision).padStart(4, '0')}`
+    const fileName = `${base}.bbmodel`
     const dir = workspacePath('checkpoints')
     ensureDir(dir)
+    // .bbmodel 的 textures[].source 是 compile 时的快照来源；画布编辑后 source 可能是旧值，
+    // 先同步回 canvas，再 compile，checkpoint 内嵌的就是当前像素（B1 根因修复）。
+    for (const tex of Texture.all) {
+      try { if (tex.canvas?.toDataURL) tex.source = tex.canvas.toDataURL('image/png') } catch { /* ignore */ }
+    }
     const content = Codecs.project.compile()
     const file = `${dir}${dir.includes('\\') ? '\\' : '/'}${fileName}`
     writeBlockbenchFile(file, content, 'text')
+    // 贴图快照：.bbmodel 只存几何，checkpoint 必须额外保存画布位图，否则恢复后贴图退回磁盘旧版
+    const textureDir = joinPath(dir, `${base}.textures`)
+    ensureDir(textureDir)
+    const textureSnapshots = []
+    const nameCounts = new Map()
+    for (const tex of Texture.all) {
+      try {
+        const owner = ModelProject.all.find((p) => Array.isArray(p.textures) && p.textures.includes(tex)) ?? Project
+        const ownerName = String(owner?.name ?? 'main').replace(/[^a-zA-Z0-9_.-]/g, '_')
+        const texName = String(tex.name || 'texture').replace(/[^a-zA-Z0-9_.-]/g, '_')
+        const ordinal = nameCounts.get(texName) ?? 0
+        nameCounts.set(texName, ordinal + 1)
+        const uuidShort = String(tex.uuid || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || `${ordinal}`
+        const safeName = `${ownerName}-${ordinal}-${texName}-${uuidShort}.png`
+        const dataUrl = tex.canvas.toDataURL('image/png')
+        writeBlockbenchFile(joinPath(textureDir, safeName), dataUrl, 'image')
+        textureSnapshots.push({ id: tex.uuid, name: tex.name, ordinal, project: owner?.name ?? 'main', file: safeName, size: [tex.width, tex.height], bytes: Math.round(dataUrl.length * 0.75) })
+      } catch (error) { console.warn('[bb-agent] checkpoint texture snapshot failed', tex.name, error?.message) }
+    }
+    // 第一人称手臂是独立 ModelProject，单独快照；否则 restore 会退回磁盘旧版
+    let armCheckpoint = null
+    try {
+      const armProject = state.project?.armProject
+      if (armProject && ModelProject.all.includes(armProject)) {
+        const mainProject = state.project?.mainProject ?? Project
+        armProject.select?.()
+        for (const tex of Texture.all) {
+          try { if (tex.canvas?.toDataURL) tex.source = tex.canvas.toDataURL('image/png') } catch { /* ignore */ }
+        }
+        const armContent = Codecs.project.compile()
+        armProject.select?.()
+        const armFile = `${base}.arm.bbmodel`
+        writeBlockbenchFile(joinPath(dir, armFile), armContent, 'text')
+        armCheckpoint = `checkpoints/${armFile}`
+        mainProject?.select?.()
+      }
+    } catch (error) { console.warn('[bb-agent] checkpoint arm snapshot failed', error?.message) }
     const meta = {
       revision,
       label: params.label ?? '',
@@ -1624,12 +1860,14 @@
       bones: Group.all.length,
       cubes: Cube.all.length,
       textures: Texture.all.length,
+      texture_snapshots: textureSnapshots,
+      arm_checkpoint: armCheckpoint,
       export_path: Project.export_path || '',
       project_name: Project.name || '',
       pack_dir: state.project?.pack_dir || '',
     }
     writeBlockbenchFile(file.replace(/\.bbmodel$/, '.meta.json'), JSON.stringify(meta, null, 2), 'text')
-    return { revision, checkpoint: `checkpoints/${fileName}`, bytes: content.length, label: meta.label }
+    return { revision, checkpoint: `checkpoints/${fileName}`, bytes: content.length, label: meta.label, textures: textureSnapshots.length, arm: !!armCheckpoint }
   }
 
   handlers['project.revisions'] = (params = {}) => {
@@ -1774,6 +2012,7 @@
     if (params.file) anim.path = packAbsolute(state.project?.pack_dir || workspacePath('pack'), params.file)
     else anim.path = defaultAnimationPath()
     if (anim.path) state.dirtyAnimations.add(anim.path)
+    state.dirtyAnimationNames.add(anim.name)
     return anim
   }
 
@@ -1812,12 +2051,20 @@
           case 'update_animation': {
             const anim = findAnimation(op.animation ?? op.id)
             if (!anim) throw err('INVALID_REFERENCE', `animation not found: ${op.animation ?? op.id}`, { code: 'INVALID_REFERENCE' })
+            const oldName = anim.name
             if (op.name) anim.name = op.name
             if (typeof op.loop === 'string' && ['once', 'loop', 'hold'].includes(op.loop)) anim.loop = op.loop
             else if (typeof op.loop === 'boolean') anim.loop = op.loop ? 'loop' : 'once'
             if (typeof op.length === 'number') { anim.length = op.length; anim.setLength(op.length) }
             changed.push({ animation: anim.name, op: 'update' })
             if (anim.path) dirtyAnimPaths.add(anim.path)
+            if (op.name && oldName !== anim.name) {
+              if (anim.path) {
+                if (!state.deletedAnimations.has(anim.path)) state.deletedAnimations.set(anim.path, new Set())
+                state.deletedAnimations.get(anim.path).add(oldName)
+              }
+            }
+            state.dirtyAnimationNames.add(anim.name)
             break
           }
           case 'set_keyframes': {
@@ -1843,6 +2090,7 @@
             anim.setLength(Math.max(anim.length, ...(op.keys ?? []).map((k) => Number(k.time) || 0)))
             changed.push({ animation: anim.name, bone: group.name, channel, op: 'set_keyframes', count: (op.keys ?? []).length })
             if (anim.path) dirtyAnimPaths.add(anim.path)
+            state.dirtyAnimationNames.add(anim.name)
             break
           }
           case 'delete_keyframes': {
@@ -1860,12 +2108,17 @@
             }
             changed.push({ animation: anim.name, bone: group.name, channel, op: 'delete_keyframes', removed: before - animator[channel].length })
             if (anim.path) dirtyAnimPaths.add(anim.path)
+            state.dirtyAnimationNames.add(anim.name)
             break
           }
           case 'delete_animation': {
             const anim = findAnimation(op.animation)
             if (!anim) throw err('INVALID_REFERENCE', `animation not found: ${op.animation}`, { code: 'INVALID_REFERENCE' })
-            if (anim.path) dirtyAnimPaths.add(anim.path)
+            if (anim.path) {
+              dirtyAnimPaths.add(anim.path)
+              if (!state.deletedAnimations.has(anim.path)) state.deletedAnimations.set(anim.path, new Set())
+              state.deletedAnimations.get(anim.path).add(anim.name)
+            }
             anim.delete?.()
             changed.push({ animation: op.animation, op: 'delete' })
             break
@@ -2107,6 +2360,9 @@
   // ---- checkpoint restore ------------------------------------------------
   handlers['project.restore'] = async (params = {}) => {
     ensureProject()
+    // 载入 checkpoint 会触发 Blockbench 的 finished_edit；这不是用户编辑，屏蔽后避免把全部动画标脏
+    state.suppressUserEdit = true
+    setTimeout(() => { state.suppressUserEdit = false }, 2000)
     if (params.confirm !== true) throw err('INVALID_OPERATION', 'restore requires confirm:true (destructive)', { code: 'INVALID_OPERATION' })
     const packDir = state.project?.pack_dir || workspacePath('pack')
     const revision = Number(params.revision)
@@ -2123,14 +2379,30 @@
     }
     Codecs.project.load(model, { path: checkpointAbs, content, name: base, no_file: true }, {})
     const project = Project
+    project.select?.()
     if (meta.export_path) project.export_path = meta.export_path
     else if (state.project?.ysmJson) project.export_path = packAbsolute(packDir, state.project.ysmJson.files?.player?.model?.main ?? 'models/main.json')
     const ysmJson = state.project?.ysmJson
+    // .bbmodel 已内嵌贴图 source（checkpoint 前已同步 canvas）；sidecar 仅作为辅助证据，不再覆盖画布
+    const textureRestore = { restored: 0, created: 0, missing: 0, embedded: true }
     let armLoaded = false
     let armError = null
+    let armFromCheckpoint = false
     if (ysmJson) {
       try {
-        const arm = await loadArmFromDisk(packDir, ysmJson)
+        // arm 是独立 tab。checkpoint 有 arm 快照时用 .bbmodel 直接加载（保留格式），失败再回退磁盘 arm.json
+        const armSnapshot = meta.arm_checkpoint ? joinPath(workspacePath('checkpoints'), pathModule.basename(meta.arm_checkpoint)) : null
+        let arm = null
+        if (armSnapshot && nodeFs?.existsSync?.(armSnapshot)) {
+          try {
+            arm = await loadArmFromSnapshot(armSnapshot, packDir, ysmJson)
+            armFromCheckpoint = !!arm
+          } catch (error) {
+            console.warn('[bb-agent] arm snapshot load failed, fallback disk', error?.message)
+            arm = null
+          }
+        }
+        if (!arm) arm = await loadArmFromDisk(packDir, ysmJson)
         if (arm) {
           if (state.project) state.project.armProject = arm.armProject
           armLoaded = true
@@ -2148,7 +2420,7 @@
     state.state = 'editing'
     state.userEditing = false
     state.counters.restores += 1
-    // checkpoint 恢复后，磁盘上的动画/控制器/贴图可能落后，全量标脏
+    // checkpoint 恢复后，贴图已从快照恢复，但仍需让保存路径写回磁盘
     for (const anim of Animation.all) if (anim.path) state.dirtyAnimations.add(anim.path)
     for (const controller of (window.AnimationController?.all ?? [])) if (controller.path) state.dirtyControllers.add(controller.path)
     for (const tex of Texture.all) state.dirtyTextures.add(tex.uuid)
@@ -2157,9 +2429,10 @@
     return {
       restored_from: previousRevision, revision: nextRevision,
       summary: { bones: Group.all.length, cubes: Cube.all.length, textures: Texture.all.length },
-      arm_loaded: armLoaded, arm_error: armError,
+      textures_restored: textureRestore.restored,
+      arm_loaded: armLoaded, arm_error: armError, arm_from_checkpoint: armFromCheckpoint,
       debug: { project_open: !!Project, active: Project?.name ?? null, main: project?.name ?? null, main_open: ModelProject.all.includes(project) },
-      warning: '当前未保存改动已丢弃；arm 已从磁盘重载（非 checkpoint 状态）',
+      warning: '当前未保存改动已丢弃；checkpoint 已内嵌贴图；arm 从磁盘重载（非 checkpoint 状态）',
     }
   }
 
@@ -2195,10 +2468,11 @@
   function registerUserEditListener() {
     try {
       Blockbench.on?.('finished_edit', () => {
-        if (state.agentEditing) return
+        if (state.agentEditing || state.suppressUserEdit) return
         state.userEditing = true
         state.revision += 1
         for (const anim of Animation.all) if (anim.path) state.dirtyAnimations.add(anim.path)
+        for (const anim of Animation.all) state.dirtyAnimationNames.add(anim.name)
         for (const controller of (window.AnimationController?.all ?? [])) if (controller.path) state.dirtyControllers.add(controller.path)
         for (const tex of Texture.all) state.dirtyTextures.add(tex.uuid)
         notify('event.project_changed', { revision: state.revision, source: 'user', changed: [] })
@@ -2229,5 +2503,6 @@
     },
   })
 })()
+
 
 

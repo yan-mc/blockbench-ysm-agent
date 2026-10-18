@@ -286,7 +286,7 @@ TOOLS = [
     {
         "name": "bb_render_views",
         "title_zh": "多机位无头渲染",
-        "description": "用固定机位渲染当前模型，默认透明背景、768px、3 个机位；图片以多模态附件返回（默认最多 4 张）。",
+        "description": "用固定机位渲染当前模型，默认透明背景、768px、3 个机位；图片以多模态附件返回（默认最多 4 张）。返回逐图 alpha/bbox/edge_touch/changed 与 review（watchdog-v2，不改图）。",
         "mutating": False, "requires_project": True, "concurrency_safe": False,
         "protocol_method": "render.views", "timeout_ms": 120000,
         "returns": "RenderResult", "attachments": True,
@@ -353,7 +353,7 @@ TOOLS = [
     {
         "name": "bb_checkpoint",
         "title_zh": "创建检查点",
-        "description": "把当前项目序列化为 .bbmodel 检查点，便于回滚/对比；大改或导出前调用。",
+        "description": "把当前项目序列化为 .bbmodel 检查点：同步内嵌当前贴图像素；arm tab 打开时一并快照。便于回滚/对比；大改或导出前调用。",
         "mutating": True, "requires_project": True, "concurrency_safe": False,
         "protocol_method": "project.checkpoint", "timeout_ms": 30000,
         "returns": "CheckpointResult", "errors": ["PROJECT_NOT_OPEN", "CHECKPOINT_FAILED"],
@@ -365,7 +365,7 @@ TOOLS = [
     {
         "name": "bb_restore",
         "title_zh": "恢复检查点",
-        "description": "恢复到指定 revision 的检查点；会丢弃当前未保存改动，必须 confirm:true。",
+        "description": "恢复到指定 revision 的检查点；会丢弃当前未保存改动，必须 confirm:true。内嵌贴图恢复；arm 有快照时从快照加载。",
         "mutating": True, "requires_project": True, "concurrency_safe": False,
         "protocol_method": "project.restore", "timeout_ms": 60000,
         "returns": "RestoreResult", "errors": ["PROJECT_NOT_OPEN", "INVALID_REFERENCE", "CHECKPOINT_FAILED"],
