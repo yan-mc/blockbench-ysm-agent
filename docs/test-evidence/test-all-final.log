@@ -1,0 +1,292 @@
+
+[test-all] === assemble ===
+[assemble] vendor=F:\Deepseek_harness\blockbench\vendor\blockbench
+[assemble] out=F:\Deepseek_harness\blockbench\dist\bb-agent-app
+[assemble] electron=F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe
+[assemble] done
+{
+  "out": "F:\\Deepseek_harness\\blockbench\\dist\\bb-agent-app",
+  "vendor": "F:\\Deepseek_harness\\blockbench\\vendor\\blockbench",
+  "electron": "F:\\Deepseek_harness\\blockbench\\vendor\\blockbench\\node_modules\\electron\\dist\\electron.exe"
+}
+
+[test-all] === M0 ===
+[assemble] vendor=F:\Deepseek_harness\blockbench\vendor\blockbench
+[assemble] out=F:\Deepseek_harness\blockbench\dist\bb-agent-app
+[assemble] electron=F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe
+[assemble] done
+[m0] electron: F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe
+[m0] app: F:\Deepseek_harness\blockbench\dist\bb-agent-app
+[m0] workspace: F:\Deepseek_harness\blockbench\workspace\_m0
+[m0] args: F:\Deepseek_harness\blockbench\dist\bb-agent-app --self-test --workspace=F:\Deepseek_harness\blockbench\workspace\_m0 --plugin=F:\Deepseek_harness\blockbench\dist\bb-agent-app\agent\bb-agent-bridge.js --user-data=F:\Deepseek_harness\blockbench\workspace\_m0\.bb\userdata --selftest-pack=F:\Deepseek_harness\blockbench\vendor\YSM-Utils-Plugins\assets\default
+
+[2026-10-18T15:02:20.204Z] offline profile: external http(s) blocked
+[2026-10-18T15:02:20.522Z] [renderer:1] Electron 43.8.0, Node 24.22.0
+[37100:1018/230220.522:INFO:CONSOLE:3886] "Electron 43.8.0, Node 24.22.0", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (3886)
+[2026-10-18T15:02:20.939Z] [renderer:2] WARNING: Multiple instances of Three.js being imported.
+[37100:1018/230220.939:INFO:CONSOLE:8707] "WARNING: Multiple instances of Three.js being imported.", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (8707)
+[2026-10-18T15:02:21.014Z] [renderer:1] Three.js r129
+[37100:1018/230221.014:INFO:CONSOLE:19957] "Three.js r129", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (19957)
+[2026-10-18T15:02:21.014Z] [renderer:1] %cBlockbench 5.2.2 Desktop (Windows, x64) border: 2px solid #3e90ff; padding: 4px 8px; font-size: 1.2em;
+[37100:1018/230221.014:INFO:CONSOLE:19957] "%cBlockbench 5.2.2 Desktop (Windows, x64) border: 2px solid #3e90ff; padding: 4px 8px; font-size: 1.2em;", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (19957)
+[2026-10-18T15:02:21.140Z] [renderer:3] Could not connect to plugin server: error [object Object]
+[37100:1018/230221.140:INFO:CONSOLE:3918] "Could not connect to plugin server: error [object Object]", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (3918)
+[2026-10-18T15:02:21.141Z] [renderer:1] Switching to plugin CDN mirror. Restart to apply.
+[37100:1018/230221.140:INFO:CONSOLE:3918] "Switching to plugin CDN mirror. Restart to apply.", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (3918)
+[2026-10-18T15:02:21.141Z] [renderer:1] All plugin installations resolved
+[37100:1018/230221.141:INFO:CONSOLE:3918] "All plugin installations resolved", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/dist/bundle.js (3918)
+[2026-10-18T15:02:21.143Z] index.html loaded
+[2026-10-18T15:02:21.234Z] [renderer:2] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[37100:1018/230221.235:INFO:CONSOLE:2] "%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+[2026-10-18T15:02:21.238Z] [renderer:3] Uncaught (in promise) #<Object>
+[37100:1018/230221.238:INFO:CONSOLE:0] "Uncaught (in promise) #<Object>", source: file:///F:/Deepseek_harness/blockbench/dist/bb-agent-app/index.html (0)
+[2026-10-18T15:02:21.240Z] Blockbench ready
+[2026-10-18T15:02:21.246Z] [renderer:1] [bb-agent] bridge plugin loaded
+[37100:1018/230221.244:INFO:CONSOLE:2495] "[bb-agent] bridge plugin loaded", source: PLUGINS/(Plugin):bb-agent-bridge.js (2495)
+[2026-10-18T15:02:21.246Z] bridge plugin: injected
+[2026-10-18T15:02:21.246Z] M0 self-test starting
+[2026-10-18T15:02:21.247Z] [renderer:1] [m0] packDir F:\Deepseek_harness\blockbench\vendor\YSM-Utils-Plugins\assets\default
+[37100:1018/230221.247:INFO:CONSOLE:15] "[m0] packDir F:\Deepseek_harness\blockbench\vendor\YSM-Utils-Plugins\assets\default", source:  (15)
+[2026-10-18T15:02:21.643Z] [renderer:1] [m0] model loaded in 396ms: bones=64, cubes=172
+[37100:1018/230221.643:INFO:CONSOLE:15] "[m0] model loaded in 396ms: bones=64, cubes=172", source:  (15)
+[2026-10-18T15:02:21.819Z] [renderer:1] [m0] project {"bones":64,"cubes":172,"textures":1,"texture_size":[128,128],"animations":0,"bounds":{"center":[0,21.649999618530273,1.4355185966939739],"size":[19.035741180302054,43.29999923706055,13.271037193387947]}}
+[37100:1018/230221.818:INFO:CONSOLE:15] "[m0] project {"bones":64,"cubes":172,"textures":1,"texture_size":[128,128],"animations":0,"bounds":{"center":[0,21.649999618530273,1.4355185966939739],"size":[19.035741180302054,43.29999923706055,13.271037193387947]}}", source:  (15)
+[2026-10-18T15:02:21.866Z] [renderer:1] [m0] render front 24ms alpha=0.196 var=2687.9
+[37100:1018/230221.864:INFO:CONSOLE:15] "[m0] render front 24ms alpha=0.196 var=2687.9", source:  (15)
+[2026-10-18T15:02:21.872Z] [renderer:1] [m0] render back 6ms alpha=0.196 var=3364.2
+[37100:1018/230221.872:INFO:CONSOLE:15] "[m0] render back 6ms alpha=0.196 var=3364.2", source:  (15)
+[2026-10-18T15:02:21.878Z] [renderer:1] [m0] render left 6ms alpha=0.138 var=1421.5
+[37100:1018/230221.876:INFO:CONSOLE:15] "[m0] render left 6ms alpha=0.138 var=1421.5", source:  (15)
+[2026-10-18T15:02:21.883Z] [renderer:1] [m0] render right 6ms alpha=0.138 var=1346.6
+[37100:1018/230221.880:INFO:CONSOLE:15] "[m0] render right 6ms alpha=0.138 var=1346.6", source:  (15)
+[2026-10-18T15:02:21.889Z] [renderer:1] [m0] render iso_fr 6ms alpha=0.203 var=2650.1
+[37100:1018/230221.889:INFO:CONSOLE:15] "[m0] render iso_fr 6ms alpha=0.203 var=2650.1", source:  (15)
+[2026-10-18T15:02:22.115Z] [renderer:1] [m0] 50 loops {"count":50,"p50_ms":5,"p95_ms":5,"max_ms":6}
+[37100:1018/230222.114:INFO:CONSOLE:15] "[m0] 50 loops {"count":50,"p50_ms":5,"p95_ms":5,"max_ms":6}", source:  (15)
+[2026-10-18T15:02:22.632Z] [renderer:1] [m0] show/hide ok=true in 516ms
+[37100:1018/230222.631:INFO:CONSOLE:15] "[m0] show/hide ok=true in 516ms", source:  (15)
+BB_AGENT_M0_RESULT: {"ok":true,"problems":{"invalid":[],"low_alpha":[],"flat":[]},"checks":[{"view":"front","ok":true,"path":"F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\front_768.png","width":768,"height":768,"alpha_ratio":0.1954373371355524,"luminance_mean":21.052,"luminance_variance":2677.699},{"view":"back","ok":true,"path":"F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\back_768.png","width":768,"height":768,"alpha_ratio":0.19519150400708,"luminance_mean":25.89,"luminance_variance":3363.825},{"view":"left","ok":true,"path":"F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\left_768.png","width":768,"height":768,"alpha_ratio":0.13476572102856582,"luminance_mean":13.088,"luminance_variance":1405.639},{"view":"right","ok":true,"path":"F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\right_768.png","width":768,"height":768,"alpha_ratio":0.13471655440287134,"luminance_mean":12.456,"luminance_variance":1302.02},{"view":"iso_fr","ok":true,"path":"F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\iso_fr_768.png","width":768,"height":768,"alpha_ratio":0.19986233344805546,"luminance_mean":20.812,"luminance_variance":2543.069}]}
+[2026-10-18T15:02:22.646Z] M0 self-test PASSED
+
+[m0] exit=0 pass=true
+[m0] checks: [
+  {
+    "view": "front",
+    "ok": true,
+    "path": "F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\front_768.png",
+    "width": 768,
+    "height": 768,
+    "alpha_ratio": 0.1954373371355524,
+    "luminance_mean": 21.052,
+    "luminance_variance": 2677.699
+  },
+  {
+    "view": "back",
+    "ok": true,
+    "path": "F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\back_768.png",
+    "width": 768,
+    "height": 768,
+    "alpha_ratio": 0.19519150400708,
+    "luminance_mean": 25.89,
+    "luminance_variance": 3363.825
+  },
+  {
+    "view": "left",
+    "ok": true,
+    "path": "F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\left_768.png",
+    "width": 768,
+    "height": 768,
+    "alpha_ratio": 0.13476572102856582,
+    "luminance_mean": 13.088,
+    "luminance_variance": 1405.639
+  },
+  {
+    "view": "right",
+    "ok": true,
+    "path": "F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\right_768.png",
+    "width": 768,
+    "height": 768,
+    "alpha_ratio": 0.13471655440287134,
+    "luminance_mean": 12.456,
+    "luminance_variance": 1302.02
+  },
+  {
+    "view": "iso_fr",
+    "ok": true,
+    "path": "F:\\Deepseek_harness\\blockbench\\workspace\\_m0\\artifacts\\m0\\iso_fr_768.png",
+    "width": 768,
+    "height": 768,
+    "alpha_ratio": 0.19986233344805546,
+    "luminance_mean": 20.812,
+    "luminance_variance": 2543.069
+  }
+]
+[m0] problems: {"invalid":[],"low_alpha":[],"flat":[]}
+[m0] report written: docs/M0-report.md
+
+[test-all] === e2e WS ===
+[e2e] rpc=ws://127.0.0.1:14394/bb-agent/v1
+
+[2026-10-18T15:02:26.768Z] offline profile: external http(s) blocked
+[2026-10-18T15:02:27.087Z] [renderer:1] Electron 43.8.0, Node 24.22.0
+[2026-10-18T15:02:27.431Z] [renderer:2] WARNING: Multiple instances of Three.js being imported.
+[2026-10-18T15:02:27.506Z] [renderer:1] Three.js r129
+[2026-10-18T15:02:27.507Z] [renderer:1] %cBlockbench 5.2.2 Desktop (Windows, x64) border: 2px solid #3e90ff; padding: 4px 8px; font-size: 1.2em;
+[2026-10-18T15:02:27.646Z] [renderer:3] Could not connect to plugin server: error [object Object]
+[2026-10-18T15:02:27.647Z] [renderer:1] Switching to plugin CDN mirror. Restart to apply.
+[2026-10-18T15:02:27.647Z] [renderer:1] All plugin installations resolved
+[2026-10-18T15:02:27.649Z] index.html loaded
+[2026-10-18T15:02:27.741Z] [renderer:2] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[2026-10-18T15:02:27.744Z] [renderer:3] Uncaught (in promise) #<Object>
+[2026-10-18T15:02:27.746Z] Blockbench ready
+[2026-10-18T15:02:27.750Z] [renderer:1] [bb-agent] bridge plugin loaded
+[2026-10-18T15:02:27.750Z] bridge plugin: injected
+[e2e] ✓ bridge connected 
+[e2e] ✓ session.status {"state":"booting","revision":0}
+[2026-10-18T15:02:27.887Z] [renderer:1] [bb-agent] connected 0.1.0
+[e2e] ✓ project.create_ysm {"project_id":"e2e_model-0ad8f452","revision":1,"summary":{"bones":70,"cubes":182,"textures":2,"animations":303,"controllers":8}}
+[e2e] ✓ project.get_scene {"counts":{"bones":64,"cubes":172,"textures":2,"animations":303},"bounds":{"center":[0,21.649999618530273,1.4355185966939739],"size":[19.035741180302054,43.29999923706055,13.271037193387947]}}
+[e2e] ✓ model.apply_patch {"revision":2,"changed":[{"kind":"bone","id":"4440204e-e66b-a591-cf5e-70f65267fbfd","op":"add","name":"E2E_Arm"},{"kind":"cube","id":"484759fd-3bef-8ecc-4853-2b5394945e85","op":"add","bone":"E2E_Arm"},{"kind":"cube","id":"484759fd-3bef-8ecc-4853-2b5394945e85","op":"update"}]}
+[e2e] ✓ texture.create {"id":"b9b74136-2101-f312-8110-500e658d57e7","size":[128,128]}
+[e2e] ✓ texture.apply_patch {"painted_pixels":307,"revision":4}
+[e2e] ✓ texture.read {"colors":16}
+[e2e] ✓ render.views {"images":[{"view":"front","bytes":11737},{"view":"right","bytes":11926},{"view":"iso_fr","bytes":19127}]}
+[e2e] ✓ render change detection {"changed_any":false,"warning":"NO_VISIBLE_CHANGE"}
+[e2e] ✓ render visible-change detection {"changed_any":true,"alpha":[0.1862,0.1272,0.1891]}
+[e2e] ✓ checkpoint/restore + arm {"restored_from":6,"revision":7,"arm_loaded":true,"debug":{"project_open":true,"active":"r0005","main":"r0005","main_open":true}}
+[e2e] ✓ save after restore {"files":15}
+[e2e] ✓ gui.show/hide {"shown":true,"hidden":false}
+[e2e] ✓ project.save {"files":3,"pack_dir":"F:\\Deepseek_harness\\blockbench\\workspace\\_e2e\\pack"}
+[e2e] ✓ save idempotence {"files_checked":3,"changed":0,"second_save_files":3}
+[e2e] ✓ project.validate {"ok":true,"errors":[],"warnings":[{"code":"YSM_LOCATOR_OPTIONAL_MISSING","target":"ViewLocator","message":"optional locator group missing: ViewLocator"}]}
+[e2e] ✓ project.export_ysm {"export_dir":"F:\\Deepseek_harness\\blockbench\\workspace\\_e2e\\exports\\20261018150229\\pack","files":{"total":32,"models":6,"textures":8,"animations":12},"manifest_files":31,"zip":{"files":32,"bytes":532842}}
+[e2e] PASSED → F:\Deepseek_harness\blockbench\workspace\_e2e\artifacts\e2e\e2e-result.json
+
+[test-all] === e2e HTTP+SSE ===
+[e2e] rpc=ws://127.0.0.1:9774/bb-agent/v1
+
+[2026-10-18T15:02:35.006Z] offline profile: external http(s) blocked
+[2026-10-18T15:02:35.330Z] [renderer:1] Electron 43.8.0, Node 24.22.0
+[2026-10-18T15:02:35.712Z] [renderer:2] WARNING: Multiple instances of Three.js being imported.
+[2026-10-18T15:02:35.785Z] [renderer:1] Three.js r129
+[2026-10-18T15:02:35.785Z] [renderer:1] %cBlockbench 5.2.2 Desktop (Windows, x64) border: 2px solid #3e90ff; padding: 4px 8px; font-size: 1.2em;
+[2026-10-18T15:02:35.911Z] [renderer:3] Could not connect to plugin server: error [object Object]
+[2026-10-18T15:02:35.911Z] [renderer:1] Switching to plugin CDN mirror. Restart to apply.
+[2026-10-18T15:02:35.911Z] [renderer:1] All plugin installations resolved
+[2026-10-18T15:02:35.914Z] index.html loaded
+[2026-10-18T15:02:36.008Z] [renderer:2] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[2026-10-18T15:02:36.012Z] [renderer:3] Uncaught (in promise) #<Object>
+[2026-10-18T15:02:36.014Z] Blockbench ready
+[2026-10-18T15:02:36.020Z] [renderer:1] [bb-agent] bridge plugin loaded
+[2026-10-18T15:02:36.020Z] bridge plugin: injected
+[e2e] ✓ bridge connected 
+[e2e] ✓ session.status {"state":"booting","revision":0}
+[2026-10-18T15:02:36.042Z] [renderer:1] [bb-agent] connected via http-sse 0.1.0
+[e2e] ✓ project.create_ysm {"project_id":"e2e_model-68fdd337","revision":1,"summary":{"bones":70,"cubes":182,"textures":2,"animations":303,"controllers":8}}
+[e2e] ✓ project.get_scene {"counts":{"bones":64,"cubes":172,"textures":2,"animations":303},"bounds":{"center":[0,21.649999618530273,1.4355185966939739],"size":[19.035741180302054,43.29999923706055,13.271037193387947]}}
+[e2e] ✓ model.apply_patch {"revision":2,"changed":[{"kind":"bone","id":"cc2cfed7-abaa-5582-6925-67a70c1c5a37","op":"add","name":"E2E_Arm"},{"kind":"cube","id":"35a7f330-9d2d-3b1f-8ff5-a1291bbdf89e","op":"add","bone":"E2E_Arm"},{"kind":"cube","id":"35a7f330-9d2d-3b1f-8ff5-a1291bbdf89e","op":"update"}]}
+[e2e] ✓ texture.create {"id":"587a19d9-cbfb-88d2-528a-5b09f0418c82","size":[128,128]}
+[e2e] ✓ texture.apply_patch {"painted_pixels":307,"revision":4}
+[e2e] ✓ texture.read {"colors":16}
+[e2e] ✓ render.views {"images":[{"view":"front","bytes":11737},{"view":"right","bytes":11926},{"view":"iso_fr","bytes":19127}]}
+[e2e] ✓ render change detection {"changed_any":false,"warning":"NO_VISIBLE_CHANGE"}
+[e2e] ✓ render visible-change detection {"changed_any":true,"alpha":[0.1862,0.1272,0.1891]}
+[e2e] ✓ checkpoint/restore + arm {"restored_from":6,"revision":7,"arm_loaded":true,"debug":{"project_open":true,"active":"r0005","main":"r0005","main_open":true}}
+[e2e] ✓ save after restore {"files":15}
+[e2e] ✓ gui.show/hide {"shown":true,"hidden":false}
+[e2e] ✓ project.save {"files":3,"pack_dir":"F:\\Deepseek_harness\\blockbench\\workspace\\_e2e\\pack"}
+[e2e] ✓ save idempotence {"files_checked":3,"changed":0,"second_save_files":3}
+[e2e] ✓ project.validate {"ok":true,"errors":[],"warnings":[{"code":"YSM_LOCATOR_OPTIONAL_MISSING","target":"ViewLocator","message":"optional locator group missing: ViewLocator"}]}
+[e2e] ✓ project.export_ysm {"export_dir":"F:\\Deepseek_harness\\blockbench\\workspace\\_e2e\\exports\\20261018150237\\pack","files":{"total":32,"models":6,"textures":8,"animations":12},"manifest_files":31,"zip":{"files":32,"bytes":532842}}
+[e2e] PASSED → F:\Deepseek_harness\blockbench\workspace\_e2e\artifacts\e2e\e2e-result.json
+
+[test-all] === hosttest ===
+[hosttest] ✓ plugin applied {"tools":["bb_session_start","bb_project_open","bb_session_status","bb_scene","bb_get_element","bb_apply_model_patch","bb_texture_create","bb_texture_patch","bb_texture_read","bb_texture_layer","bb_texture_pbr","bb_render_views","bb_render_
+[blockbench-agent] bridge listening on ws://127.0.0.1:11182/bb-agent/v1
+[blockbench-agent] Blockbench connected
+[bb-ws] system.hello ok 1ms trace=845d713c8dd8
+[hosttest] ✓ bb_session_status {"state":"idle","revision":0}
+[hosttest] ✓ bb_session_start {"project_id":"hosttest_model-70cf6b89","revision":1,"summary":{"bones":70,"cubes":182,"textures":2,"animations":303,"controllers":8}}
+[hosttest] ✓ bb_scene {"counts":{"bones":64,"cubes":172,"textures":2,"animations":303}}
+[hosttest] ✓ bb_apply_model_patch {"revision":2,"changed":2}
+[hosttest] ✓ bb_texture_create {"size":[128,128]}
+[hosttest] ✓ bb_texture_patch {"painted_pixels":290}
+[hosttest] ✓ bb_render_views {"images":2,"imageBlocks":2,"savedImages":2}
+[hosttest] ✓ bb_checkpoint {"checkpoint":"checkpoints/r0004.bbmodel","bytes":8577057}
+[hosttest] ✓ bb_revisions {"count":2}
+[hosttest] ✓ bb_save_project {"files":4,"pack_dir":"F:\\Deepseek_harness\\blockbench\\workspace\\_hosttest\\workspaces\\demo\\pack"}
+[hosttest] ✓ bb_validate {"ok":true,"errors":0,"warnings":1}
+[hosttest] ✓ revision conflict {"code":"REVISION_CONFLICT"}
+[hosttest] ✓ animation create/patch/list {"created":"hosttest_wave","list":304}
+[hosttest] ✓ texture export/import {"path":"artifacts/textures/default.png","size":7445}
+[hosttest] ✓ checkpoint/restore {"from":174,"to":173,"revision":12,"textures":4,"restored_textures":0,"arm_from_checkpoint":true}
+[hosttest] ✓ model patch inflate/rotation/uv_size/alias {"inflate":1.5,"uv_size":[6,6]}
+[hosttest] ✓ controller bind {"controller":"player.pre_main","state":"default"}
+[hosttest] ✓ texture layers {"layers":2,"flattened":false}
+[hosttest] ✓ texture PBR {"texture":"default_n","saved_files":17}
+[hosttest] ✓ animation merge-back {"baseline":50,"after":51}
+[hosttest] ✓ render watchdog {"verdict":"no_visible_change","streak":1}
+[hosttest] ✓ closeup + SSAA {"width":256,"antialias":"ssaa","focus":"Head"}
+[hosttest] ✓ bb_batch {"results":2,"ok":true}
+[hosttest] ✓ bb_diagnostics {"childPid":27528,"logs":["runtime","agent"]}
+[hosttest] ✓ /show + GUI_BUSY + /hide {"show":"Blockbench 已显示（revision 19）。编辑完成后输入 /hide 返回。","hide":"Blockbench 已隐藏（revision 19）。","blocked":"GUI_BUSY"}
+[hosttest] ✓ bb_project_close {"closed":true}
+[blockbench-agent] disposing blockbench-agent
+[blockbench-agent] runtime exited code=1 signal=null
+[hosttest] PASSED → F:\Deepseek_harness\blockbench\workspace\_hosttest\hosttest-result.json
+
+[test-all] === animation semantic diff ===
+{
+  "a": "F:\\Deepseek_harness\\blockbench\\dist\\bb-agent-app\\templates\\ysm_default",
+  "b": "F:\\Deepseek_harness\\blockbench\\workspace\\_hosttest\\workspaces\\demo\\pack",
+  "animations": {
+    "a": 302,
+    "b": 303
+  },
+  "added": [
+    "hosttest_wave"
+  ],
+  "removed": [],
+  "changed": [],
+  "strict_equal": false,
+  "equal": true,
+  "allow_added": true
+}
+[anim-diff] EQUAL → workspace\_logs\animation-diff.json
+
+[test-all] summary:
+  PASS  assemble  154ms
+  PASS  M0  6594ms
+  PASS  e2e WS  8244ms
+  PASS  e2e HTTP+SSE  8153ms
+  PASS  hosttest  10505ms
+  PASS  animation semantic diff  115ms
+[test-all] PASSED (6/6)

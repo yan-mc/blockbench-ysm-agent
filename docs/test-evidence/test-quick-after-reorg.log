@@ -1,0 +1,59 @@
+
+[test-all] === hosttest ===
+[hosttest] ✓ plugin applied {"tools":["bb_session_start","bb_project_open","bb_session_status","bb_scene","bb_get_element","bb_apply_model_patch","bb_texture_create","bb_texture_patch","bb_texture_read","bb_texture_layer","bb_texture_pbr","bb_render_views","bb_render_
+[blockbench-agent] bridge listening on ws://127.0.0.1:2754/bb-agent/v1
+[blockbench-agent] Blockbench connected
+[bb-ws] system.hello ok 0ms trace=94641ac7ba71
+[hosttest] ✓ bb_session_status {"state":"idle","revision":0}
+[hosttest] ✓ bb_session_start {"project_id":"hosttest_model-37d99bd5","revision":1,"summary":{"bones":70,"cubes":182,"textures":2,"animations":303,"controllers":8}}
+[hosttest] ✓ bb_scene {"counts":{"bones":64,"cubes":172,"textures":2,"animations":303}}
+[hosttest] ✓ bb_apply_model_patch {"revision":2,"changed":2}
+[hosttest] ✓ bb_texture_create {"size":[128,128]}
+[hosttest] ✓ bb_texture_patch {"painted_pixels":290}
+[hosttest] ✓ bb_render_views {"images":2,"imageBlocks":2,"savedImages":2}
+[hosttest] ✓ bb_checkpoint {"checkpoint":"checkpoints/r0004.bbmodel","bytes":8577057}
+[hosttest] ✓ bb_revisions {"count":2}
+[hosttest] ✓ bb_save_project {"files":4,"pack_dir":"F:\\Deepseek_harness\\blockbench\\workspace\\_hosttest\\workspaces\\demo\\pack"}
+[hosttest] ✓ bb_validate {"ok":true,"errors":0,"warnings":1}
+[hosttest] ✓ revision conflict {"code":"REVISION_CONFLICT"}
+[hosttest] ✓ animation create/patch/list {"created":"hosttest_wave","list":304}
+[hosttest] ✓ texture export/import {"path":"artifacts/textures/default.png","size":7445}
+[hosttest] ✓ checkpoint/restore {"from":174,"to":173,"revision":12,"textures":4,"restored_textures":0,"arm_from_checkpoint":true}
+[hosttest] ✓ model patch inflate/rotation/uv_size/alias {"inflate":1.5,"uv_size":[6,6]}
+[hosttest] ✓ controller bind {"controller":"player.pre_main","state":"default"}
+[hosttest] ✓ texture layers {"layers":2,"flattened":false}
+[hosttest] ✓ texture PBR {"texture":"default_n","saved_files":17}
+[hosttest] ✓ animation merge-back {"baseline":50,"after":51}
+[hosttest] ✓ render watchdog {"verdict":"no_visible_change","streak":1}
+[hosttest] ✓ closeup + SSAA {"width":256,"antialias":"ssaa","focus":"Head"}
+[hosttest] ✓ bb_batch {"results":2,"ok":true}
+[hosttest] ✓ bb_diagnostics {"childPid":35092,"logs":["runtime","agent"]}
+[hosttest] ✓ /show + GUI_BUSY + /hide {"show":"Blockbench 已显示（revision 19）。编辑完成后输入 /hide 返回。","hide":"Blockbench 已隐藏（revision 19）。","blocked":"GUI_BUSY"}
+[hosttest] ✓ bb_project_close {"closed":true}
+[blockbench-agent] disposing blockbench-agent
+[blockbench-agent] runtime exited code=1 signal=null
+[hosttest] PASSED → F:\Deepseek_harness\blockbench\workspace\_hosttest\hosttest-result.json
+
+[test-all] === animation semantic diff ===
+{
+  "a": "F:\\Deepseek_harness\\blockbench\\dist\\bb-agent-app\\templates\\ysm_default",
+  "b": "F:\\Deepseek_harness\\blockbench\\workspace\\_hosttest\\workspaces\\demo\\pack",
+  "animations": {
+    "a": 302,
+    "b": 303
+  },
+  "added": [
+    "hosttest_wave"
+  ],
+  "removed": [],
+  "changed": [],
+  "strict_equal": false,
+  "equal": true,
+  "allow_added": true
+}
+[anim-diff] EQUAL → workspace\_logs\animation-diff.json
+
+[test-all] summary:
+  PASS  hosttest  7470ms
+  PASS  animation semantic diff  95ms
+[test-all] PASSED (2/2)
