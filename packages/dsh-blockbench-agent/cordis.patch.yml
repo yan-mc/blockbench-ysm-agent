@@ -4,8 +4,8 @@
     - id: blockbench-agent
       name: '@local/dsh-blockbench-agent'
       config:
-        workspaceRoot: 'F:\Deepseek_harness\blockbench\workspace'
-        project: 'default'
+        workspaceRoot: 'F:\Deepseek_harness\blockbench\projects'
+        project: 'deepseek-fish'
         autoStart: true
         executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
         appPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app'

@@ -1,0 +1,8 @@
+# 参考图版权归原作者/社区，仅作内部造型参考，不随仓库分发
+reference/
+artifacts/
+checkpoints/
+logs/
+.bb/
+notes/*.log
+release/pack/

@@ -44,6 +44,7 @@
 | [spec/generate_spec.py](spec/generate_spec.py) | 契约生成器（改一处生成两份 JSON） | 工具链 |
 | **[ENGINEERING.md](ENGINEERING.md)** | **工程实现状态/实测数据/DSH 端完成度/已知限制**（设计不变，实现以此为准） | 落地状态 |
 | [packages/README.md](packages/README.md) | 两个实现包的构建、测试与运行命令 | 工程说明 |
+| [projects/](projects/README.md) | 实际工程：首个 DeepSeek 鲸鱼娘 YSM 模型、渲染/游戏内截图、BUG 与迭代记录 | 落地工程 |
 | [prototype/](prototype/README.md) | dsh 插件 + BAE 主进程/preload/bridge 插件骨架；WS 协议冒烟测试已通过 | 参考实现 |
 | [research/blockbench-core.md](research/blockbench-core.md) | Blockbench v5.2.2 源码级研究（847 行，文件:行号） | 事实依据 |
 | [research/ysm-format.md](research/ysm-format.md) | YSM 格式/插件导入导出研究（999 行，文件:行号） | 事实依据 |
