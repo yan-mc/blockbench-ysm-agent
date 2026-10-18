@@ -1,0 +1,18 @@
+{
+  "name": "blockbench-agent-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "YSM x Blockbench headless agent plugin workspace (design docs + BAE runtime + dsh host plugin)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "assemble": "node packages/bb-agent-runtime/scripts/assemble.mjs",
+    "m0": "node packages/bb-agent-runtime/scripts/m0.mjs",
+    "m0:safe": "node packages/bb-agent-runtime/scripts/m0.mjs --safe-mode",
+    "e2e": "node packages/bb-agent-runtime/scripts/e2e.mjs",
+    "hosttest": "node packages/dsh-blockbench-agent/test/host-smoke.mjs",
+    "release": "node packages/bb-agent-runtime/scripts/package-release.mjs",
+    "spec": "python spec/generate_spec.py"
+  }
+}

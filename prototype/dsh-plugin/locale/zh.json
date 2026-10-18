@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Blockbench Agent",
+    "description": "在 dsh 中通过语义工具驱动后台 Blockbench：建模、像素贴图、无头渲染反馈与 YSM 导出。"
+  }
+}

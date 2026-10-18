@@ -1,0 +1,32 @@
+{
+  "name": "@local/dsh-blockbench-agent",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "dsh Host plugin: semantic Blockbench modeling/texturing tools with headless render feedback",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "lib/ws-server.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "skills/*.md",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
+    "@deepseek-ai/cordis": "*"
+  }
+}
+

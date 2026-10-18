@@ -1,0 +1,11 @@
+{
+  "name": "@local/bb-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BB-Agent JSON-RPC protocol constants, errors and helpers (shared by BAE and dsh plugin)",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js"
+  }
+}

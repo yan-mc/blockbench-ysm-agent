@@ -1,0 +1,13 @@
+{
+  "name": "@local/bb-agent-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BAE: headless Blockbench Agent Runtime derived from Blockbench (GPL-3.0-or-later)",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "assemble": "node scripts/assemble.mjs",
+    "m0": "node scripts/m0.mjs",
+    "m0:safe": "node scripts/m0.mjs --safe-mode"
+  }
+}

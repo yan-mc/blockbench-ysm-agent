@@ -1,0 +1,13 @@
+# 插入 Host 插件行；config 可被用户 profile 的 cordis.patch.yml 覆盖。
+# 注意：autoStart 默认 false，避免安装后立刻尝试启动并不存在的 BAE 可执行文件。
+- insert:
+    - id: blockbench-agent
+      name: '@local/dsh-blockbench-agent'
+      config:
+        workspaceRoot: 'F:\Deepseek_harness\blockbench\workspace'
+        project: 'default'
+        autoStart: false
+        executable: ''
+        appPath: ''
+        connectTimeoutMs: 30000
+        defaultTimeoutMs: 120000

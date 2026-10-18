@@ -1,0 +1,17 @@
+# 插入 Host 插件行；config 可被用户 profile 的 cordis.patch.yml 覆盖。
+# 本地开发默认使用 F:\Deepseek_harness\blockbench\dist\bb-agent-app（由 scripts/assemble.mjs 生成）。
+- insert:
+    - id: blockbench-agent
+      name: '@local/dsh-blockbench-agent'
+      config:
+        workspaceRoot: 'F:\Deepseek_harness\blockbench\workspace'
+        project: 'default'
+        autoStart: true
+        executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
+        appPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app'
+        pluginPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app\agent\bb-agent-bridge.js'
+        connectTimeoutMs: 30000
+        defaultTimeoutMs: 120000
+        maxImagesPerCall: 4
+        imageMaxDimension: 512
+        exposeGuiTools: false

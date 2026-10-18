@@ -1,0 +1,19 @@
+# runtime
+workspace/
+dist/
+node_modules/
+*.log
+
+# upstream clones (keep out of VCS; re-clone per research docs)
+vendor/
+
+# generated previews（仅根目录；docs/artifacts 保留为验收证据）
+/artifacts/
+
+# isolated in-game validation environment (Forge/YSM/assets/world) and release artifacts
+game-test/
+release/
+
+# local scratch prompt (not part of the deliverable)
+临时文件.txt
+

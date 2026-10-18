@@ -1,0 +1,820 @@
+{
+  "manifest_version": "1.0.0",
+  "protocol": "bb-agent/1",
+  "transport": {
+    "default": "ws",
+    "url": "ws://127.0.0.1:<port>/bb-agent/v1",
+    "subprotocol": "bb-agent.v1",
+    "fallback": "http-sse",
+    "http": {
+      "rpc": "POST /rpc",
+      "events": "GET /events",
+      "health": "GET /health"
+    },
+    "framing": "utf-8 json text (binary frames reserved; not used in v1)",
+    "max_message_bytes": 8388608,
+    "max_batch": 64,
+    "max_patch_ops": 4096,
+    "max_inflight": 8
+  },
+  "auth": {
+    "scheme": "first-message-token",
+    "token_bits": 256,
+    "compare": "constant-time",
+    "bind": "127.0.0.1"
+  },
+  "revision": {
+    "semantics": "project-level monotonic integer; any successful mutation +1; restore appends",
+    "mutation_requires_expected_revision_unless_forced": true,
+    "idempotency_key": "_meta.client_request_id (LRU 5min)"
+  },
+  "methods": [
+    {
+      "name": "system.hello",
+      "direction": "client_to_server",
+      "kind": "lifecycle",
+      "idempotent": false,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": "握手：鉴权、版本协商、capabilities、返回 session/project 状态"
+    },
+    {
+      "name": "system.ping",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 3000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": "RTT/健康探测"
+    },
+    {
+      "name": "system.batch",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 300000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": "原子批处理（顺序执行；失败回滚）"
+    },
+    {
+      "name": "system.shutdown",
+      "direction": "client_to_server",
+      "kind": "lifecycle",
+      "idempotent": false,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": "写 checkpoint、关窗口、退出进程"
+    },
+    {
+      "name": "system.log_tail",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": "取最近 N 行日志（脱敏）"
+    },
+    {
+      "name": "session.status",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": "状态机/revision/预算/健康"
+    },
+    {
+      "name": "project.create_ysm",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.open_pack",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.close",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.save",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": false,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.export_ysm",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": false,
+      "timeout_ms": 300000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.get_scene",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.get_element",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.validate",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.checkpoint",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.restore",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 60000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "project.revisions",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "model.apply_patch",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "model.get_tree",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "model.get_cube",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "model.auto_uv",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.create",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 15000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.apply_patch",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 60000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.read",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.select",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.export_png",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "texture.import_png",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 60000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "system.diagnostics",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "animation.create",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "animation.apply_patch",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "animation.list",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "animation.delete",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "animation.bind_controller",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.views",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.texture",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 30000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.cancel",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.artifacts",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "gui.show",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "gui.hide",
+      "direction": "client_to_server",
+      "kind": "write",
+      "idempotent": false,
+      "timeout_ms": 15000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "gui.state",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "gui.capture_page",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 15000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    }
+  ],
+  "events": [
+    {
+      "name": "event.project_changed",
+      "params": {
+        "revision": "int",
+        "source": "agent|user|external|restore",
+        "changed": "array"
+      }
+    },
+    {
+      "name": "event.render_progress",
+      "params": {
+        "request_id": "string",
+        "done": "int",
+        "total": "int",
+        "view": "string"
+      }
+    },
+    {
+      "name": "event.gui_state",
+      "params": {
+        "visible": "bool",
+        "focused": "bool",
+        "revision": "int",
+        "user_editing": "bool"
+      }
+    },
+    {
+      "name": "event.heartbeat",
+      "params": {
+        "revision": "int",
+        "queue_len": "int",
+        "mem_mb": "int",
+        "gpu_ok": "bool"
+      }
+    },
+    {
+      "name": "event.recovered",
+      "params": {
+        "from_revision": "int",
+        "checkpoint": "string",
+        "reason": "string"
+      }
+    },
+    {
+      "name": "event.engine_degraded",
+      "params": {
+        "reason": "string",
+        "fallback": "no_gpu|swiftshader|no_webgl"
+      }
+    },
+    {
+      "name": "event.log",
+      "params": {
+        "level": "string",
+        "message": "string",
+        "fields": "object?"
+      }
+    }
+  ],
+  "errors": [
+    {
+      "jsonrpc": -32700,
+      "code": "PARSE_ERROR",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32600,
+      "code": "INVALID_REQUEST",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32601,
+      "code": "METHOD_NOT_FOUND",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32602,
+      "code": "INVALID_PARAMS",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32603,
+      "code": "INTERNAL_ERROR",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32800,
+      "code": "REQUEST_CANCELLED",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32001,
+      "code": "UNAUTHORIZED",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32002,
+      "code": "PROTOCOL_MISMATCH",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32003,
+      "code": "SESSION_BUSY",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32010,
+      "code": "PROJECT_NOT_OPEN",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32011,
+      "code": "REVISION_CONFLICT",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32012,
+      "code": "INVALID_REFERENCE",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32013,
+      "code": "VALIDATION_FAILED",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32014,
+      "code": "RENDER_FAILED",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32015,
+      "code": "TIMEOUT",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32016,
+      "code": "GUI_BUSY",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32017,
+      "code": "USER_TAKEOVER",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32018,
+      "code": "RESOURCE_LIMIT",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32019,
+      "code": "UNSUPPORTED",
+      "recoverable": false
+    },
+    {
+      "jsonrpc": -32020,
+      "code": "CHECKPOINT_FAILED",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32021,
+      "code": "ENGINE_DEGRADED",
+      "recoverable": true
+    },
+    {
+      "jsonrpc": -32022,
+      "code": "INVALID_OPERATION",
+      "recoverable": true
+    }
+  ]
+}
