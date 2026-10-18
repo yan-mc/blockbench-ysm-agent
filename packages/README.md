@@ -44,7 +44,7 @@ $node = 'D:\dsh\resources\runtime\primary-runtime\dependencies\node\bin\node.exe
 - `workspace/_e2e/`：e2e 的 pack、renders、exports、`e2e-result.json`。
 - `workspace/_hosttest/`：Host 插件冒烟结果与真实 spawn 的 BAE 工作目录。
 - `docs/M0-report.md`、`docs/M0-report-safe.md`：自动生成的 M0 报告。
-- `release/bb-agent-<version>-<stamp>.zip`：可直接分发的发布包（0.4.0 为 208 文件 / 9.3MB；含 BAE、插件、文档、SHA256、GPL SOURCE）。
+- `release/bb-agent-<version>-<stamp>.zip`：可直接分发的发布包（0.4.0 为 211 文件 / 9.4MB；含 BAE、插件、文档、SHA256、GPL SOURCE）。
 - `game-test/`：独立 Forge 1.20.1 + YSM 游戏内验证环境（首次 `setup.ps1`，之后 `ingame.ps1`；体积大，已 gitignore）。
 
 ## 实现边界（当前）
@@ -58,6 +58,8 @@ $node = 'D:\dsh\resources\runtime\primary-runtime\dependencies\node\bin\node.exe
 - 新增：checkpoint 贴图/arm 快照、动画合并回写、watchdog-v2、`npm run test`/`test:quick`、composer dock Client UI 状态 pill + Host `/bb-agent/status`。
 - 剩余：electron-builder 安装器/签名（无证书，zip 为正式分发）、完整内置 VLM critic、PBR 预览、浏览器自动化 UI 截图验证。
 - 已安装到当前 profile（`include:blockbench-agent`，autoStart=true）；卸载用 `plugin_manager remove_bundle`。
+
+
 
 
 

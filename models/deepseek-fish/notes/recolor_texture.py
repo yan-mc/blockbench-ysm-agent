@@ -7,8 +7,8 @@ from PIL import Image
 import colorsys
 import sys, os
 
-src = sys.argv[1] if len(sys.argv) > 1 else r'F:\Deepseek_harness\blockbench\projects\deepseek-fish\artifacts\textures\default.png'
-out = sys.argv[2] if len(sys.argv) > 2 else r'F:\Deepseek_harness\blockbench\projects\deepseek-fish\reference\recolor-v1.png'
+src = sys.argv[1] if len(sys.argv) > 1 else r'F:\Deepseek_harness\blockbench\models\deepseek-fish\artifacts\textures\default.png'
+out = sys.argv[2] if len(sys.argv) > 2 else r'F:\Deepseek_harness\blockbench\models\deepseek-fish\reference\recolor-v1.png'
 
 img = Image.open(src).convert('RGBA')
 px = img.load()
@@ -52,3 +52,4 @@ for y in range(min(100, h)):
 
 img.save(out)
 print('saved', out)
+

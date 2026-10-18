@@ -4,7 +4,7 @@
     - id: blockbench-agent
       name: '@local/dsh-blockbench-agent'
       config:
-        workspaceRoot: 'F:\Deepseek_harness\blockbench\projects'
+        workspaceRoot: 'F:\Deepseek_harness\blockbench\models'
         project: 'deepseek-fish'
         autoStart: true
         executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
@@ -16,3 +16,4 @@
         imageMaxDimension: 512
         exposeGuiTools: false
         bridgeTransport: auto
+

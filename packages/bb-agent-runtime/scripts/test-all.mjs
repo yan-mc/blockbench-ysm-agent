@@ -37,7 +37,7 @@ if (!run('hosttest', ['packages/dsh-blockbench-agent/test/host-smoke.mjs'])) pro
 const template = path.join(REPO_ROOT, 'dist', 'bb-agent-app', 'templates', 'ysm_default')
 const candidates = [
   path.join(REPO_ROOT, 'workspace', '_hosttest', 'workspaces', 'demo', 'pack'),
-  path.join(REPO_ROOT, 'projects', 'deepseek-fish', 'pack'),
+  path.join(REPO_ROOT, 'models', 'deepseek-fish', 'pack'),
   path.join(REPO_ROOT, 'workspace', 'default', 'pack'),
 ]
 const pack = candidates.find((p) => fs.existsSync(path.join(p, 'animations')))
@@ -53,3 +53,4 @@ console.log('\n[test-all] summary:')
 for (const r of results) console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.name}  ${r.ms}ms`)
 console.log(`[test-all] ${failed.length ? 'FAILED' : 'PASSED'} (${results.length - failed.length}/${results.length})`)
 process.exit(failed.length ? 1 : 0)
+

@@ -1,7 +1,7 @@
 # DeepSeek 鲸鱼娘 · YSM 模型工程
 
 > 目标：把 DeepSeek 的拟人形象「蓝色大肥鱼 / 鲸鱼娘（DeepSeek娘）」做成可进游戏加载的 YSM 模型，并用无头渲染迭代细节。
-> 工程工作区：本目录（plugin workspace = `projects/deepseek-fish`）；原始素材与截图也都在本目录下。
+> 工程工作区：本目录（plugin workspace = `models/deepseek-fish`）；原始素材与截图也都在本目录下。
 
 ## 角色设定（参考社区共识）
 
@@ -40,7 +40,7 @@
 ## 目录
 
 ```
-projects/deepseek-fish/
+models/deepseek-fish/
   README.md            本文件
   BUGS.md              本轮遇到的问题与 bug 记录
   reference/           参考图（社区 fan art，仅内部参考，不随发布）
@@ -73,5 +73,6 @@ projects/deepseek-fish/
 6. 游戏内截图里角色出现在屋顶/空中是当前测试世界位置，不是模型悬浮 bug。
 
 问题记录见 [BUGS.md](./BUGS.md)，迭代过程见 [notes/iterations.md](./notes/iterations.md)。
+
 
 

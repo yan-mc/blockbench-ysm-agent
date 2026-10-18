@@ -1,7 +1,7 @@
 from PIL import Image
 import sys
 
-p = sys.argv[1] if len(sys.argv) > 1 else r'F:\Deepseek_harness\blockbench\projects\deepseek-fish\artifacts\textures\default.png'
+p = sys.argv[1] if len(sys.argv) > 1 else r'F:\Deepseek_harness\blockbench\models\deepseek-fish\artifacts\textures\default.png'
 img = Image.open(p).convert('RGBA')
 w, h = img.size
 px = img.load()
@@ -45,3 +45,4 @@ for yy in range(0, h, 16):
         else:
             row += '.'
     print(yy, row)
+

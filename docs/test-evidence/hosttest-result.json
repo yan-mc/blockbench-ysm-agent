@@ -1,0 +1,252 @@
+{
+  "ok": true,
+  "steps": [
+    {
+      "name": "plugin applied",
+      "data": {
+        "tools": [
+          "bb_session_start",
+          "bb_project_open",
+          "bb_session_status",
+          "bb_scene",
+          "bb_get_element",
+          "bb_apply_model_patch",
+          "bb_texture_create",
+          "bb_texture_patch",
+          "bb_texture_read",
+          "bb_texture_layer",
+          "bb_texture_pbr",
+          "bb_render_views",
+          "bb_render_texture",
+          "bb_validate",
+          "bb_checkpoint",
+          "bb_revisions",
+          "bb_restore",
+          "bb_save_project",
+          "bb_export_ysm",
+          "bb_project_close",
+          "bb_animation_list",
+          "bb_animation_create",
+          "bb_animation_patch",
+          "bb_animation_delete",
+          "bb_texture_export_png",
+          "bb_texture_import_png",
+          "bb_batch",
+          "bb_diagnostics"
+        ],
+        "commands": [
+          "show",
+          "hide",
+          "bb-status",
+          "bb-start",
+          "bb-help"
+        ]
+      }
+    },
+    {
+      "name": "bb_session_status",
+      "data": {
+        "state": "idle",
+        "revision": 0
+      }
+    },
+    {
+      "name": "bb_session_start",
+      "data": {
+        "project_id": "hosttest_model-70cf6b89",
+        "revision": 1,
+        "summary": {
+          "bones": 70,
+          "cubes": 182,
+          "textures": 2,
+          "animations": 303,
+          "controllers": 8
+        }
+      }
+    },
+    {
+      "name": "bb_scene",
+      "data": {
+        "counts": {
+          "bones": 64,
+          "cubes": 172,
+          "textures": 2,
+          "animations": 303
+        }
+      }
+    },
+    {
+      "name": "bb_apply_model_patch",
+      "data": {
+        "revision": 2,
+        "changed": 2
+      }
+    },
+    {
+      "name": "bb_texture_create",
+      "data": {
+        "size": [
+          128,
+          128
+        ]
+      }
+    },
+    {
+      "name": "bb_texture_patch",
+      "data": {
+        "painted_pixels": 290
+      }
+    },
+    {
+      "name": "bb_render_views",
+      "data": {
+        "images": 2,
+        "imageBlocks": 2,
+        "savedImages": 2
+      }
+    },
+    {
+      "name": "bb_checkpoint",
+      "data": {
+        "checkpoint": "checkpoints/r0004.bbmodel",
+        "bytes": 8577057
+      }
+    },
+    {
+      "name": "bb_revisions",
+      "data": {
+        "count": 2
+      }
+    },
+    {
+      "name": "bb_save_project",
+      "data": {
+        "files": 4,
+        "pack_dir": "F:\\Deepseek_harness\\blockbench\\workspace\\_hosttest\\workspaces\\demo\\pack"
+      }
+    },
+    {
+      "name": "bb_validate",
+      "data": {
+        "ok": true,
+        "errors": 0,
+        "warnings": 1
+      }
+    },
+    {
+      "name": "revision conflict",
+      "data": {
+        "code": "REVISION_CONFLICT"
+      }
+    },
+    {
+      "name": "animation create/patch/list",
+      "data": {
+        "created": "hosttest_wave",
+        "list": 304
+      }
+    },
+    {
+      "name": "texture export/import",
+      "data": {
+        "path": "artifacts/textures/default.png",
+        "size": 7445
+      }
+    },
+    {
+      "name": "checkpoint/restore",
+      "data": {
+        "from": 174,
+        "to": 173,
+        "revision": 12,
+        "textures": 4,
+        "restored_textures": 0,
+        "arm_from_checkpoint": true
+      }
+    },
+    {
+      "name": "model patch inflate/rotation/uv_size/alias",
+      "data": {
+        "inflate": 1.5,
+        "uv_size": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "name": "controller bind",
+      "data": {
+        "controller": "player.pre_main",
+        "state": "default"
+      }
+    },
+    {
+      "name": "texture layers",
+      "data": {
+        "layers": 2,
+        "flattened": false
+      }
+    },
+    {
+      "name": "texture PBR",
+      "data": {
+        "texture": "default_n",
+        "saved_files": 17
+      }
+    },
+    {
+      "name": "animation merge-back",
+      "data": {
+        "baseline": 50,
+        "after": 51
+      }
+    },
+    {
+      "name": "render watchdog",
+      "data": {
+        "verdict": "no_visible_change",
+        "streak": 1
+      }
+    },
+    {
+      "name": "closeup + SSAA",
+      "data": {
+        "width": 256,
+        "antialias": "ssaa",
+        "focus": "Head"
+      }
+    },
+    {
+      "name": "bb_batch",
+      "data": {
+        "results": 2,
+        "ok": true
+      }
+    },
+    {
+      "name": "bb_diagnostics",
+      "data": {
+        "childPid": 27528,
+        "logs": [
+          "runtime",
+          "agent"
+        ]
+      }
+    },
+    {
+      "name": "/show + GUI_BUSY + /hide",
+      "data": {
+        "show": "Blockbench 已显示（revision 19）。编辑完成后输入 /hide 返回。",
+        "hide": "Blockbench 已隐藏（revision 19）。",
+        "blocked": "GUI_BUSY"
+      }
+    },
+    {
+      "name": "bb_project_close",
+      "data": {
+        "closed": true
+      }
+    }
+  ]
+}

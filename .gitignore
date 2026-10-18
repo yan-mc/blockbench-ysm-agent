@@ -17,3 +17,11 @@ release/
 # local scratch prompt (not part of the deliverable)
 临时文件.txt
 
+
+# media build outputs
+media/_tts/
+media/frames/
+media/*.mp4
+media/*.wav
+media/*.log
+

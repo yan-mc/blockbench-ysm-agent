@@ -46,7 +46,7 @@ for (const dir of ['lib', 'locale', 'skills']) {
 
 const docsDir = path.join(bundleDir, 'docs')
 fs.mkdirSync(docsDir, { recursive: true })
-for (const entry of ['ENGINEERING.md', 'docs/M0-report.md', 'docs/M0-report-safe.md', 'packages/README.md', 'spec/tool-manifest.json', 'spec/bridge-methods.json', 'spec/generate_spec.py']) {
+for (const entry of ['ENGINEERING.md', 'MANUAL.md', 'FOLDER-MAP.md', 'docs/M0-report.md', 'docs/M0-report-safe.md', 'docs/assets/cover.png', 'packages/README.md', 'spec/tool-manifest.json', 'spec/bridge-methods.json', 'spec/generate_spec.py']) {
   const src = path.join(REPO_ROOT, entry)
   if (!fs.existsSync(src)) continue
   const dst = path.join(docsDir, entry.replace(/[\\/]/g, '__'))
@@ -111,4 +111,5 @@ const summary = {
 }
 fs.writeFileSync(path.join(releaseRoot, 'release-result.json'), JSON.stringify(summary, null, 2) + '\n', 'utf8')
 console.log(JSON.stringify(summary, null, 2))
+
 

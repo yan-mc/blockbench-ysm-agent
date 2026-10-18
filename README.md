@@ -1,17 +1,52 @@
-# YSM × Blockbench 无头建模与贴图 Agent 插件 · 系统开发与设计方案
+<p align="center">
+  <img src="docs/assets/cover.png" alt="DSH × Blockbench Agent" width="100%">
+</p>
 
-> 在 dsh（DeepSeek Harness）内，让 AI 通过**高级语义 Tool** 驱动后台隐藏的 Blockbench，完成"从头建模 → 像素级贴图 → 无头多机位渲染 → VLM 视觉自检 → 修正 → YSM 导出"的完整闭环；用户可随时 `/show` 唤醒 GUI 接手。
+<h1 align="center">DSH × Blockbench Agent</h1>
+
+<p align="center">
+  <b>让 AI 真正走进 Blockbench：隐藏建模 · 无头渲染 · 像素贴图 · 动画 · YSM 游戏验证</b>
+</p>
+
+<p align="center">
+  <img alt="version" src="https://img.shields.io/badge/version-0.4.0-59c2ff">
+  <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20dsh-1b2a52">
+  <img alt="tools" src="https://img.shields.io/badge/tools-30-3d7fd6">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-4ade80">
+</p>
+
+<p align="center">
+  <a href="MANUAL.md"><b>📖 完整使用手册</b></a> ·
+  <a href="https://github.com/yan-mc/blockbench-ysm-agent/releases">⬇️ 下载 v0.4.0</a> ·
+  <a href="ENGINEERING.md">工程状态</a> ·
+  <a href="SETUP.md">从零搭建</a> ·
+  <a href="models/deepseek-fish/README.md">测试模型：大肥鱼</a>
+</p>
+
+> **用一句话说**：给 dsh 里的模型装上“Blockbench 的手和眼睛”——它能语义化建模、精确改贴图、无头渲染看结果、检查点回滚、保存/导出 YSM，并最终在 Minecraft 里加载验证；需要人工时 `/show` 随时接管。
+
+## 🎬 视频介绍
+
+[![插件介绍视频](docs/assets/cover.png)](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)
+
+- **B 站向介绍视频（2:46）**：[deepseek-blockbench-agent-intro.mp4](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)
+- 讲功能、使用与优势，不含制作过程；素材使用测试模型「DeepSeek 鲸鱼娘 / 蓝色大肥鱼」
+- 封面与投稿文案：[media/bilibili-upload.md](media/bilibili-upload.md)、[media/bilibili-cover.png](media/bilibili-cover.png)
 
 ## 工程状态
 
 **已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、30 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、closeup/SSAA、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill、游戏内加载验证、发布打包。当前版本 **v0.4.0**。
 
 - 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
+- 完整使用手册：[MANUAL.md](MANUAL.md)
+- 目录地图：[FOLDER-MAP.md](FOLDER-MAP.md)
 - 从零搭建：[SETUP.md](SETUP.md)
 - 实现包说明：[packages/README.md](packages/README.md)
 - 机器可读契约：[spec/tool-manifest.json](spec/tool-manifest.json)、[spec/bridge-methods.json](spec/bridge-methods.json)
 
 ---
+
+# 设计文档：YSM × Blockbench 无头建模与贴图 Agent 插件
 
 ## 0. 先读结论（TL;DR）
 
@@ -44,7 +79,7 @@
 | [spec/generate_spec.py](spec/generate_spec.py) | 契约生成器（改一处生成两份 JSON） | 工具链 |
 | **[ENGINEERING.md](ENGINEERING.md)** | **工程实现状态/实测数据/DSH 端完成度/已知限制**（设计不变，实现以此为准） | 落地状态 |
 | [packages/README.md](packages/README.md) | 两个实现包的构建、测试与运行命令 | 工程说明 |
-| [projects/](projects/README.md) | 实际工程：首个 DeepSeek 鲸鱼娘 YSM 模型、渲染/游戏内截图、BUG 与迭代记录 | 落地工程 |
+| [models/](models/README.md) | 测试模型仓库：DeepSeek 鲸鱼娘 YSM 模型、渲染/游戏内截图、BUG 与迭代记录 | 落地工程 |
 | [prototype/](prototype/README.md) | dsh 插件 + BAE 主进程/preload/bridge 插件骨架；WS 协议冒烟测试已通过 | 参考实现 |
 | [research/blockbench-core.md](research/blockbench-core.md) | Blockbench v5.2.2 源码级研究（847 行，文件:行号） | 事实依据 |
 | [research/ysm-format.md](research/ysm-format.md) | YSM 格式/插件导入导出研究（999 行，文件:行号） | 事实依据 |
@@ -128,15 +163,25 @@ flowchart LR
 
 ```
 F:\Deepseek_harness\blockbench\
-├─ README.md                      # 本文件
-├─ 系统开发与设计方案.md          # 合并版主文档
-├─ docs\                          # 01–06 分章
+├─ README.md                      # 门面：封面 / 快速链接
+├─ MANUAL.md                      # 完整使用手册
+├─ ENGINEERING.md                 # 工程状态/实测数据/已知限制
+├─ 系统开发与设计方案.md          # 合并版设计主文档
+├─ docs\                          # 01–06 分章 + test-evidence + assets(封面)
 ├─ spec\                          # 机器可读契约 + 生成器
-├─ prototype\                     # 骨架代码（dsh-plugin / blockbench-agent）
+├─ packages\
+│  ├─ bb-agent-runtime\           # BAE 组装/bridge/测试脚本
+│  └─ dsh-blockbench-agent\       # dsh Host 插件 + Client pill + Skill
+├─ models\                        # 测试模型仓库
+│  └─ deepseek-fish\              # 鲸鱼娘 YSM pack / 截图 / 导出 zip
+├─ media\                         # 介绍视频、幻灯片、构建脚本
+├─ prototype\                     # 早期骨架代码（历史参考）
 ├─ research\                      # Blockbench / YSM / dsh 研究证据
 ├─ vendor\blockbench\             # 上游 v5.2.2（只读）
 ├─ vendor\YSM-Utils-Plugins\      # 上游 v2.6.0（只读）
-└─ workspace\                     # 运行时数据（未创建/未使用）
+├─ dist\bb-agent-app\             # 组装后的 BAE（本地运行）
+├─ release\                       # 发布 zip（gitignored）
+└─ game-test\                     # 可选隔离 Forge/YSM 验证环境（gitignored）
 ```
 
 ---
@@ -148,4 +193,5 @@ F:\Deepseek_harness\blockbench\
 - **YSM-Utils-Plugins**：MIT；复用其规范化规则/代码需保留版权与许可声明。
 - **YSM 默认模型**：官方文档注明以 CC 0 发布（可修改分发）；用户提供的参考图/皮肤版权由用户负责。
 - **Minecraft**：遵守 Mojang EULA，不分发原始游戏资产。
+
 

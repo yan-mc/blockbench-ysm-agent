@@ -1,7 +1,7 @@
 from PIL import Image
 import sys
 
-p = sys.argv[1] if len(sys.argv) > 1 else r'F:\Deepseek_harness\blockbench\projects\deepseek-fish\artifacts\textures\default.png'
+p = sys.argv[1] if len(sys.argv) > 1 else r'F:\Deepseek_harness\blockbench\models\deepseek-fish\artifacts\textures\default.png'
 img = Image.open(p).convert('RGBA')
 w, h = img.size
 px = img.load()
@@ -20,3 +20,4 @@ for y1 in range(h):
             if area > best[0]:
                 best = (area, x, y1, x2, y2)
 print('largest free rect area,x1,y1,x2,y2 =', best)
+

@@ -13,7 +13,7 @@
 | A5 | `bb_texture_pbr list` 把基础 color 贴图也列出来 | 过滤条件把 `pbr_channel='color'` 当真 PBR | 过滤 color，已修 |
 | A6 | Host 端 `nativeImage` 不可用，512 缩略图失效 | dsh Host 无 Electron API | 改由 renderer 生成 `_attach512.png`，已修 |
 | A7 | 游戏内验证环境搭建：PCL 启动脚本 Java 路径过期、JavaWrapper 缺失、重复 width 参数 | 本地环境差异 | 改装 Java 17.0.19 + ATM9 JavaWrapper + 清理重复参数，已修（脚本在 `game-test/`） |
-| A8 | 旧 workspace 308MB 杂乱 | 历史 demo/证据混在 default | 归档到 `workspace/_archive/`，新工程独立到 `projects/deepseek-fish` |
+| A8 | 旧 workspace 308MB 杂乱 | 历史 demo/证据混在 default | 归档到 `workspace/_archive/`，新工程独立到 `models/deepseek-fish` |
 
 ## B. 本轮模型制作
 
@@ -38,3 +38,4 @@
 | B13 | 游戏截图分辨率 320×240 太小 | 脚本默认 resolution 320×240 | 改为 1280×720 后重跑 | 已修 |
 | B16 | 动画合并回写仍把未编辑动画重写/时间量化 | 恢复 checkpoint 触发 `finished_edit`，误把全部动画名标脏；同时 codec 导出会轻微量化关键帧时间 | ① restore 期间 `suppressUserEdit` 屏蔽 listener；② 只把 create/update/set_keyframes/delete 涉及的名字加入 `dirtyAnimationNames`，merge 保留其余原始对象；anim diff 现在只剩新增动画 | 已修复并回归 |
 | B17 | Client UI 状态 pill 当前页面看不到 | client half 只在页面 boot graph 加载；当前页面未刷新，且无浏览器自动化权限 | 已通过 Host `GET /bb-agent/status` HTTP 验证；刷新页面后应出现 composer dock pill；截图验证待浏览器可用时补 | 待视觉验证 |
+

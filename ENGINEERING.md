@@ -13,7 +13,7 @@
 - **YSM 可用**：默认包创建/打开（main+arm、2 贴图、303 动画、8 控制器）、显式保存（16 个文件）、导出（32 个文件 + manifest）、YSM 校验、贴图/动画/检查点/回滚。
 - **dsh 插件已安装并激活**：`include:blockbench-agent`（`@local/dsh-blockbench-agent`），`autoStart:true`；**30 个 `bb_*` 工具**（默认暴露 28 个，2 个 GUI 工具由命令接管）、**5 个命令**、**1 个 Skill**（`blockbench-ysm-artist`）、进程崩溃自动重启、GUI 抢占冻结、512px 附件缩略图。
 - **真实闭环已验证**：AI 通过工具创建 YSM 项目 → 加方块 → 精确 UV → 像素涂色 → 无头渲染 → 看图确认金色王冠 → 保存 → 导出。
-- **游戏内加载验证已通过**：在仓库内独立安装 Forge 1.20.1 + YSM 2.6.5，把导出包放入 `config/yes_steve_model/custom/live_gold3`，启动客户端进入世界后 `/ysm model reload` + `/ysm model set`，YSM 返回 `Set 'live_gold3' models for player`，第三人称截图可见金色王冠。
+- **游戏内加载验证已通过**：在仓库内独立安装 Forge 1.20.1 + YSM 2.6.5，把导出包放入 `config/yes_steve_model/custom/deepseek_fish`，启动客户端进入世界后 `/ysm model reload` + `/ysm model set`，YSM 返回 `Set 'live_gold3' models for player`，第三人称截图可见金色王冠。
 
 ## 2. 实测证据
 
@@ -113,7 +113,7 @@ v0.3.0 新增能力（hosttest 覆盖并通过）：
 
 产物：
 
-- 工作副本：`workspace/default/live_gold3/`（ysm.json、models/main.json、textures/default.png 等）
+- 工作副本：`models/deepseek-fish/pack/`（ysm.json、models/main.json、textures/default.png 等）；游戏验证使用 `deepseek_fish` 包
 - 发布副本：`workspace/default/exports/20261018123836/live_gold3/`（含 `export-manifest.json`）
 - 最终渲染：`workspace/default/artifacts/renders/r0003/{front,iso_fr}_768.png`（另有 512 附件缩略图 `*_attach512.png`）
 
@@ -185,7 +185,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 ## 5. 安装与使用
 
 - 已安装到当前 profile：entry `include:blockbench-agent`，配置见 `packages/dsh-blockbench-agent/cordis.patch.yml`。
-- **发布包**：`release/bb-agent-0.4.0-202610181503.zip`（208 个文件，9.3MB，含 `bb-agent-app/`、插件 bundle、文档、`INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`）；解包后按 `INSTALL.md` 安装。
+- **发布包**：`release/bb-agent-0.4.0-202610181519.zip`（211 个文件，9.4MB，含 `bb-agent-app/`、插件 bundle、文档、`INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`）；解包后按 `INSTALL.md` 安装。
 - 当前会话可直接调用 `bb_*` 工具；`/show` 显示隐藏的 Blockbench 窗口，`/hide` 回后台并同步用户改动，`/bb-status` 查看状态，`/bb-start` 启动运行时，`/bb-help` 列出工具。
 - 工作区：`F:\Deepseek_harness\blockbench\workspace\default\`；每次插件激活使用独立 `userdata-<pid>-<rand>`，避免实例锁冲突。
 - 关闭/重启 dsh 后插件会自动启动 BAE（autoStart=true）。如不想常驻，把 config 的 `autoStart` 改为 false。
@@ -210,6 +210,8 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 - 附件缩略图在 renderer 里生成（512px），因为 dsh Host 侧 `nativeImage` 不可用（见 `bb_diagnostics.image.nativeImage=false`）；原图仍按 768 落盘。
 - YSM 模板以 `templates/ysm_default` 随 BAE 分发（来自 YSM-Utils-Plugins assets/default，CC0 默认模型）。
 - 游戏内验证使用仓库内独立 `game-test/`（Forge/YSM/assets/world），不读写用户其他 Minecraft 实例；该目录已被 `.gitignore` 排除。
+
+
 
 
 
