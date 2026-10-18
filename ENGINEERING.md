@@ -36,6 +36,7 @@
 |---|---|---|
 | 协议 + BAE e2e（创建 YSM 包→建模→贴图→渲染→保存→导出） | `node packages/bb-agent-runtime/scripts/e2e.mjs` | ✅ PASSED（`workspace/_e2e/e2e-result.json`） |
 | dsh Host 插件全工具（mock ctx + 真实 spawn BAE + 图片附件 + 命令） | `node packages/dsh-blockbench-agent/test/host-smoke.mjs` | ✅ PASSED（`workspace/_hosttest/hosttest-result.json`） |
+| 全量回归（assemble → M0 → e2e WS → e2e HTTP+SSE → hosttest → 动画语义 diff） | `npm run test` | ✅ 6/6 PASSED（`workspace/_logs/test-all-final.log`） |
 | 导出的贴图像素校验 | PIL 读取导出 `default.png` | ✅ (8,8)=白、(10,10)=#aa3344（涂抹持久化） |
 
 e2e 关键结果：`project.create_ysm` 返回 70 bones / 182 cubes / 2 textures / 303 animations / 8 controllers；`project.save` 16 files；`project.export_ysm` 32 files + manifest；`project.validate` ok=true。
@@ -66,7 +67,7 @@ v0.4.0 新增能力（hosttest / e2e / test:all 覆盖）：
 - 动画保存：合并回写，保留原文件中未修改的动画条目/顺序，只替换语义变化、追加新增、移除删除；hosttest baseline 50→51；
 - watchdog-v2：逐图 `bbox/edge_touch`，review 增加 verdict（visible_change_clipped/empty_render）、metrics、checks、suggestions、vlm_hint；
 - Client UI：composer dock 的 `Blockbench` 状态 pill 轮询同源 `/bb-agent/status`（Host 注册的只读 JSON 路由），显示连接/状态/revision/GUI/verdict；
-- `npm run test`（全量）/`npm run test:quick`（hosttest + 动画语义 diff）。
+- `npm run test`（全量）/`npm run test:quick`（hosttest + 动画语义 diff）；2026-10-18 最终回归 **6/6 PASSED**。
 
 v0.3.0 新增能力（hosttest 覆盖并通过）：
 
@@ -209,6 +210,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 - 附件缩略图在 renderer 里生成（512px），因为 dsh Host 侧 `nativeImage` 不可用（见 `bb_diagnostics.image.nativeImage=false`）；原图仍按 768 落盘。
 - YSM 模板以 `templates/ysm_default` 随 BAE 分发（来自 YSM-Utils-Plugins assets/default，CC0 默认模型）。
 - 游戏内验证使用仓库内独立 `game-test/`（Forge/YSM/assets/world），不读写用户其他 Minecraft 实例；该目录已被 `.gitignore` 排除。
+
 
 
 
