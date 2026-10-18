@@ -114,11 +114,12 @@ v0.3.0 新增能力（hosttest 覆盖并通过）：
 产物：
 
 - 工作副本：`models/deepseek-fish/pack/`（ysm.json、models/main.json、textures/default.png 等）；游戏验证使用 `deepseek_fish` 包
-- 发布副本：`workspace/default/exports/20261018123836/live_gold3/`（含 `export-manifest.json`）
-- 最终渲染：`workspace/default/artifacts/renders/r0003/{front,iso_fr}_768.png`（另有 512 附件缩略图 `*_attach512.png`）
+- 游戏内安装：`game-test/config/yes_steve_model/custom/deepseek_fish/`
+- 最终截图：`models/deepseek-fish/screenshots/ingame-set.png`、`ingame-thirdperson.png`
+- 渲染图：`models/deepseek-fish/screenshots/render-front.png`、`render-closeup.png`、`render-iso.png`
 
-![live demo front](workspace/default/artifacts/renders/r0003/front_768.png)
-![live demo iso](workspace/default/artifacts/renders/r0003/iso_fr_768.png)
+![DeepSeek 鲸鱼娘 · 游戏内](models/deepseek-fish/screenshots/ingame-set.png)
+![DeepSeek 鲸鱼娘 · 渲染](models/deepseek-fish/screenshots/render-front.png)
 
 ## 3. 已实现的组成
 
@@ -210,6 +211,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 - 附件缩略图在 renderer 里生成（512px），因为 dsh Host 侧 `nativeImage` 不可用（见 `bb_diagnostics.image.nativeImage=false`）；原图仍按 768 落盘。
 - YSM 模板以 `templates/ysm_default` 随 BAE 分发（来自 YSM-Utils-Plugins assets/default，CC0 默认模型）。
 - 游戏内验证使用仓库内独立 `game-test/`（Forge/YSM/assets/world），不读写用户其他 Minecraft 实例；该目录已被 `.gitignore` 排除。
+
 
 
 
