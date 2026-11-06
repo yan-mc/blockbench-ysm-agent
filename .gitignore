@@ -7,6 +7,9 @@ node_modules/
 # archived test / reference material (kept on disk, never distributed)
 _archive/
 
+# 本地素材库（教程 PDF / 共享模型 / 参考图；含版权内容，不进仓库）
+材料/
+
 # upstream clones (keep out of VCS; re-clone per research docs)
 vendor/
 

@@ -23,6 +23,11 @@
 
 ## 2. 造型
 
+> **开做前先读语料规则**（181 个真实社区模型实测）：
+> 用 read 工具读 `F:\Deepseek_harness\blockbench\packages\dsh-blockbench-agent\reference\ysm-corpus-rules.md`
+> 三条最关键的：**方块总数中位 306**；**头部区域要占 35–40%**（成品感主要来自头）；
+> **贴图默认开 512**（128 只是模板遗留）。
+
 - 加方块：`{op:"add_cube", bone:"Head", name:"...", origin:[x,y,z], size:[w,h,d], texture:"default"}`
   - 坐标是 Blockbench 空间（Y 向上，像素=1/16 格）；先看父骨骼已有 cube 的 origin/size 对齐。
   - 加完立刻看 UV：`bb_scene({scope:"cube", id:"<name>", include_uv:true})`。
@@ -30,6 +35,8 @@
 - 改尺寸/位置：`{op:"update_cube", id:"...", origin:[...], size:[...]}`；改骨骼 `{op:"update_bone", ...}`。
 - `delete` 用 refs 数组；删骨骼会连带子级，慎重。
 - 布尔/网格/自由造型当前不保证；优先方块+骨骼。
+- **骨骼名要有语义**：语料里 `bone`/`bone2`… 出现率 54%，那是没改名的导入品，不是风格。
+- 手/脚加 `RightHandLocator` / `LeftHandLocator`（社区 62% 都有，只是空骨骼，成本为零）。
 
 ## 3. 贴图
 
@@ -98,8 +105,15 @@
 
 ## 8. YSM 约束速查
 
-- 默认 main：64 bones / 172 cubes 上限；arm：6 bones。超出会导致游戏端丢弃。
-- 贴图默认 128×128；单纹理多 UV 图集。
-- 必需定位组：Head、Body、RightArm、LeftArm、RightLeg、LeftLeg 等；`bb_validate` 会报缺失。
+> 硬约束与实测值必须分清。详见
+> `F:\Deepseek_harness\blockbench\packages\dsh-blockbench-agent\reference\ysm-corpus-rules.md` §0。
+
+- **骨骼数量：没有上限。** 默认模板是 64 bones / 172 cubes，但那是**模板自身的数量**，
+  不是限制。语料实测 77% 的模型 >64 骨，中位 83，最高 451。
+- **真正的限制是嵌套层数 ≤32**（YSM 2.6.3 起解除），以及网格子级 ≤64、纹理子级 ≤32。
+- 贴图分辨率上限 **4096×4096**（2.2.2 起）；默认模板是 128，但社区 35% 用 512。
+- 必需定位组：`Head`、`Body`、`RightArm`、`LeftArm`、`RightLeg`、`LeftLeg` 等；
+  `bb_validate` 会报缺失。手/脚建议加 `RightHandLocator`/`LeftHandLocator`（社区 62% 有）。
 - 动画文件路径由 ysm.json 决定（通常 `animations/main.animation.json`）；新建动画默认挂到 main。
 - 改完模型/贴图记得保存，否则导出的是磁盘旧版本。
+- 网格子级/纹理子级的上限由 `Cube.all.length`、`Texture.all.length` 决定，`bb_validate` 报错。

@@ -19,6 +19,7 @@
     "locale/*.json",
     "icon.svg",
     "skills/*.md",
+    "reference/*.md",
     "README.md"
   ],
   "dsh": {
