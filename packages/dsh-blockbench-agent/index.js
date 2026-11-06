@@ -16,6 +16,7 @@ import { searchRefs, sortCandidates, SOURCES as REF_SOURCES } from './lib/refsea
 import { collectRefs } from './lib/refcollect.js'
 import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSION } from './lib/spec.js'
 import { probeEnvironment, planInstall } from './lib/segprobe.js'
+import { inspectInstall, runInstall } from './lib/seginstall.js'
 import {
   findPython, modelsReady, downloadModels, ensureOnnxruntime, runSegmentation,
   SEG_MODEL_TOTAL_MB, PLUGIN_ROOT,
@@ -1641,6 +1642,67 @@ export function apply(ctx, config = {}) {
           hint: '看对照图（最后一格是分块图）：核对每个部件的位置/占比/颜色。'
             + '这是 T1，只覆盖可见区域；被遮挡部分的层级要靠常识或 T2。',
           ...(attachment ? { attachment } : {}),
+        })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_seg_install',
+    description: '安装 T2（See-through 分层能力）：内置下载 ComfyUI 便携版 + See-through 节点 + pip 依赖。'
+      + '默认只返回计划与当前安装状态（confirm:false）；confirm:true 才真下载（约 1.8GB + 2GB，可能十几分钟）。'
+      + '每步幂等可续：已存在的产物会跳过。**权重不在这里下**——由节点首次跑分层时自动从 HuggingFace 拉。'
+      + '装完会返回启动命令与 comfyUrl，需要把 comfyUrl 写进插件配置再用。',
+    parameters: {
+      confirm: { type: 'boolean', description: 'true 才真正执行安装，默认 false 只看计划' },
+      install_dir: { type: 'string', description: '安装目录，默认取配置 segInstallDir 或 ~/.dsh-seethrough' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args, exec) {
+      try {
+        const installDir = args.install_dir || cfg.segInstallDir || path.join(os.homedir(), '.dsh-seethrough')
+        const state = await inspectInstall(installDir)
+
+        if (!args.confirm) {
+          const probe = await raceAbort(probeEnvironment({ installDir, comfyUrl: cfg.comfyUrl }))
+          const plan = planInstall(probe, { installDir })
+          return lossless({
+            ok: true,
+            stage: 'plan',
+            install_dir: installDir,
+            current: state,
+            canInstall: plan.canInstall,
+            blockers: plan.blockers,
+            steps: plan.steps,
+            totalGB: plan.totalGB,
+            hint: plan.canInstall
+              ? '确认无误后调用 bb_seg_install({confirm:true}) 真正安装'
+              : '环境不满足 T2 条件，先用 T1（bb_seg_lite）',
+          })
+        }
+
+        if (state.portableExists && state.nodeExists) {
+          return lossless({
+            ok: true, stage: 'already-installed', install_dir: installDir, current: state,
+            paths: {
+              startCommand: `"${state.portable}\\python_embeded\\python.exe" -s "${state.comfyMain}" --listen 127.0.0.1 --port 8188`,
+              comfyUrl: 'http://127.0.0.1:8188',
+            },
+            hint: '已装好；用上面的 startCommand 启动 ComfyUI，再把 comfyUrl 写进插件配置',
+          })
+        }
+
+        const r = await runInstall({ installDir, onLog: log, signal: exec?.signal })
+        return lossless({
+          ok: r.ok,
+          stage: r.ok ? 'installed' : 'failed',
+          install_dir: installDir,
+          steps: r.steps,
+          paths: r.paths ?? null,
+          error: r.error ?? null,
+          hint: r.ok
+            ? '用 paths.startCommand 启动 ComfyUI（保持运行），然后把 comfyUrl 写进插件配置；首次跑分层会自动下载约 3GB 权重'
+            : '看 steps 里哪一步失败；已完成的步骤会保留，修好后可重跑（幂等）',
         })
       } catch (error) { return errorResult(error) }
     },

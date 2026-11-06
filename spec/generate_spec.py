@@ -541,6 +541,21 @@ TOOLS = [
         }, ["file"]),
     },
     {
+        "name": "bb_seg_install",
+        "title_zh": "安装分层能力（T2）",
+        "description": "安装 See-through：下载 ComfyUI 便携版 + See-through 节点 + pip 依赖。"
+                       "默认只返回计划与当前状态；confirm:true 才真下载（约 1.8GB+2GB）。"
+                       "每步幂等可续，已存在产物跳过。权重不在这里下（节点首次跑分层时自动拉）。",
+        "mutating": False, "requires_project": False, "concurrency_safe": False,
+        "protocol_method": None, "timeout_ms": 3600000,
+        "returns": "SegInstallResult", "attachments": False,
+        "errors": ["REQUEST_CANCELLED"],
+        "parameters": obj({
+            "confirm": {"type": "boolean", "default": False},
+            "install_dir": {"type": "string"},
+        }),
+    },
+    {
         "name": "bb_validate",
         "title_zh": "YSM 规范校验",
         "description": "按 YSM 规范与几何规则校验；导出前必须调用。A 级定位组缺失/改名=error，B 级默认层级偏离=warning。",
