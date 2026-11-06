@@ -141,6 +141,70 @@
   const packAbsolute = (packDir, rel) => joinPath(packDir, ...String(rel).split(/[\\/]+/).filter(Boolean))
 
   /**
+   * 把 PNG 最近邻重采样到指定尺寸（保持像素风，不引入插值糊）。
+   * 只在确实需要改尺寸时写盘。
+   */
+  async function resizePngFile(absPath, w, h) {
+    if (!nodeFs?.readFileSync || !nodeFs?.writeFileSync) return false
+    let buf
+    try { buf = nodeFs.readFileSync(absPath) } catch { return false }
+    const dataUrl = `data:image/png;base64,${buf.toString('base64')}`
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error(`decode failed: ${absPath}`))
+      el.src = dataUrl
+    })
+    if (img.width === w && img.height === h) return false
+    const c = document.createElement('canvas')
+    c.width = w; c.height = h
+    const ctx = c.getContext('2d')
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(img, 0, 0, w, h)
+    nodeFs.writeFileSync(absPath, c.toDataURL('image/png').split(',')[1], 'base64')
+    return true
+  }
+
+  /**
+   * 按目标分辨率改写资源包的贴图尺寸。
+   *
+   * 背景：`bb_session_start({resolution})` 之前完全没被实现 ——
+   * create_ysm 只读 height_scale/width_scale，模板永远是 128×128。
+   * 直接后果是**所有 >128 的 UV 被 clamp，渲染全错**，而错误信息不会告诉任何原因。
+   * 这里在加载前把几何描述与贴图像素一起改掉。
+   */
+  async function applyPackResolution(packDir, w, h) {
+    const changed = []
+    for (const name of ['main', 'arm']) {
+      const p = joinPath(packDir, 'models', `${name}.json`)
+      if (!nodeFs.existsSync(p)) continue
+      try {
+        const doc = JSON.parse(readTextSync(p))
+        const geo = doc?.['minecraft:geometry']?.[0]
+        if (!geo?.description) continue
+        if (geo.description.texture_width === w && geo.description.texture_height === h) continue
+        geo.description.texture_width = w
+        geo.description.texture_height = h
+        nodeFs.writeFileSync(p, JSON.stringify(doc), 'utf8')
+        changed.push(`models/${name}.json`)
+      } catch { /* 单个失败不阻断 */ }
+    }
+    const texDir = joinPath(packDir, 'textures')
+    if (nodeFs.existsSync(texDir)) {
+      for (const fname of nodeFs.readdirSync(texDir)) {
+        if (!/\.png$/i.test(fname)) continue
+        const base = fname.replace(/\.png$/i, '').toLowerCase()
+        // 只缩主角色贴图，别碰 arrow/boat 那些附属图
+        if (!['default', 'blue', 'skin', 'main'].includes(base)) continue
+        try {
+          if (await resizePngFile(joinPath(texDir, fname), w, h)) changed.push(`textures/${fname}`)
+        } catch { /* ignore */ }
+      }
+    }
+    return changed
+  }
+
+  /**
    * 收敛 pack_dir，防止「workspace 被拼了两次」。
    *
    * 实测事故：调用方传了仓库根相对的 `models/<项目>/sakiko`，它被当成 workspace 相对路径
@@ -977,6 +1041,18 @@
     const template = templateCandidates.find((p) => p && nodeFs.existsSync(p))
     if (!template) throw err('PACK_INVALID', `YSM default template missing (looked in ${templateCandidates.join(', ')})`, { code: 'PACK_INVALID' })
     copyDirRecursive(template, packDir)
+    // 分辨率：模板固定 128×128，不处理会让 >128 的 UV 被 clamp
+    const clampRes = (v) => Math.max(16, Math.min(4096, Math.round(Number(v) || 0)))
+    const wantRes = (() => {
+      const raw = params.resolution
+      if (Array.isArray(raw) && raw.length >= 2) return [clampRes(raw[0]), clampRes(raw[1])]
+      if (typeof raw === 'number' && Number.isFinite(raw)) { const v = clampRes(raw); return [v, v] }
+      return null
+    })()
+    let resolutionChanged = []
+    if (wantRes && (wantRes[0] !== 128 || wantRes[1] !== 128)) {
+      resolutionChanged = await applyPackResolution(packDir, wantRes[0], wantRes[1])
+    }
     const ysmJson = normalizeYsm(readJsonSync(joinPath(packDir, 'ysm.json')))
     ysmJson.metadata.name = name
     if (typeof params.height_scale === 'number') ysmJson.properties.height_scale = params.height_scale
@@ -1017,6 +1093,7 @@
       summary: { bones, cubes, textures: textureIds.size, animations: Animation.all.length, controllers: (window.AnimationController?.all ?? []).length },
       root_bones: Group.all.filter((g) => !g.parent).map((g) => ({ bone: g.name, id: g.uuid, parent: null, cubes: g.children?.length ?? 0 })),
       textures: [...textureIds.values()].map((t) => ({ texture: t.name, id: t.uuid, size: [t.width, t.height] })),
+      resolution: wantRes ? { requested: wantRes, changed_files: resolutionChanged } : { requested: null, changed_files: [] },
       warnings: [],
     }
   }
@@ -1244,7 +1321,8 @@
               to: [origin[0] + size[0], origin[1] + size[1], origin[2] + size[2]],
               origin: op.pivot ? vec(op.pivot) : [0, 0, 0],
               uv_offset: [0, 0],
-              autouv: op.autouv === false ? 0 : 1,
+              // 显式要 box UV 时别先 mapAutoUV，否则会被自动排布覆盖
+              autouv: (op.autouv === false || op.uv?.mode === 'box') ? 0 : 1,
             })
             if (op.name) cube.name = op.name
             if (op.rotation) cube.rotation = vec(op.rotation)
@@ -1259,7 +1337,18 @@
             }
             if (bone) cube.addTo(bone)
             Canvas.updateView?.({ elements: [cube], element_aspects: { transform: true, geometry: true, faces: true } })
-            if (op.uv?.mode === 'faces' && op.uv.faces) {
+            if (op.uv?.mode === 'box') {
+              // 之前只处理 faces 分支，box 会被静默忽略 —— 调用方以为指定了贴图区域，
+              // 实际仍是 mapAutoUV 乱排的结果。这里补上真正的 box UV。
+              cube.box_uv = true
+              const off = op.uv.uv ?? op.uv.offset ?? op.uv_offset
+              if (Array.isArray(off)) cube.uv_offset = [Number(off[0]) || 0, Number(off[1]) || 0]
+              const boxSize = op.uv.size ?? op.uv_size
+              cube.stretch_uv = false
+              if (Array.isArray(boxSize) && boxSize.length >= 2) {
+                cube.uv_size = [Number(boxSize[0]) || 0, Number(boxSize[1]) || 0]
+              }
+            } else if (op.uv?.mode === 'faces' && op.uv.faces) {
               cube.box_uv = false
               const faceSize = {
                 north: [size[0], size[1]], south: [size[0], size[1]],
@@ -3172,10 +3261,16 @@
     let success = false
     try {
       const anim = createAnimation(params)
+      // 必须标记脏：saveYsmPack 只写 state.dirtyAnimations 里的文件，
+      // 而且 mergeAnimationJson 只会把「脏名字」的新动画补进已有 JSON。
+      // 实测漏掉这一步会得到「新动画在 .bbmodel 里、但不在 main.animation.json 里」，
+      // 导出后游戏里看不到动作。
+      if (anim.path) state.dirtyAnimations.add(anim.path)
+      state.dirtyAnimationNames.add(anim.name)
       success = true
       state.counters.edits += 1
       const revision = bump('agent', [{ kind: 'animation', id: anim.uuid, op: 'create' }])
-      return { animation: anim.name, id: anim.uuid, length: anim.length, loop: anim.loop, revision }
+      return { animation: anim.name, id: anim.uuid, length: anim.length, loop: anim.loop, path: anim.path ?? null, revision }
     } finally {
       if (success) { try { Undo.finishEdit('Agent create animation') } catch { /* ignore */ } }
     }

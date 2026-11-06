@@ -1,8 +1,8 @@
 {
   "spec": 2,
   "metadata": {
-    "name": "deepseek-fish",
-    "tips": "默认模型",
+    "name": "丰川祥子 · 旋律的主人",
+    "tips": "Arknights x BanG Dream! Ave Mujica — CROSSOVER skin / Master of Melodia",
     "license": {
       "type": "CC 0"
     },
@@ -55,7 +55,7 @@
     "gui_no_lighting": false,
     "gui_foreground": "textures/gui/foreground.png",
     "gui_background": "textures/gui/background.png",
-    "default_texture": "default",
+    "default_texture": "skin",
     "render_layers_first": false,
     "free": true
   },
@@ -81,8 +81,7 @@
         "controller/main.animation_controllers.json"
       ],
       "texture": [
-        "textures/default.png",
-        "textures/blue.png"
+        "textures/skin.png"
       ]
     },
     "projectiles": [

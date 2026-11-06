@@ -243,7 +243,7 @@
 | op | 字段 | 说明 |
 |---|---|---|
 | `add_bone` | `parent?`, `name`, `pivot`, `rotation?`, `mirror?` | 新建骨骼；`mirror:"x"` 时同时创建镜像骨骼（名字自动 `_R`/`_L` 或按 YSM 规则） |
-| `update_bone` | `bone`, `pivot?`, `rotation?`, `scale?`, `name?` | 修改骨骼属性 |
+| `update_bone` | `bone`, `pivot?`, `rotation?`, `name?` | 修改骨骼属性。**不支持 `scale`**（Blockbench 不做骨骼缩放渲染/导出，传了会报 `UNSUPPORTED_FIELD`；要改体量请用 `update_cube` 改几何或加中间骨骼） |
 | `reparent` | `bone`, `parent` | 改父级（保持世界变换或局部变换，默认局部） |
 | `add_cube` | `bone`, `name?`, `origin`, `size`, `rotation?`, `pivot?`, `uv?`, `texture?`, `inflate?` | 加方块；`uv` 省略时自动按 Box UV 放置并避让已占用区域 |
 | `update_cube` | `cube_id`, `origin?`, `size?`, `rotation?`, `pivot?`, `inflate?`, `texture?` | 改方块 |
