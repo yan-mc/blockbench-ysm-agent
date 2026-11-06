@@ -23,10 +23,14 @@
 
 ## 2. 造型
 
-> **开做前先读语料规则**（181 个真实社区模型实测）：
-> 用 read 工具读 `F:\Deepseek_harness\blockbench\packages\dsh-blockbench-agent\reference\ysm-corpus-rules.md`
-> 三条最关键的：**方块总数中位 306**；**头部区域要占 35–40%**（成品感主要来自头）；
-> **贴图默认开 512**（128 只是模板遗留）。
+> **开做前读这两份**（用 read 工具，绝对路径）：
+> - `F:\Deepseek_harness\blockbench\packages\dsh-blockbench-agent\reference\blockbench-ysm-playbook.md`
+>   —— 操作规范：骨架/命名/边角填缝/眼睛四层/贴图色彩/arm.json/动画槽位/MoLang
+> - `F:\Deepseek_harness\blockbench\packages\dsh-blockbench-agent\reference\ysm-corpus-rules.md`
+>   —— 181 个真实模型实测：方块预算、竖向分布、贴图尺寸、骨架出现率
+>
+> 三条最关键的：**方块总数中位 306、人物建议 50-300**；
+> **头部区域要占 35–40%**（成品感主要来自头）；**贴图默认开 256，128 只是模板遗留**。
 
 - 加方块：`{op:"add_cube", bone:"Head", name:"...", origin:[x,y,z], size:[w,h,d], texture:"default"}`
   - 坐标是 Blockbench 空间（Y 向上，像素=1/16 格）；先看父骨骼已有 cube 的 origin/size 对齐。
@@ -36,9 +40,21 @@
 - `delete` 用 refs 数组；删骨骼会连带子级，慎重。
 - 布尔/网格/自由造型当前不保证；优先方块+骨骼。
 - **骨骼名要有语义**：语料里 `bone`/`bone2`… 出现率 54%，那是没改名的导入品，不是风格。
+  官方规范：大写驼峰 + 形容词+名称（`LeftArm`/`AllHead`）；无意义分组用 `Mouth1`/`Mouth2`。
 - 手/脚加 `RightHandLocator` / `LeftHandLocator`（社区 62% 都有，只是空骨骼，成本为零）。
+  **Locator 必须放在对应 `Hand` 组里面**，否则持物定位失效。
+- **边角接缝**：两面共面或近乎共面时调 `inflate`——`+0.01~+0.005` 外撑遮缝，
+  `-0.01` 内收避穿模。不要用大幅 inflate 当圆角。
+- **眼睛做四层**：`Eyelid → EyelidBase → EyesDot / Pupil (+高光)`，缺 EyesDot 会"糊"。
 
 ## 3. 贴图
+
+**上色五条**（来自官方群课程，详见 playbook §7）：
+1. **明度**：朝上的面更亮、朝下的面更暗；朝南北较亮、朝东西较暗
+2. **饱和度**：亮部更低、暗部更高；阴影饱和度较低
+3. **天光设定**：阳光亮黄+大气蓝 → **亮面偏暖、暗面偏冷、阴影偏冷**
+4. **AO**：阳角亮、阴角暗
+5. **闭塞阴影**：物体根部/缝隙最深，越远越浅
 
 - 先 `bb_texture_read({format:"palette", region:[...]})` 看主色，避免覆盖重要区域。
 - 涂色：`bb_texture_patch({texture:"default", ops:[{op:"rect"...},{op:"line"...},{op:"pixel"...}]})`，坐标是纹理像素（默认 128×128）。
