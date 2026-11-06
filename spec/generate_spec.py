@@ -428,25 +428,52 @@ TOOLS = [
         }),
     },
     {
-        "name": "bb_ref_search",
-        "title_zh": "参考图多源搜索",
-        "description": "按角色名在多个图片源搜索造型参考图（正面/侧面/背面的官方立绘、设定集、动画截图）。"
-                       "内置 Bing / 360 / 萌娘百科图库；单源失败自动跳过并在 sources 报告状态。"
-                       "结果按「信息密度」先验排序（设定集/全身立绘 > 一般图）。",
+        "name": "bb_ref_canon",
+        "title_zh": "官方基准（必做第一步）",
+        "description": "取角色的官方基准：百科条目的外观文字描述 + 官方/条目自带图，"
+                       "并抽出外文名/罗马音供深度搜索使用。用于在大量搜集同人图之前先确认"
+                       "角色到底长什么样，避免把别的角色或 AI 图当参考。",
         "mutating": False, "requires_project": False, "concurrency_safe": True,
         "protocol_method": None, "timeout_ms": 120000,
+        "returns": "RefCanonResult", "attachments": True,
+        "errors": ["INVALID_PARAMS", "REQUEST_CANCELLED"],
+        "parameters": obj({
+            "character": {"type": "string", "description": "角色名（中文/日文/英文）"},
+            "download": {"type": "boolean", "default": True},
+            "max_images": {"type": "integer", "minimum": 1, "maximum": 20, "default": 6},
+            "cell": {"type": "integer", "minimum": 96, "maximum": 512, "default": 260},
+            "attach": {"type": "boolean", "default": True},
+        }, ["character"]),
+    },
+    {
+        "name": "bb_ref_search",
+        "title_zh": "参考图多源深度搜索",
+        "description": "按角色名在多个图片源搜索造型参考图（官方立绘、设定集、动画截图）。"
+                       "源：Bing（多语区×分页）/ 360（分页）/ 萌娘百科图库 / yande.re（booru，需罗马音）。"
+                       "depth=deep 会展开全部查询词×多语区×多页，候选量可放大十几倍（搜索本身很便宜）。"
+                       "单源失败自动跳过并在 sources 报告状态；结果按信息密度先验排序。",
+        "mutating": False, "requires_project": False, "concurrency_safe": True,
+        "protocol_method": None, "timeout_ms": 180000,
         "returns": "RefSearchResult", "attachments": False,
         "errors": ["INVALID_PARAMS", "REQUEST_CANCELLED"],
         "parameters": obj({
             "character": {"type": "string", "description": "角色名（中文/日文/英文均可）"},
+            "depth": {"type": "string", "enum": ["fast", "deep"],
+                      "description": "fast=6 词单页（默认）；deep=全部模板×多语区×多页"},
+            "romaji": {"type": "array", "items": {"type": "string"},
+                       "description": "罗马音/外文名（来自 bb_ref_canon 的 name_variants），给 yande.re 用"},
             "queries": {"type": "array", "items": {"type": "string"},
                         "description": "自定义查询词；省略用内置模板"},
-            "sources": {"type": "array", "items": {"enum": ["bing", "so360", "moegirl"]},
+            "sources": {"type": "array", "items": {"enum": ["bing", "so360", "moegirl", "yande"]},
                         "description": "源 id 白名单；省略用全部"},
+            "markets": {"type": "array", "items": {"type": "string"},
+                        "description": "Bing 语区，deep 默认 zh-CN/ja-JP/en-US"},
+            "pages": {"type": "array", "items": {"type": "integer", "minimum": 1},
+                      "description": "分页序号，deep 时 bing 默认 [1,2,3]、360 默认 [1,2]"},
             "per_source": {"type": "integer", "minimum": 5, "maximum": 50, "default": 30},
-            "max_queries": {"type": "integer", "minimum": 1, "maximum": 10, "default": 6},
+            "max_queries": {"type": "integer", "minimum": 1, "maximum": 24, "default": 6},
             "timeout_ms": {"type": "integer", "minimum": 1000, "default": 20000},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 60},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 300, "default": 60},
         }, ["character"]),
     },
     {

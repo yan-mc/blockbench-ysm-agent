@@ -13,6 +13,7 @@ import { createWsServer } from './lib/ws-server.js'
 import { imageTokens } from './lib/viewsheet.js'
 import { offloadSessionImages, countLiveImages } from './lib/imageprune.js'
 import { searchRefs, sortCandidates, SOURCES as REF_SOURCES } from './lib/refsearch.js'
+import { canonLookup } from './lib/refcanon.js'
 import { collectRefs } from './lib/refcollect.js'
 import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSION } from './lib/spec.js'
 import { probeEnvironment, planInstall } from './lib/segprobe.js'
@@ -1170,6 +1171,8 @@ export function apply(ctx, config = {}) {
 
   /** 上一次搜索结果，供 bb_ref_collect 免传 urls。 */
   let lastRefSearch = null
+/** 最近一次 bb_ref_canon 的结果（含 name_variants，供深度搜索复用罗马音）。 */
+let lastRefCanon = null
 
   /** 角色名 → 安全的目录名。 */
   function slugify(s) {
@@ -1209,26 +1212,127 @@ export function apply(ctx, config = {}) {
   }
 
   tool({
-    name: 'bb_ref_search',
-    description: '按角色名在多个图片源搜索**造型参考图**（正面/侧面/背面的官方立绘、设定集、动画截图）。'
-      + '内置 Bing / 360 / 萌娘百科图库三个源，单源失败自动跳过并在 sources 里报告状态。'
-      + '结果按「信息密度」先验排序：设定集/全身立绘 > 一般图。'
-      + '拿到列表后调用 bb_ref_collect 下载并拼成对照表。找不到的源会明确写 error，不要谎报成功。',
+    name: 'bb_ref_canon',
+    description: '【第一步必做】取角色的**官方基准**：百科条目里的外观文字描述 + 官方/条目自带的图。'
+      + '用途：在大量搜集同人图之前，先确认「这个角色到底长什么样」（发色/瞳色/服装/身高），'
+      + '后面每张候选图都拿它来对，防止把别的角色或 AI 图当成参考。'
+      + '同时会抽出**外文名/罗马音**（booru 类图站只认罗马音标签），供 bb_ref_search 深度搜索用。'
+      + '数据来自公开 MediaWiki API（萌娘百科 / 维基百科）。',
     parameters: {
       character: { type: 'string', required: true, description: '角色名（中文/日文/英文都可以）' },
-      queries: { type: 'array', description: '自定义查询词数组；省略则用内置模板（设定集/三视图/全身立绘/背面/日英版本）' },
+      download: { type: 'boolean', description: '是否把官方图下载下来拼成对照表，默认 true' },
+      max_images: { type: 'number', description: '最多取几张官方图，默认 6' },
+      cell: { type: 'number', description: '对照表单格像素，默认 260' },
+      attach: { type: 'boolean', description: '是否附图，默认 true' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const t0 = Date.now()
+        const character = String(args.character || '').trim()
+        if (!character) return { ok: false, code: 'INVALID_PARAMS', message: 'character required' }
+
+        const canon = await raceAbort(canonLookup({
+          character, signal: exec?.signal, maxImages: args.max_images ?? 6,
+        }), exec?.signal)
+
+        // 记住基准，供后续深度搜索用（尤其罗马音）
+        lastRefCanon = { character, at: Date.now(), ...canon }
+
+        let sheet = null
+        let sheetSize = null
+        let downloaded = []
+        if (args.download !== false && canon.images.length) {
+          const relDir = path.posix.join(cfg.refDir, slugify(character), 'canon')
+          const absDir = path.resolve(workspace, relDir)
+          try {
+            const collected = await raceAbort(collectRefs({
+              candidates: canon.images.map((i) => ({ url: i.url, kind: 'canon' })),
+              outDir: absDir,
+              fsp,
+              maxImages: args.max_images ?? 6,
+              concurrency: 4,
+              timeoutMs: cfg.refTimeoutMs,
+              signal: exec?.signal,
+              onLog: log,
+            }), exec?.signal)
+            downloaded = collected.images.map((im, i) => ({
+              index: i, rel: im.rel, size: im.size, bytes: im.bytes,
+              title: canon.images[i]?.title ?? null,
+            }))
+            if (downloaded.length) {
+              const s = await raceAbort(call('ref.sheet', {
+                files: downloaded.map((d) => d.rel),
+                cell: args.cell ?? 260,
+                background: '#101014',
+                labels: true,
+                hash: false,
+              }, 120000), exec?.signal)
+              if (args.attach !== false) {
+                sheet = await saveInlineAttachment(s.png, `canon-${slugify(character)}.png`)
+                sheetSize = [s.width, s.height]
+                if (sheet) lookStats.images += 1
+              }
+            }
+          } catch (error) { log('[canon] 下载/拼图失败:', error?.message) }
+        }
+
+        return lossless({
+          ok: true,
+          character,
+          facts: canon.facts,
+          name_variants: canon.name_variants,
+          images: canon.images,
+          downloaded,
+          image_pool: canon.image_pool,
+          sources: canon.sources,
+          out_dir: downloaded.length ? path.posix.join(cfg.refDir, slugify(character), 'canon') : null,
+          tokens_est: sheetSize ? imageTokens(sheetSize[0], sheetSize[1]) : 0,
+          elapsed_ms: Date.now() - t0,
+          hint: '先读 facts 与 name_variants，再**看这张官方图**确认风格；'
+            + '然后 bb_ref_search({character, depth:"deep", romaji:name_variants}) 做大面积搜索，'
+            + '每题都用这份基准判断对不对。',
+          ...(sheet ? { attachment: sheet } : {}),
+        })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_ref_search',
+    description: '按角色名在多个图片源搜索**造型参考图**（正面/侧面/背面的官方立绘、设定集、动画截图）。'
+      + '源：Bing（多语区×分页）/ 360 图片（分页）/ 萌娘百科图库 / yande.re（booru，需罗马音）。'
+      + '单源失败自动跳过并在 sources 里报告状态。'
+      + '**推荐先用 bb_ref_canon 拿官方基准**，再把它的 name_variants 作为 romaji 传进来；'
+      + '搜索本身很便宜，depth:"deep" 会展开全部查询词 × 多语区 × 多页，候选量可放大十几倍。'
+      + '结果按「信息密度」先验排序：设定集/全身立绘 > 一般图。拿到列表后调用 bb_ref_collect 下载拼图。',
+    parameters: {
+      character: { type: 'string', required: true, description: '角色名（中文/日文/英文都可以）' },
+      depth: { type: 'string', enum: ['fast', 'deep'], description: 'fast=6 词单页（默认）；deep=全部模板 × 多语区 × 多页' },
+      romaji: { type: 'array', description: '罗马音/外文名数组（来自 bb_ref_canon 的 name_variants），给 yande.re 用' },
+      queries: { type: 'array', description: '自定义查询词数组；省略则用内置模板' },
       sources: { type: 'array', description: `源 id 白名单，可选：${REF_SOURCES.map((s) => s.id).join(' / ')}；省略用全部` },
+      markets: { type: 'array', description: 'Bing 语区，deep 时默认 ["zh-CN","ja-JP","en-US"]' },
+      pages: { type: 'array', description: '分页序号，deep 时 bing 默认 [1,2,3]、360 默认 [1,2]' },
       per_source: { type: 'number', description: '每个源每次查询取多少条，默认 30（5-50）' },
-      max_queries: { type: 'number', description: '最多用几个查询词，默认 6' },
+      max_queries: { type: 'number', description: '最多用几个查询词；deep 默认全部' },
       timeout_ms: { type: 'number', description: '单次请求超时，默认 20000' },
-      limit: { type: 'number', description: '返回给模型的候选条数上限，默认 60' },
+      limit: { type: 'number', description: '返回给模型的候选条数上限，默认 60（deep 可到 200）' },
     },
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
     async execute(args, exec) {
       try {
         const t0 = Date.now()
+        // 没显式给 romaji 就沿用 bb_ref_canon 抽出来的外文名
+        const romaji = Array.isArray(args.romaji) && args.romaji.length
+          ? args.romaji
+          : (lastRefCanon?.character === args.character ? lastRefCanon.name_variants : [])
         const res = await raceAbort(searchRefs({
           character: args.character,
+          depth: args.depth,
+          romaji,
+          markets: Array.isArray(args.markets) && args.markets.length ? args.markets : undefined,
+          pages: Array.isArray(args.pages) && args.pages.length ? args.pages : undefined,
           extraQueries: Array.isArray(args.queries) ? args.queries : undefined,
           sources: Array.isArray(args.sources) && args.sources.length ? args.sources : (cfg.refSources?.length ? cfg.refSources : undefined),
           perSource: args.per_source,
@@ -1239,11 +1343,14 @@ export function apply(ctx, config = {}) {
         }), exec?.signal)
         const sorted = sortCandidates(res.candidates)
         lastRefSearch = { character: args.character, candidates: sorted, sources: res.sources, queries: res.queries }
-        const limit = Math.max(1, Math.min(200, args.limit ?? 60))
+        const limit = Math.max(1, Math.min(300, args.limit ?? (args.depth === 'deep' ? 120 : 60)))
         const okSources = res.sources.filter((s) => s.ok)
         return lossless({
           ok: true,
           character: args.character,
+          depth: res.depth,
+          tasks: res.tasks,
+          romaji_used: res.romaji_used,
           total: sorted.length,
           queries: res.queries,
           sources: res.sources,

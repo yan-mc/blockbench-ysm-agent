@@ -22,19 +22,39 @@ const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 /** 查询词模板：中文 / 日文 / 英文三路，覆盖「设定集」这类高价值词。 */
 export const QUERY_TEMPLATES = [
-  { kind: 'base', suffix: '' },
+  // 中文：设定资料优先
   { kind: 'sheet', suffix: ' 设定集' },
   { kind: 'sheet', suffix: ' 三视图' },
   { kind: 'fullbody', suffix: ' 全身立绘' },
+  { kind: 'base', suffix: '' },
   { kind: 'back', suffix: ' 背面' },
+  { kind: 'sheet', suffix: ' 官方设定图' },
+  { kind: 'fullbody', suffix: ' 立绘 官方' },
+  { kind: 'sheet', suffix: ' 人设图' },
+  { kind: 'fullbody', suffix: ' 全身 高清' },
+  { kind: 'closeup', suffix: ' 脸部特写' },
+  { kind: 'outfit', suffix: ' 服装 细节' },
+  { kind: 'side', suffix: ' 侧面' },
+  // 日文
   { kind: 'sheet', suffix: ' 設定資料集', lang: 'ja' },
   { kind: 'fullbody', suffix: ' 立ち絵', lang: 'ja' },
+  { kind: 'sheet', suffix: ' 全身 設定', lang: 'ja' },
+  { kind: 'back', suffix: ' 後ろ姿', lang: 'ja' },
+  { kind: 'outfit', suffix: ' 衣装 設定', lang: 'ja' },
+  // 英文
   { kind: 'sheet', suffix: ' character sheet', lang: 'en' },
   { kind: 'fullbody', suffix: ' full body', lang: 'en' },
   { kind: 'back', suffix: ' back view', lang: 'en' },
+  { kind: 'fullbody', suffix: ' official art', lang: 'en' },
+  { kind: 'outfit', suffix: ' outfit reference', lang: 'en' },
+  { kind: 'side', suffix: ' side view', lang: 'en' },
 ];
 
-/** 按角色名生成查询列表。默认只要 5 条：base+sheet×2+fullbody+back，兼顾覆盖面与耗时。 */
+/**
+ * 按角色名生成查询列表。
+ * @param {object} opts
+ * @param {'fast'|'deep'} [opts.depth]  fast=6 条，deep=全部模板（大面积搜，搜索本身很便宜）
+ */
 export function buildQueries(character, opts = {}) {
   const name = String(character || '').trim();
   if (!name) return [];
@@ -42,13 +62,11 @@ export function buildQueries(character, opts = {}) {
   if (extra.length) {
     return [...extra.map((q) => ({ q: String(q), kind: 'custom' }))];
   }
-  const max = Math.max(1, Math.min(QUERY_TEMPLATES.length, opts.maxQueries ?? 6));
-  // 优先取中文高价值词，再按需补日/英
-  const order = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-  return order.slice(0, max).map((i) => {
-    const t = QUERY_TEMPLATES[i];
-    return { q: `${name}${t.suffix}`, kind: t.kind, lang: t.lang ?? 'zh' };
-  });
+  const deep = opts.depth === 'deep' || opts.deep === true;
+  const max = Math.max(1, Math.min(QUERY_TEMPLATES.length, opts.maxQueries ?? (deep ? QUERY_TEMPLATES.length : 6)));
+  return QUERY_TEMPLATES.slice(0, max).map((t) => ({
+    q: `${name}${t.suffix}`, kind: t.kind, lang: t.lang ?? 'zh',
+  }));
 }
 
 function decodeEntities(s) {
@@ -80,13 +98,15 @@ async function httpGet(url, { headers = {}, timeoutMs = 15000, signal } = {}) {
 
 // ---------------------------------------------------------------- adapters
 
-/** Bing 图片（异步接口，一次约 34 条）。 */
+/** Bing 图片（异步接口，一次约 34 条；可通过 market/page 放大覆盖）。 */
 const bing = {
   id: 'bing',
   label: 'Bing 图片',
-  async search(query, { count = 35, signal } = {}) {
+  async search(query, { count = 35, market = 'zh-CN', page = 1, signal } = {}) {
+    // first=1,36,71… 分页；mkt 换语区能显著增加不同结果（实测 ja-JP 与 zh-CN 结果差异大）
+    const first = 1 + (Math.max(1, page) - 1) * count
     const url = `https://www.bing.com/images/async?q=${encodeURIComponent(query)}`
-      + `&first=1&count=${count}&mkt=zh-CN&adlt=off`
+      + `&first=${first}&count=${count}&mkt=${encodeURIComponent(market)}&adlt=off`
     const r = await httpGet(url, {
       headers: { Accept: 'text/javascript,text/html,*/*', Referer: 'https://www.bing.com/images/search' },
       signal,
@@ -107,12 +127,13 @@ const bing = {
   },
 }
 
-/** 360 图片（JSON 接口）。 */
+/** 360 图片（JSON 接口，支持 pn 分页）。 */
 const so360 = {
   id: 'so360',
   label: '360 图片',
-  async search(query, { count = 30, signal } = {}) {
-    const url = `https://image.so.com/j?q=${encodeURIComponent(query)}&pn=0&rn=${count}&src=srp`
+  async search(query, { count = 30, page = 1, signal } = {}) {
+    const pn = (Math.max(1, page) - 1) * count
+    const url = `https://image.so.com/j?q=${encodeURIComponent(query)}&pn=${pn}&rn=${count}&src=srp`
     const r = await httpGet(url, {
       headers: { Accept: 'application/json,*/*', Referer: `https://image.so.com/i?q=${encodeURIComponent(query)}` },
       signal,
@@ -130,6 +151,41 @@ const so360 = {
         height: Number(it.height) || undefined,
       }))
       .filter((x) => /^https?:\/\//.test(x.url))
+  },
+}
+
+/**
+ * yande.re（danbooru 系 booru）。
+ *
+ * 价值：以**原始尺寸高质量插画**为主，且带精确 width/height/score/rating，
+ * 是「大面积搜集 + 用尺寸和评分筛」的好来源。
+ * 限制：标签必须是**罗马音/英文**（如 minato_yukari），中文名搜不到 ——
+ * 所以由 bb_ref_canon 从百科文本里抽 name_variants，再传给这里。
+ * 只用 rating:s（safe），避免不适宜内容。
+ */
+const yande = {
+  id: 'yande',
+  label: 'yande.re（booru）',
+  async search(query, { count = 30, signal } = {}) {
+    const tag = String(query).trim().replace(/\s+/g, '_').toLowerCase()
+    if (!/^[a-z0-9_]+$/.test(tag)) throw new Error('yande 需要罗马音标签')
+    const url = `https://yande.re/post.json?tags=${encodeURIComponent(`${tag} rating:s`)}&limit=${Math.min(100, count)}`
+    const r = await httpGet(url, { headers: { Accept: 'application/json,*/*' }, signal })
+    if (!r.ok) throw new Error(`yande ${r.status}`)
+    let data
+    try { data = JSON.parse(r.text) } catch { throw new Error('yande json parse failed') }
+    if (!Array.isArray(data)) return []
+    return data
+      .map((it) => ({
+        // 优先 sample（够用且小），没有就用原图
+        url: it.sample_url || it.jpeg_url || it.file_url,
+        pageUrl: `https://yande.re/post/show/${it.id}`,
+        title: it.tags,
+        width: Number(it.sample_width || it.width) || undefined,
+        height: Number(it.sample_height || it.height) || undefined,
+        score: Number(it.score) || 0,
+      }))
+      .filter((x) => /^https?:\/\//.test(x.url || ''))
   },
 }
 
@@ -188,7 +244,7 @@ const moegirl = mediaWikiAdapter({
 })
 
 /** 已注册源。加源只需往这里 push 一个 {id,label,search}。 */
-export const SOURCES = [bing, so360, moegirl]
+export const SOURCES = [bing, so360, moegirl, yande]
 
 export function sourceById(id) {
   return SOURCES.find((s) => s.id === id) ?? null
@@ -228,15 +284,19 @@ export function looksLikeImageUrl(url) {
  * @returns {Promise<{candidates:object[], sources:object[]}>}
  */
 export async function searchRefs(p = {}) {
+  const deep = p.depth === 'deep' || p.deep === true
   const queries = Array.isArray(p.queries) && p.queries.length
     ? p.queries.map((q) => ({ q: String(q), kind: 'custom' }))
-    : buildQueries(p.character, { extraQueries: p.extraQueries, maxQueries: p.maxQueries })
+    : buildQueries(p.character, { extraQueries: p.extraQueries, maxQueries: p.maxQueries, depth: deep ? 'deep' : 'fast' })
   if (!queries.length) throw Object.assign(new Error('character or queries required'), { code: 'INVALID_PARAMS' })
 
   const wanted = new Set(Array.isArray(p.sources) && p.sources.length ? p.sources : SOURCES.map((s) => s.id))
   const active = SOURCES.filter((s) => wanted.has(s.id))
   const perSource = Math.max(5, Math.min(50, p.perSource ?? 30))
   const timeoutMs = p.timeoutMs ?? 20000
+  // 罗马音标签：booru 系（yande）只认这个，由 bb_ref_canon 从百科文本抽出后传进来
+  const romaji = (Array.isArray(p.romaji) ? p.romaji : (p.romaji ? [p.romaji] : []))
+    .map((s) => String(s).trim()).filter(Boolean)
 
   const seen = new Set()
   const candidates = []
@@ -244,41 +304,93 @@ export async function searchRefs(p = {}) {
 
   const tasks = []
   active.forEach((src, si) => {
-    queries.forEach((q) => {
-      tasks.push((async () => {
-        const stat = sourceStats[si]
-        try {
-          const list = await src.search(q.q, { count: perSource, signal: p.signal, timeoutMs })
-          let added = 0
-          for (const it of list) {
-            const url = normalizeUrl(it.url)
-            if (!looksLikeImageUrl(url)) continue
-            const key = url.replace(/[?#].*$/, '')
-            if (seen.has(key)) continue
-            seen.add(key)
-            candidates.push({
-              url,
-              pageUrl: it.pageUrl ? normalizeUrl(it.pageUrl) : undefined,
-              title: it.title,
-              site: it.site,
-              width: it.width,
-              height: it.height,
-              mime: it.mime,
-              source: src.id,
-              query: q.q,
-              kind: q.kind,
-            })
-            added += 1
+    // 每个源要跑哪些变体：deep 模式下用「语区 × 分页」把候选量放大
+    let plans
+    if (src.id === 'bing') {
+      const markets = p.markets ?? ['zh-CN', 'ja-JP', 'en-US']
+      const pages = p.pages ?? (deep ? [1, 2, 3] : [1])
+      plans = deep ? markets.flatMap((market) => pages.map((page) => ({ market, page }))) : [{ market: markets[0], page: 1 }]
+    } else if (src.id === 'so360') {
+      const pages = p.pages ?? (deep ? [1, 2] : [1])
+      plans = pages.map((page) => ({ page }))
+    } else {
+      plans = [{}]
+    }
+
+    if (src.id === 'yande') {
+      if (!romaji.length) {
+        sourceStats[si].errors.push('缺罗马音标签（先用 bb_ref_canon 取 name_variants，再传 romaji）')
+        return
+      }
+      for (const tag of romaji.slice(0, 4)) {
+        tasks.push((async () => {
+          const stat = sourceStats[si]
+          try {
+            const list = await src.search(tag, { count: Math.min(perSource, 100), signal: p.signal, timeoutMs })
+            let added = 0
+            for (const it of list) {
+              const url = normalizeUrl(it.url)
+              if (!looksLikeImageUrl(url)) continue
+              const key = url.replace(/[?#].*$/, '')
+              if (seen.has(key)) continue
+              seen.add(key)
+              candidates.push({
+                url, pageUrl: it.pageUrl ? normalizeUrl(it.pageUrl) : undefined,
+                title: it.title, width: it.width, height: it.height,
+                source: src.id, query: tag, kind: 'booru', score: it.score,
+              })
+              added += 1
+            }
+            stat.ok = true
+            stat.count += added
+            p.onLog?.(`[ref] ${src.id} «${tag}» +${added}`)
+          } catch (error) {
+            if (p.signal?.aborted) return
+            stat.errors.push(`${tag}: ${error?.message ?? error}`)
           }
-          stat.ok = true
-          stat.count += added
-          p.onLog?.(`[ref] ${src.id} «${q.q}» +${added}`)
-        } catch (error) {
-          if (p.signal?.aborted) return
-          stat.errors.push(`${q.q}: ${error?.message ?? error}`)
-          p.onLog?.(`[ref] ${src.id} «${q.q}» 失败: ${error?.message ?? error}`)
-        }
-      })())
+        })())
+      }
+      return
+    }
+
+    queries.forEach((q) => {
+      plans.forEach((plan) => {
+        tasks.push((async () => {
+          const stat = sourceStats[si]
+          try {
+            const list = await src.search(q.q, { count: perSource, signal: p.signal, timeoutMs, ...plan })
+            let added = 0
+            for (const it of list) {
+              const url = normalizeUrl(it.url)
+              if (!looksLikeImageUrl(url)) continue
+              const key = url.replace(/[?#].*$/, '')
+              if (seen.has(key)) continue
+              seen.add(key)
+              candidates.push({
+                url,
+                pageUrl: it.pageUrl ? normalizeUrl(it.pageUrl) : undefined,
+                title: it.title,
+                site: it.site,
+                width: it.width,
+                height: it.height,
+                mime: it.mime,
+                source: src.id,
+                query: q.q,
+                kind: q.kind,
+              })
+              added += 1
+            }
+            stat.ok = true
+            stat.count += added
+            const tag = plan.market ? `${q.q}@${plan.market}#${plan.page}` : (plan.page ? `${q.q}#${plan.page}` : q.q)
+            p.onLog?.(`[ref] ${src.id} «${tag}» +${added}`)
+          } catch (error) {
+            if (p.signal?.aborted) return
+            stat.errors.push(`${q.q}: ${error?.message ?? error}`)
+            p.onLog?.(`[ref] ${src.id} «${q.q}» 失败: ${error?.message ?? error}`)
+          }
+        })())
+      })
     })
   })
 
@@ -291,7 +403,13 @@ export async function searchRefs(p = {}) {
     count: s.count,
     error: s.ok ? null : (s.errors[0] ?? 'no result'),
   }))
-  return { candidates, sources, queries: queries.map((q) => q.q) }
+  return {
+    candidates, sources,
+    queries: queries.map((q) => q.q),
+    depth: deep ? 'deep' : 'fast',
+    tasks: tasks.length,
+    romaji_used: romaji,
+  }
 }
 
 /** 按「信息密度」先验排序：设定集/立绘 > 一般图；有明确尺寸且偏竖图加分。 */
