@@ -71,7 +71,7 @@ dsh Host 插件  ── WebSocket / HTTP+SSE ──►  BAE（隐藏 Electron + 
 | **双传输** | WebSocket 主链路；HTTP+SSE 回退（`--transport=auto/ws/http`） |
 | **安全/预算** | revision 前置校验、编辑/渲染/restore 预算、GUI 可见时冻结写操作 |
 | **Client UI** | dsh Web composer dock 的 Blockbench 状态 pill（需刷新页面加载） |
-| **工具规模** | 34 个 `bb_*` 工具 + 5 个命令 + 1 个 Skill |
+| **工具规模** | 36 个 `bb_*` 工具 + 5 个命令 + 1 个 Skill |
 
 ---
 

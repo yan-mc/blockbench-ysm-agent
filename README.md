@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="version" src="https://img.shields.io/badge/version-0.5.0-59c2ff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20dsh-1b2a52">
-  <img alt="tools" src="https://img.shields.io/badge/tools-34-3d7fd6">
+  <img alt="tools" src="https://img.shields.io/badge/tools-36-3d7fd6">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-4ade80">
 </p>
 
@@ -48,6 +48,7 @@
 | **贴图像素放大** | `bb_render_texture` 走 inline 拼图路径，精修核对微小改动 |
 | **动画采样** | `bb_anim_check` 按时间轴采样 4-16 帧，检查动作幅度与起止姿势 |
 | **图史压缩** | 旧渲染图从上下文剥离为占位文本（surface replace，零模型调用）+ 预算护栏 |
+| **参考图收集** | `bb_ref_search` / `bb_ref_collect`：多源搜角色参考图 → 下载去重 → 一张带编号对照表；零安装（详见 [docs/11](docs/11-参考图收集管线.md)） |
 
 同时修掉 4 个实机缺陷：WebSocket 分片不支持（>64KB 响应必断连）、离屏渲染 `resize/applyCamera` 顺序导致首帧空图、`set_uv` 的 box 模式静默丢弃 `uv_size`、`bb_batch` 内图片块丢失。当前版本 **v0.5.0**。
 
