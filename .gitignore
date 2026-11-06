@@ -36,3 +36,12 @@ models/*/refs/
 # T1/T2 分层产物（来自 ComfyUI，体积大且是派生物）
 models/*/seg/
 
+# 运行时工作目录（Chromium 缓存 / 渲染中间产物 / 导出包），不进版本库
+models/*/.bb/
+models/*/artifacts/
+models/*/exports/
+models/*/checkpoints/
+models/*/logs/
+
+# 全新用户验收跑出来的模型包（保留产物，但这份是过程证据，随来源变化）
+models/*/sakiko-fresh-acceptance/
