@@ -1975,6 +1975,72 @@
       }
     },
     {
+      "name": "bb_seg_lite",
+      "title_zh": "轻量分割（SAM2）",
+      "description": "T1 轻量分割：用 SAM2.1（CPU，无需 GPU）把立绘自动切成若干部件，返回对照图（原图 + 每部件彩色高亮 + 最终分块图）与部件清单。首次使用自动下载模型（约 59MB）并安装 onnxruntime。只覆盖可见区域，不补全遮挡（那需要 T2/See-through）。",
+      "mutating": false,
+      "requires_project": false,
+      "concurrency_safe": false,
+      "protocol_method": null,
+      "timeout_ms": 300000,
+      "returns": "SegLiteResult",
+      "attachments": true,
+      "errors": [
+        "NOT_FOUND",
+        "INVALID_PARAMS",
+        "PYTHON_MISSING",
+        "ONNXRUNTIME_MISSING",
+        "MODELS_MISSING",
+        "SEG_FAILED",
+        "REQUEST_CANCELLED"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "workspace 内相对路径的图片"
+          },
+          "grid": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 24,
+            "default": 12
+          },
+          "max_parts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 24,
+            "default": 9
+          },
+          "min_area": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.004
+          },
+          "min_iou": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.35
+          },
+          "install": {
+            "type": "boolean",
+            "default": true
+          },
+          "attach": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ]
+      }
+    },
+    {
       "name": "bb_validate",
       "title_zh": "YSM 规范校验",
       "description": "按 YSM 规范与几何规则校验；导出前必须调用。A 级定位组缺失/改名=error，B 级默认层级偏离=warning。",

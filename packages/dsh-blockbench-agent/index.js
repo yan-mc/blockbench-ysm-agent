@@ -16,9 +16,14 @@ import { searchRefs, sortCandidates, SOURCES as REF_SOURCES } from './lib/refsea
 import { collectRefs } from './lib/refcollect.js'
 import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSION } from './lib/spec.js'
 import { probeEnvironment, planInstall } from './lib/segprobe.js'
+import {
+  findPython, modelsReady, downloadModels, ensureOnnxruntime, runSegmentation,
+  SEG_MODEL_TOTAL_MB, PLUGIN_ROOT,
+} from './lib/seglite.js'
 import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { createRequire } from 'node:module'
@@ -89,6 +94,10 @@ const DEFAULTS = {
   comfyUrl: 'http://127.0.0.1:8188',
   /** See-through / ComfyUI 计划安装目录。 */
   segInstallDir: '',
+  /** T1：Python 解释器（空 = 自动探测，优先 DSH 自带）。 */
+  pythonExe: '',
+  /** T1：SAM2 模型缓存目录（空 = ~/.dsh-blockbench-agent/sam2）。 */
+  segModelDir: '',
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -1509,7 +1518,130 @@ export function apply(ctx, config = {}) {
           comfyUrl: args.comfy_url || cfg.comfyUrl,
         }))
         const plan = planInstall(probe, { installDir: args.install_dir || cfg.segInstallDir || undefined })
+
+        // T1 就绪度：Python + onnxruntime + 模型缓存
+        const modelDir = cfg.segModelDir || path.join(os.homedir(), '.dsh-blockbench-agent', 'sam2')
+        const py = await findPython(cfg.pythonExe)
+        const models = await modelsReady(modelDir)
+        probe.tiers.t1.ready = py.ok && models.ok
+        probe.tiers.t1.detail = {
+          python: py.ok ? py.exe : null,
+          onnxruntime: py.ok ? py.ortVersion : null,
+          models: models.ok ? 'ready' : `missing:${models.missing}`,
+          model_dir: modelDir,
+          auto_install: '首次 bb_seg_lite 会自动下载约 59MB 模型并装 onnxruntime',
+        }
         return lossless({ ok: true, ...probe, plan })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_seg_lite',
+    description: 'T1 轻量分割：用 SAM2.1（CPU，无需 GPU）把一张立绘**自动切成若干部件**，'
+      + '返回一张对照图（原图 + 每个部件彩色高亮 + 最终分块图）和部件清单（bbox/面积/质心/主色）。'
+      + '用途：建模后拿同一角色的立绘拆分结果，**逐部件对照**检查哪里不像。'
+      + '首次使用会自动下载模型（约 59MB）并 pip 安装 onnxruntime；嫌慢可先 install:false 只查状态。'
+      + '注意：它只给可见区域，**不补全被遮挡部分**（那需要 T2/See-through）。',
+    parameters: {
+      file: { type: 'string', required: true, description: 'workspace 内相对路径的图片，如 refs/角色/ref_001.png' },
+      grid: { type: 'number', description: '提示点网格边长，默认 12（144 点，约 8 秒）' },
+      max_parts: { type: 'number', description: '最多输出几个部件，默认 9' },
+      min_area: { type: 'number', description: '最小面积占比，默认 0.004' },
+      min_iou: { type: 'number', description: '最小置信度，默认 0.35' },
+      install: { type: 'boolean', description: '缺失时是否自动装依赖/下模型，默认 true' },
+      attach: { type: 'boolean', description: '是否附图，默认 true' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const rel = String(args.file || '').replace(/\\/g, '/').replace(/^\/+/, '')
+        const abs = path.resolve(workspace, rel)
+        if (!abs.startsWith(workspace + path.sep) && abs !== workspace) {
+          return { ok: false, code: 'INVALID_PARAMS', message: `file escapes workspace: ${rel}` }
+        }
+        if (!fs.existsSync(abs)) {
+          return { ok: false, code: 'NOT_FOUND', message: `图片不存在: ${rel}`, hint: '先 bb_ref_collect 拿到参考图，或传 workspace 内已有图片路径' }
+        }
+
+        const modelDir = cfg.segModelDir || path.join(os.homedir(), '.dsh-blockbench-agent', 'sam2')
+        const steps = []
+
+        // 1) Python
+        const py = await raceAbort(findPython(cfg.pythonExe), exec?.signal)
+        if (!py.ok) {
+          return {
+            ok: false, code: 'PYTHON_MISSING',
+            message: '找不到带 onnxruntime 的 Python',
+            hint: '安装 Python 3.10+ 并 pip install onnxruntime numpy pillow；或配置 pythonExe',
+            plugin_root: PLUGIN_ROOT,
+          }
+        }
+        steps.push({ step: 'python', exe: py.exe, onnxruntime: py.ortVersion })
+
+        // 2) onnxruntime
+        const ort = await ensureOnnxruntime(py.exe, { onLog: log })
+        if (!ort.ok) {
+          return { ok: false, code: 'ONNXRUNTIME_MISSING', message: 'onnxruntime 不可用', detail: ort.error, steps }
+        }
+        steps.push({ step: 'onnxruntime', version: ort.version, installed: ort.installed })
+
+        // 3) 模型
+        const before = await modelsReady(modelDir)
+        if (!before.ok) {
+          if (args.install === false) {
+            return {
+              ok: false, code: 'MODELS_MISSING', message: `模型未下载（缺 ${before.missing}）`,
+              model_dir: modelDir, download_mb: SEG_MODEL_TOTAL_MB,
+              hint: '传 install:true 自动下载，或手动放到 model_dir',
+            }
+          }
+          await downloadModels(modelDir, { onLog: log, signal: exec?.signal })
+          steps.push({ step: 'models', downloaded: true, dir: modelDir, mb: SEG_MODEL_TOTAL_MB })
+        } else {
+          steps.push({ step: 'models', downloaded: false, dir: modelDir })
+        }
+
+        // 4) 跑分割
+        const base = path.basename(rel, path.extname(rel))
+        const outRel = `seg/${base}`
+        const outAbs = path.resolve(workspace, outRel)
+        const t0 = Date.now()
+        const seg = await runSegmentation({
+          python: py.exe, modelDir, image: abs, outDir: outAbs,
+          grid: args.grid, maxParts: args.max_parts,
+          minArea: args.min_area, minIou: args.min_iou,
+          signal: exec?.signal,
+        })
+        if (!seg.ok) {
+          return { ok: false, code: 'SEG_FAILED', message: seg.error, detail: seg.stdout ? { stdout: seg.stdout, stderr: seg.stderr } : seg.stderr, steps }
+        }
+
+        // 5) 对照图作附件
+        let attachment = null
+        if (args.attach !== false && seg.montage && fs.existsSync(seg.montage)) {
+          const buf = await fsp.readFile(seg.montage)
+          attachment = await saveInlineAttachment(buf.toString('base64'), `seg-${base}-${Date.now()}.png`)
+          if (attachment) lookStats.images += 1
+        }
+        const tokens = attachment ? imageTokens(seg.montage_size?.[0] ?? 880, seg.montage_size?.[1] ?? 660) : 0
+
+        return lossless({
+          ok: true,
+          file: rel,
+          image_size: seg.size,
+          parts: seg.parts,
+          candidates: seg.candidates,
+          out_dir: outRel,
+          montage: `${outRel}/montage.png`,
+          montage_size: seg.montage_size,
+          tokens_est: tokens,
+          steps,
+          elapsed_ms: Date.now() - t0,
+          hint: '看对照图（最后一格是分块图）：核对每个部件的位置/占比/颜色。'
+            + '这是 T1，只覆盖可见区域；被遮挡部分的层级要靠常识或 T2。',
+          ...(attachment ? { attachment } : {}),
+        })
       } catch (error) { return errorResult(error) }
     },
   })
