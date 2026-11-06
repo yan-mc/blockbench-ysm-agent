@@ -168,6 +168,8 @@ test('derivePlan 给出构建顺序、父级与贴图分区', () => {
   assert.equal(head.parent, 'AllHead')
   const hair = plan.bones.find((b) => b.bone === 'Hair')
   assert.equal(hair.parent, 'Head')
+  // 父级不能等于自身（bones=UpperBody 时父级要退到 UpBody）
+  for (const b of plan.bones) assert.notEqual(b.parent, b.bone, `${b.part}: parent 不能是自身`)
   // 总量守恒
   const sum = plan.bones.reduce((a, b) => a + b.cubes, 0)
   assert.equal(plan.totals.cubes, sum)

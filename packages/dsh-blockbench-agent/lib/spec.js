@@ -44,17 +44,27 @@ export function regionOf(part) {
 /** 构建顺序：先大形体，后细节，最后饰品。 */
 const BUILD_ORDER = ['torso', 'leg', 'arm', 'head', 'hair', 'skirt', 'accessory', 'neck', 'other']
 
-/** 部位 → 推荐父骨骼（YSM 标准骨架，见 playbook §4）。 */
-const PARENT_BY_REGION = {
-  torso: 'UpperBody',
-  leg: 'DownBody',
-  arm: 'UpBody',
-  head: 'AllHead',
-  hair: 'Head',
-  skirt: 'DownBody',
-  accessory: 'Head',
-  neck: 'UpBody',
-  other: 'Root',
+/**
+ * 部位 → 推荐父骨骼候选链（YSM 标准骨架，见 playbook §4）。
+ * 用链而不是单值：如果本部位的 bone 恰好等于首选父级（例如 torso 的骨骼就叫 UpperBody），
+ * 就往上退一级，避免出现 "bone=UpperBody, parent=UpperBody" 这种自指。
+ */
+const PARENT_CHAIN = {
+  torso: ['UpperBody', 'UpBody', 'AllBody'],
+  leg: ['DownBody', 'AllBody'],
+  arm: ['UpBody', 'AllBody'],
+  head: ['AllHead', 'UpBody'],
+  hair: ['Head', 'AllHead'],
+  skirt: ['DownBody', 'AllBody'],
+  accessory: ['Head', 'AllHead'],
+  neck: ['UpBody', 'AllBody'],
+  other: ['Root'],
+}
+
+function parentFor(region, bone) {
+  const chain = PARENT_CHAIN[region] ?? ['Root']
+  const hit = chain.find((p) => p !== bone)
+  return hit ?? 'Root'
 }
 
 function arr(v) { return Array.isArray(v) ? v : [] }
@@ -179,7 +189,7 @@ export function derivePlan(input = {}) {
   const bones = sorted.map((p) => ({
     part: p.id,
     bone: p.bone,
-    parent: PARENT_BY_REGION[p.region] ?? 'Root',
+    parent: parentFor(p.region, p.bone),
     cubes: p.cubes,
     region: p.region,
     colors: p.colors,

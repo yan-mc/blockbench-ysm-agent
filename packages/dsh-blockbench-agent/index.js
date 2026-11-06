@@ -1403,7 +1403,8 @@ export function apply(ctx, config = {}) {
         }
         await fsp.mkdir(absDir, { recursive: true })
         const jsonAbs = path.join(absDir, `${baseName}.json`)
-        await fsp.writeFile(jsonAbs, JSON.stringify({ ...check.spec, plan }, null, 2), 'utf8')
+        // 只存 spec 本身。plan 是派生数据，每次 load 重算 —— 存进去会随规则更新而变陈旧。
+        await fsp.writeFile(jsonAbs, JSON.stringify(check.spec, null, 2), 'utf8')
         if (args.write_markdown !== false) {
           await fsp.writeFile(path.join(absDir, `${baseName}.md`), md, 'utf8')
         }
