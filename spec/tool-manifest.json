@@ -1946,6 +1946,35 @@
       }
     },
     {
+      "name": "bb_seg_probe",
+      "title_zh": "分层能力探测",
+      "description": "探测本机能否跑 See-through 分层并给出能力分级与安装计划。T0 零依赖 / T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（24 层 + 遮挡补全）。检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否可达、是否旧架构。只探测不安装；环境不支持会明确说明，不会假装可用。",
+      "mutating": false,
+      "requires_project": false,
+      "concurrency_safe": true,
+      "protocol_method": null,
+      "timeout_ms": 30000,
+      "returns": "SegProbeResult",
+      "attachments": false,
+      "errors": [
+        "REQUEST_CANCELLED"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "install_dir": {
+            "type": "string",
+            "description": "计划安装目录（用于磁盘检查），默认 ~/.dsh-seethrough"
+          },
+          "comfy_url": {
+            "type": "string",
+            "description": "ComfyUI 地址，默认取配置 comfyUrl"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "bb_validate",
       "title_zh": "YSM 规范校验",
       "description": "按 YSM 规范与几何规则校验；导出前必须调用。A 级定位组缺失/改名=error，B 级默认层级偏离=warning。",

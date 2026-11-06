@@ -15,6 +15,7 @@ import { offloadSessionImages, countLiveImages } from './lib/imageprune.js'
 import { searchRefs, sortCandidates, SOURCES as REF_SOURCES } from './lib/refsearch.js'
 import { collectRefs } from './lib/refcollect.js'
 import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSION } from './lib/spec.js'
+import { probeEnvironment, planInstall } from './lib/segprobe.js'
 import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
@@ -82,6 +83,12 @@ const DEFAULTS = {
   // ---- 建模规格（docs/12）----
   /** spec 落盘子目录（位于 workspace 下）。 */
   specDir: 'specs',
+
+  // ---- 分层能力（docs/13，P3）----
+  /** ComfyUI 地址（用于探测是否已装）。 */
+  comfyUrl: 'http://127.0.0.1:8188',
+  /** See-through / ComfyUI 计划安装目录。 */
+  segInstallDir: '',
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -1479,6 +1486,30 @@ export function apply(ctx, config = {}) {
           plan,
           markdown: renderSpecMarkdown(check.spec, plan),
         })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_seg_probe',
+    description: '探测本机能否跑 See-through 分层（可选增强），给出能力分级与安装计划。'
+      + '分级：T0 零依赖（模型直接看立绘）/ T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（24 层 + 遮挡补全）。'
+      + '检查项：NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否已装可达、是否旧架构（Pascal 不支持 NF4）。'
+      + '只探测不安装；返回 plan 步骤与体积估算。非 N 卡会明确说不支持，不会假装可用。',
+    parameters: {
+      install_dir: { type: 'string', description: '计划安装目录（用于磁盘检查），默认 ~/.dsh-seethrough' },
+      comfy_url: { type: 'string', description: 'ComfyUI 地址，默认取配置 comfyUrl' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args) {
+      try {
+        const installDir = args.install_dir || cfg.segInstallDir || undefined
+        const probe = await raceAbort(probeEnvironment({
+          installDir,
+          comfyUrl: args.comfy_url || cfg.comfyUrl,
+        }))
+        const plan = planInstall(probe, { installDir: args.install_dir || cfg.segInstallDir || undefined })
+        return lossless({ ok: true, ...probe, plan })
       } catch (error) { return errorResult(error) }
     },
   })
