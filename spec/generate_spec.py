@@ -482,7 +482,9 @@ TOOLS = [
         "returns": "SpecSaveResult", "attachments": False,
         "errors": ["INVALID_PARAMS", "SPEC_INVALID"],
         "parameters": obj({
-            "spec": {"type": "object", "description": "{character, references, palette, parts, budget, gaps, notes}"},
+            # DSH 要求 object 参数必须显式声明 additionalProperties，否则整条插件失效
+            "spec": {"type": "object", "additionalProperties": True,
+                     "description": "{character, references, palette, parts, budget, gaps, notes}"},
             "name": {"type": "string", "description": "文件名，默认 character.name"},
             "write_markdown": {"type": "boolean", "default": True},
         }, ["spec"]),

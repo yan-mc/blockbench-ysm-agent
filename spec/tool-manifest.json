@@ -1901,6 +1901,7 @@
         "properties": {
           "spec": {
             "type": "object",
+            "additionalProperties": true,
             "description": "{character, references, palette, parts, budget, gaps, notes}"
           },
           "name": {

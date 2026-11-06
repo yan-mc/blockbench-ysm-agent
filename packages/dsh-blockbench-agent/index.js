@@ -1367,7 +1367,15 @@ export function apply(ctx, config = {}) {
       + '**缺背面参考时是否在 gaps 里记录**（没记录会直接报错）。'
       + '通过后返回构建计划（按什么顺序建、每个骨骼给多少方块、贴图怎么分区），后续按计划调用 bb_* 建模。',
     parameters: {
-      spec: { type: 'object', description: '规格对象：{character, references, palette, parts, budget, gaps, notes}', required: true },
+      // 注意：DSH 要求 object 类型参数必须显式声明 additionalProperties，
+      // 否则整条插件会 fiberPhase=failed（不只是这个工具失败）。
+      spec: {
+        type: 'object',
+        description: '规格对象：{character, references, palette, parts, budget, gaps, notes}',
+        required: true,
+        properties: {},
+        additionalProperties: true,
+      },
       name: { type: 'string', description: '文件名（默认用 character.name）' },
       write_markdown: { type: 'boolean', description: '同时写一份人读 .md，默认 true' },
     },

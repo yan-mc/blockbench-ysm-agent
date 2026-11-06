@@ -60,6 +60,20 @@ await plugin.apply(ctx, {
 })
 step('plugin applied', { tools: [...tools.keys()], commands: [...commands.keys()] })
 
+// 工具参数 schema 静态校验。
+// stub defineTool 不做校验，所以这里必须显式补上 —— DSH 只要有一个参数不合法，
+// 整条插件就会 fiberPhase=failed（所有工具与技能一起消失），排查代价极高。
+{
+  const { lintTools } = await import('../lib/toolschema.js')
+  const lint = lintTools([...tools.values()])
+  if (!lint.ok) {
+    const detail = lint.errors.map((e) => `${e.tool}: ${e.message}`).join('; ')
+    fail('tool schema lint', new Error(detail))
+    throw new Error(`tool schema lint failed: ${detail}`)
+  }
+  step('tool schema lint', { checked: lint.checked })
+}
+
 const exec = async (name, args = {}) => {
   const def = tools.get(name)
   if (!def) throw new Error(`tool missing: ${name}`)
