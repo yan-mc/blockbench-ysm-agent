@@ -645,6 +645,111 @@
       "description": ""
     },
     {
+      "name": "render.preview",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 60000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.sheet",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.turntable",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.animation_frame",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "render.texture_sheet",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 60000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "camera.get",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
+      "name": "camera.set",
+      "direction": "client_to_server",
+      "kind": "read",
+      "idempotent": true,
+      "timeout_ms": 15000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
       "name": "render.texture",
       "direction": "client_to_server",
       "kind": "long",

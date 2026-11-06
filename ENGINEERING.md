@@ -211,12 +211,57 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 - 附件缩略图在 renderer 里生成（512px），因为 dsh Host 侧 `nativeImage` 不可用（见 `bb_diagnostics.image.nativeImage=false`）；原图仍按 768 落盘。
 - YSM 模板以 `templates/ysm_default` 随 BAE 分发（来自 YSM-Utils-Plugins assets/default，CC0 默认模型）。
 - 游戏内验证使用仓库内独立 `game-test/`（Forge/YSM/assets/world），不读写用户其他 Minecraft 实例；该目录已被 `.gitignore` 排除。
+---
 
+## 8. v0.5.0 · 视口实时反馈（眼睛 A+B）
 
+> 方案与决策：[docs/07-视口实时反馈方案-冻结.md](docs/07-视口实时反馈方案-冻结.md)
+> 本轮结论：**已实现并实机验收**；不做"常驻观看"（眼睛 C）。
 
+### 8.1 交付内容
 
+| 层 | 变更 |
+|---|---|
+| bridge | 新增 `camera.get/set`、`render.preview`、`render.sheet`、`render.turntable`、`render.animation_frame`、`render.texture_sheet`；`render.texture` 增加 inline；**渲染串行化** |
+| host | 新增 `bb_look` / `bb_camera` / `bb_orbit` / `bb_anim_check`；**写操作自动附图**（step 级合并）；图史压缩器；`/bb-status` 展示图片预算 |
+| 新模块 | `lib/viewsheet.js`（token 估算 + 网格规划）、`lib/imageprune.js`（旧图 surface replace 剥离） |
+| 测试 | `e2e-look.mjs`（10 项）、`viewsheet.test.mjs` + `imageprune.test.mjs`（21 项） |
 
+### 8.2 实测数据（RTX 4080 / 默认 YSM 模型）
 
+| 指标 | 实测 |
+|---|---|
+| `render.preview` 640² 单帧 | 渲染 p50 **4.5–6.4 ms**；端到端 40–60 ms（含 PNG 编码 + base64） |
+| `render.sheet` 2 格 320² | 9–24 ms，**211 token** |
+| `render.sheet` 8 格转台 1280×640 | 12–25 ms，**514 token** |
+| 自动附图（front+iso，320²） | **11–13 ms**，211 token |
+| `render.texture_sheet` 2 块放大 | 1.7–3.6 ms |
+| 动画采样 4 帧 | 17–25 ms |
 
+### 8.3 实机验收中发现并修复的缺陷
 
+| # | 缺陷 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | WebSocket 分片不支持 | `ws-server.js` 遇非 FIN 帧直接 `closeWith(1003)`；浏览器对 >64KB 消息**强制分片**，故 8MB 上限从未真正生效 | 按 RFC 6455 §5.4 重组分片；累计超限才 1009 |
+| 2 | 拼图首格恒空 | 用整张 sheet 判空（被其它格撑着永不空）；且 `resize` 与 `applyCamera` 之间插入调用会拿到空 buffer | 新增按**格子矩形**判空；`resize→applyCamera→draw` 封装为 `prepare` 在每次重试前重跑 |
+| 3 | `set_uv` box 模式静默丢 `uv_size` | 只写 `uv_offset`，`uv_size` 未读 | box 模式支持显式尺寸 |
+| 4 | `bb_batch` 内图片块丢失 | 子结果整包 JSON 化，image block 结构丢失 | 收集子调用 image block 统一附加；剥离 base64（JSON 从数 MB → 1.4KB） |
+| 5 | `focus.padding` 参数无效 | 声明未实现，closeup 总触边 | 按 padding 外扩聚焦包围盒 |
+| 6 | **清理 `logs/` 目录导致宿主崩溃** | `createWriteStream(logs/runtime.log)` 无目录、无 `error` 监听 → 未捕获异常 → dsh host 退出 | spawn 前确保目录存在 + 监听 stream error + apply 时重建全部运行时目录 |
 
+### 8.4 复验
+
+| 套件 | 结果 |
+|---|---|
+| 单元测试（viewsheet + imageprune） | 21/21 |
+| 视口 E2E（e2e-look） | 10/10 |
+| 协议回归（e2e.mjs） | 通过 |
+| host 插件回归（host-smoke） | 33 项全通过 |
+| 实机建模 | 通过（`sakiko-final`：56 骨 / 196 方块 / 0 error / 导出 38 文件） |
+
+### 8.5 已知边界
+
+- **L2 长跨度摘要未接入**：`compaction-basic` 被 `dsh-web-app` 默认 `disabled:true`，强行启用影响整个 profile，超出插件职责。
+  当前用 L1（图史剥离）+ L3（`image-offload` 兜底）控制成本。
+- **不做常驻连续观看**（眼睛 C）：每帧送模型不划算，改为"编辑即看 + 按需拉取"。
+- 用户 Ctrl+Z/Ctrl+Y 仍未计入 revision（既有问题，与本轮无关）。

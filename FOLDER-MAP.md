@@ -15,13 +15,14 @@
 | `packages/` | BAE + dsh Host 插件 + Skill | ✅ | 核心源码 |
 | `models/` | 测试模型仓库 | ✅（reference 除外） | 每个模型一个目录 |
 | `media/` | 介绍视频、幻灯片、构建脚本 | ✅（输出视频除外） | 视频输出在 `.gitignore` |
-| `prototype/` | 早期骨架代码 | ✅ | 仅历史参考 |
+| `prototype/` | 早期骨架代码 | ❌（已归档） | 移入 `_archive/prototype/` |
 | `research/` | Blockbench/YSM/dsh 研究 | ✅ | 事实依据 |
 | `vendor/` | 上游 Blockbench/YSM（只读） | ❌ | 体积大，按 SETUP 重建 |
 | `dist/` | 组装后的 BAE | ❌ | 由 `assemble.mjs` 生成 |
 | `release/` | 发布 zip | ❌ | 由 `package-release.mjs` 生成 |
-| `game-test/` | 隔离 Forge/YSM 测试环境 | ❌ | 需要时按 `game-test/` 脚本重建 |
-| `workspace/` | 测试脚本的临时输出 | ❌ | `npm test` 会重建 |
+| `game-test/` | 隔离 Forge/YSM 测试环境 | ❌（已归档） | 移入 `_archive/game-test/` |
+| `workspace/` | 测试脚本的临时输出 | ❌（已归档） | 移入 `_archive/workspace/` |
+| `_archive/` | **测试/参考资料归档** | ❌（gitignored） | 见下节 |
 
 ## 模型目录约定（`models/<name>/`）
 
@@ -44,6 +45,32 @@ models/deepseek-fish/
 - `docs/test-evidence/hosttest-result.json`：Host 插件工具回归
 - `docs/test-evidence/e2e-result.json`：WS/HTTP+SSE 协议回归
 - `workspace/_logs/`：测试脚本临时输出（不提交）
+
+---
+
+## `_archive/` · 测试与参考资料归档（不提交）
+
+> 为保持仓库干净，测试产物与参考资料统一移到这里；`_archive/` 已加入 `.gitignore`。
+
+```text
+_archive/
+├─ workspace/                      # 旧测试脚本临时输出
+├─ game-test/                      # 隔离 Forge/YSM 游戏内验证环境（~1.1 GB）
+├─ prototype/                      # 早期骨架代码
+└─ model-scratch/                  # 模型测试中间产物
+   ├─ .bb/                         # BAE userdata 历史目录
+   ├─ checkpoints/  artifacts/  logs/
+   ├─ reference/                   # 参考图（版权原因不随仓库分发）
+   ├─ sakiko-iter1/                # 第一轮迭代（默认模板改造）
+   ├─ sakiko-iter1-export/
+   ├─ sakiko-intermediate-export/
+   └─ sakiko-final-release-extracted/
+```
+
+**注意**：`models/<name>/logs/`、`artifacts/`、`checkpoints/`、`.bb/` 是**运行时目录**，
+插件运行期间会持续写入。可以清空内容，但**不要删除目录本身**（host 插件写
+`logs/runtime.log` 时若目录缺失，曾导致宿主未捕获异常退出；v0.5.0 已改为自愈创建 + 错误监听）。
+
 
 ## 发布
 

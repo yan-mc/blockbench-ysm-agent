@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.4.0-59c2ff">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.0-59c2ff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20dsh-1b2a52">
-  <img alt="tools" src="https://img.shields.io/badge/tools-30-3d7fd6">
+  <img alt="tools" src="https://img.shields.io/badge/tools-34-3d7fd6">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-4ade80">
 </p>
 
@@ -35,7 +35,34 @@
 
 ## 工程状态
 
-**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、30 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、closeup/SSAA、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill、游戏内加载验证、发布打包。当前版本 **v0.4.0**。
+**已实现并验证（v0.5.0）**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、34 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、closeup/SSAA、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill、游戏内加载验证、发布打包。
+
+**v0.5.0 新增「视口实时反馈」（眼睛 A+B，详见 [docs/07](docs/07-视口实时反馈方案-冻结.md)）**：
+
+| 能力 | 说明 |
+|---|---|
+| **编辑即看** | 写操作完成后自动附一张小拼图（同 step 合并成一张），改完立刻看见 |
+| **参数化相机** | `bb_camera` 任意方位/俯仰/距离/正交透视；`render.preview` 不落盘单帧 |
+| **多格拼图** | `bb_look` 一次返回一张 N 格拼图（2-8 帧 token 相近，比多次渲染省 2-3 倍） |
+| **环绕转台** | `bb_orbit` 8 角度合一张图，替代"靠三视图脑补"，查穿模与对称性 |
+| **贴图像素放大** | `bb_render_texture` 走 inline 拼图路径，精修核对微小改动 |
+| **动画采样** | `bb_anim_check` 按时间轴采样 4-16 帧，检查动作幅度与起止姿势 |
+| **图史压缩** | 旧渲染图从上下文剥离为占位文本（surface replace，零模型调用）+ 预算护栏 |
+
+同时修掉 4 个实机缺陷：WebSocket 分片不支持（>64KB 响应必断连）、离屏渲染 `resize/applyCamera` 顺序导致首帧空图、`set_uv` 的 box 模式静默丢弃 `uv_size`、`bb_batch` 内图片块丢失。当前版本 **v0.5.0**。
+
+### 示例：AI 独立完成的成品模型
+
+`models/deepseek-fish/sakiko-final/` 是 v0.5.0 视口反馈闭环下生成的成品 YSM 模型
+（56 骨骼 / 196 方块，0 校验错误）。全程只靠工具与渲染图自我校验，没有人工建模。
+
+| | |
+|---|---|
+| ![8 视角](models/deepseek-fish/sakiko-final/screenshots/_sheet_8views.png) | ![特写](models/deepseek-fish/sakiko-final/screenshots/closeup.png) |
+
+构建记录见 [模型 README](models/deepseek-fish/sakiko-final/README.md)；可分发包在
+[`sakiko-final-release.zip`](models/deepseek-fish/sakiko-final-release.zip)。
+
 
 - 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
 - 完整使用手册：[MANUAL.md](MANUAL.md)
@@ -55,7 +82,7 @@
 | 怎么隐藏 Blockbench？ | 上游 `electron/main.js` **硬编码 `win.show()`**，必须 fork 主进程（3 处小改：不 show、`backgroundThrottling:false`、注入 bridge 插件）；渲染层零改动。 |
 | 怎么无头出图？ | 复用 Blockbench 内置**离屏 Preview**（`MediaPreview`/`NoAAPreview`）+ `Screencam.advancedScreenshot(cb)` + `Blockbench.writeFile`；renderer 已 `preserveDrawingBuffer:true`，全程无对话框。 |
 | 怎么让 AI 不写原始 JSON？ | dsh 侧注册 `bb_*` 语义工具（建模 patch / 像素绘制 / 渲染 / 校验），底层 JSON-RPC 转给 Blockbench 插件；回执只给 changed ids + diff + 摘要，列表全部分页。 |
-| 怎么让 AI "看见"？ | `ctx.attachments.saveImage()` + `output.render()` 返回 `image` block；全分辨率 PNG 落盘，模型按需 `read_image`；图片默认 512px、每轮 ≤4 张（图片会重复计费）。 |
+| 怎么让 AI "看见"？ | `ctx.attachments.saveImage()` + `output.render()` 返回 `image` block；v0.5 起支持**编辑即看**（写操作自动附图）、`bb_look`/`bb_orbit` 多格拼图、参数化相机、动画采样；旧图可被剥离为占位文本以控上下文。 |
 | 怎么保证 YSM 能进游戏？ | YSM-Utils 是 **UI 插件、无导出 API、只写 ysm.json**；必须自研 YRL（规范化/骨架/导出编排），并强制 `export_empty_groups=true`（否则 30 根空定位骨骼被剪，进游戏缺手持物/鞘翅）。 |
 | 怎么人机协同？ | dsh 原生 `/show` `/hide` 命令（`ctx.commands.register`），不消耗模型 token；GUI 期间冻结写操作，`/hide` 后 resync revision 并注入用户改动摘要。 |
 | 通信走什么？ | 本地 WebSocket JSON-RPC 2.0（dsh 为 server，BBAR 为 client）；首包 token 鉴权；协议与传输解耦，可回退 HTTP+SSE / Python client。 |

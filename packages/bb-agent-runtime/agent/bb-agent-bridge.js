@@ -50,6 +50,10 @@
     lastError: null,
     counters: { edits: 0, renders: 0, saves: 0, exports: 0, restores: 0 },
     limits: { edits: 60, renders: 40, restores: 2 },
+    // 视口反馈方法（preview/sheet/turntable/...）的高频、轻量、只读，
+    // 不该跟 render.views 共用那 40 次预算，否则自动附图几次就耗尽。
+    // 单独放宽，但仍保留上限以防无限制刷渲染。
+    lookLimits: { renders: 400 },
     lastRender: null,
     loop: { pendingEdits: 0, unchangedStreak: 0, lastRenderRevision: null },
     dirtyTextures: new Set(),
@@ -732,7 +736,8 @@
       try { msg = JSON.parse(event.data) } catch { return }
       handleTransportMessage(msg)
     }
-    socket.onclose = () => {
+    socket.onclose = (ev) => {
+      console.warn('[bb-agent] socket closed', ev?.code, ev?.reason, 'bufferedAmount=', socket?.bufferedAmount)
       handleDisconnect()
       if (!disposed) {
         if (TRANSPORT_PREF === 'auto' && reconnectAttempt >= 2) httpMode = true
@@ -822,6 +827,21 @@
   }
 
   // ------------------------------------------------------------------ RPC dispatch
+  // 渲染串行化：离屏 preview 只有一个 canvas/renderer，并发调用（尤其 async 的
+  // render.sheet / render.animation_frame）会互相踩状态导致 renderer 崩溃断连。
+  // 这里用一条 Promise 链把**所有渲染类方法**串起来执行（docs/07 R6）。
+  const RENDER_METHODS = new Set([
+    'render.views', 'render.preview', 'render.sheet', 'render.turntable',
+    'render.animation_frame', 'render.texture', 'render.texture_sheet',
+  ])
+  let renderChain = Promise.resolve()
+  function serializeRender(fn) {
+    const run = renderChain.then(fn, fn)
+    // 无论成功失败都让链继续，避免一次失败卡死后续调用
+    renderChain = run.then(() => undefined, () => undefined)
+    return run
+  }
+
   async function handleInbound(msg) {
     const id = msg.id ?? null
     try {
@@ -847,7 +867,23 @@
         throw err('RESOURCE_LIMIT', `restore budget exhausted (${state.limits.restores})`, { code: 'RESOURCE_LIMIT', recoverable: true })
       }
       state.agentEditing = MUTATING_METHODS.has(method)
-      const result = await handler(params, msg._meta ?? {})
+      const result = RENDER_METHODS.has(method)
+        ? await serializeRender(() => {
+          // 所有渲染方法统一计入预算（以前只有 render.views 会计数，
+          // 于是 bb_look / bb_orbit / 自动附图可以无限刷渲染而不受任何约束）。
+          // render.views 沿用 renders 预算；视口反馈类走更宽的 lookLimits。
+          if (method !== 'render.views') {
+            if (state.counters.renders >= state.limits.renders + (state.lookLimits?.renders ?? 400)) {
+              throw err('RESOURCE_LIMIT', `render budget exhausted (${state.limits.renders + (state.lookLimits?.renders ?? 400)})`, {
+                code: 'RESOURCE_LIMIT', recoverable: true,
+                hint: 'restart the runtime, or reduce autolook frequency',
+              })
+            }
+            state.counters.renders += 1
+          }
+          return handler(params, msg._meta ?? {})
+        })
+        : await handler(params, msg._meta ?? {})
       sendRaw({ jsonrpc: '2.0', id, result })
     } catch (error) {
       state.lastError = { code: error?.bbCode ?? 'INTERNAL_ERROR', message: error?.message ?? String(error) }
@@ -891,6 +927,7 @@
     budgets: {
       edits_used: state.counters.edits, edits_max: state.limits.edits,
       renders_used: state.counters.renders, renders_max: state.limits.renders,
+      renders_max_total: state.limits.renders + (state.lookLimits?.renders ?? 400),
       restores_used: state.counters.restores, restores_max: state.limits.restores,
     },
     last_error: state.lastError,
@@ -1146,6 +1183,32 @@
               if (op.mode === 'box' || (!op.faces && op.uv)) {
                 cube.box_uv = true
                 cube.uv_offset = vec(op.uv ?? [0, 0])
+                // box 模式此前只写 uv_offset，uv_size 被静默忽略 —— 调用方以为
+                // 指定了贴图区域，实际仍按几何尺寸从 uv_offset 开始取样，导致
+                // "UV 设置成功但外观没变"。这里补上显式尺寸支持。
+                const boxSize = op.uv_size ?? op.size
+                if (Array.isArray(boxSize) && boxSize.length >= 2) {
+                  cube.stretch_uv = false
+                  // Blockbench 的 box UV 尺寸由 faces 的 uv_size 承载，逐面写入
+                  const from = vec(cube.from)
+                  const to = vec(cube.to)
+                  const dims = [to[0] - from[0], to[1] - from[1], to[2] - from[2]]
+                  const faceSize = {
+                    north: [dims[0], dims[1]], south: [dims[0], dims[1]],
+                    east: [dims[2], dims[1]], west: [dims[2], dims[1]],
+                    up: [dims[0], dims[2]], down: [dims[0], dims[2]],
+                  }
+                  const scaleX = Number(boxSize[0]) / Math.max(1e-6, Math.max(dims[0], dims[2]))
+                  const scaleY = Number(boxSize[1]) / Math.max(1e-6, dims[1])
+                  for (const faceName of ['north', 'south', 'east', 'west', 'up', 'down']) {
+                    const f = cube.faces?.[faceName]
+                    if (!f) continue
+                    const base = faceSize[faceName] ?? [dims[0], dims[1]]
+                    const sx = (faceName === 'east' || faceName === 'west') ? scaleX : scaleX
+                    const sy = (faceName === 'up' || faceName === 'down') ? scaleX : scaleY
+                    f.uv_size = [base[0] * sx, base[1] * sy].map((v) => Math.max(0.01, Math.round(v * 10000) / 10000))
+                  }
+                }
               } else if (op.faces) {
                 cube.box_uv = false
                 const from = vec(cube.from)
@@ -1558,7 +1621,16 @@
     const ssaa = params.antialias === 'ssaa' ? 2 : 1
     const renderSize = [size[0] * ssaa, size[1] * ssaa]
     const focusRef = params.focus?.element ?? (views.includes('closeup') ? 'Head' : null)
-    const focusBounds = focusRef ? elementBounds(focusRef) : null
+    // focus.padding：外扩聚焦包围盒（以前这个参数被声明但完全没用，导致 closeup 总是触边）
+    const focusPadding = Math.max(0, Math.min(4, Number(params.focus?.padding) || 0))
+    let focusBounds = focusRef ? elementBounds(focusRef) : null
+    if (focusBounds && focusPadding > 0) {
+      const padUnits = Math.max(focusBounds.size[0], focusBounds.size[1], focusBounds.size[2]) * focusPadding
+      focusBounds = {
+        ...focusBounds,
+        size: focusBounds.size.map((v) => v + padUnits * 2),
+      }
+    }
     if (focusRef && !focusBounds) throw err('INVALID_REFERENCE', `focus element not found: ${focusRef}`, { code: 'INVALID_REFERENCE' })
     const preview = window.MediaPreview ?? window.Screencam?.NoAAPreview
     if (!preview) throw err('ENGINE_DEGRADED', 'offscreen preview unavailable', { code: 'ENGINE_DEGRADED' })
@@ -1725,24 +1797,800 @@
     }
   }
 
+  // ---- 视口实时反馈 v1.0（docs/07）----------------------------------------
+  // 设计约束（务必保持）：
+  //   1) 全部为**只读**方法：不进 MUTATING_METHODS、不吃 edit 预算、不 bump revision。
+  //   2) 默认**不落盘**、不做 pngStats、不生成缩略图 —— 只为"快"。
+  //   3) 相机定义与 fitCamera 的 zoom-to-fit 数学保持一致，避免两个视图不一致。
+
+  /** 相机参数默认值。azimuth: 0=正前(-Z)，顺时针为正；elevation: 0=水平、90=正上。 */
+  const CAMERA_DEFAULTS = { azimuth: 0, elevation: 0, distance: null, projection: 'ortho', fov: 40, padding: 0.05 }
+
+  /** 由方位/俯仰角生成单位方向向量（与 VIEW_DIRS 的 front=[0,0,-1] 对齐）。 */
+  function camDir(azimuthDeg, elevationDeg) {
+    const az = (num(azimuthDeg, 0) * Math.PI) / 180
+    const el = (num(elevationDeg, 0) * Math.PI) / 180
+    return new THREE.Vector3(
+      Math.sin(az) * Math.cos(el),
+      Math.sin(el),
+      -Math.cos(az) * Math.cos(el),
+    ).normalize()
+  }
+
+  /**
+   * 按相机描述摆放离屏 preview 的相机。复用既有 fitCamera 的 zoom-to-fit 公式，
+   * 但允许显式给 azimuth/elevation/distance，并支持透视投影。
+   */
+  function applyCamera(preview, camIn, bounds) {
+    const cam = { ...CAMERA_DEFAULTS, ...(camIn || {}) }
+    const [cx, cy, cz] = bounds.center
+    const [sx, sy, sz] = bounds.size
+    const dir = camDir(cam.azimuth, cam.elevation)
+    const autoDist = Math.max(sx, sy, sz) * 3
+    const dist = Number.isFinite(cam.distance) ? Math.max(0.001, cam.distance) : autoDist
+
+    const persp = cam.projection === 'persp'
+    preview.setProjectionMode(!persp)
+    preview.camera.position.set(cx + dir.x * dist, cy + dir.y * dist, cz + dir.z * dist)
+    preview.controls.target.set(cx, cy, cz)
+    preview.controls.update()
+
+    const w = preview.width, h = preview.height
+    const pad = Math.max(0, num(cam.padding, 0.05))
+    const k = 1 + pad
+    // 侧向包围盒随方位角变化：用与视线垂直的两个轴向尺寸近似
+    const upAxis = Math.abs(dir.y) > 0.95 ? Math.max(sx, sz) : sy
+    const sideAxis = Math.max(sx, sz)
+    const needW = sideAxis * k
+    const needH = upAxis * k
+    if (persp) {
+      preview.camera.fov = Math.max(5, Math.min(120, num(cam.fov, 40)))
+      preview.camera.zoom = 1
+      preview.camera.updateProjectionMatrix()
+    } else {
+      preview.camera.zoom = Math.min((2 * (w / 80)) / Math.max(needW, 0.001), (2 * (h / 80)) / Math.max(needH, 0.001))
+      preview.camera.updateProjectionMatrix()
+    }
+    return {
+      azimuth: +num(cam.azimuth, 0).toFixed(2),
+      elevation: +num(cam.elevation, 0).toFixed(2),
+      distance: +dist.toFixed(3),
+      position: preview.camera.position.toArray().map((v) => +v.toFixed(3)),
+      target: [cx, cy, cz].map((v) => +v.toFixed(3)),
+      zoom: +(preview.camera.zoom ?? 1).toFixed(4),
+      fov: +(preview.camera.fov ?? 40).toFixed(2),
+      projection: persp ? 'persp' : 'ortho',
+    }
+  }
+
+  /** 渲染一帧并以**同步**方式画进目标 2D 上下文（不经过 Image 异步解码）。 */
+  function drawFrameInto(ctx2d, preview, size, background, dx, dy) {
+    const prevBg = Canvas.scene.background
+    try {
+      if (background === null || background === undefined) {
+        Canvas.scene.background = null
+        preview.renderer?.setClearAlpha?.(0)
+      } else if (colorOk(background)) {
+        Canvas.scene.background = new THREE.Color(background)
+        preview.renderer?.setClearAlpha?.(1)
+      }
+      const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      Canvas.withoutGizmos(() => preview.render())
+      // 关键：用 drawImage(canvas) 同步取像素，不能用 new Image() + onload
+      ctx2d.drawImage(preview.canvas, 0, 0, preview.canvas.width, preview.canvas.height,
+        dx, dy, size[0], size[1])
+      const t1 = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      return +(t1 - t0).toFixed(2)
+    } finally {
+      Canvas.scene.background = prevBg
+    }
+  }
+
+  /**
+   * 检测一帧是否"基本为空"（只有底色/全透明）。
+   * 采样 64×64 缩略图的颜色多样性：<=1 种颜色视为空帧。
+   * 用于离屏 preview 首次 resize 后的空帧自愈。
+   */
+  function frameLooksEmpty(canvas) {
+    try {
+      const c = document.createElement('canvas')
+      c.width = 64; c.height = 64
+      const cx = c.getContext('2d', { willReadFrequently: true })
+      cx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 64, 64)
+      const d = cx.getImageData(0, 0, 64, 64).data
+      const seen = new Set()
+      let opaque = 0
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] > 8) opaque += 1
+        if (seen.size < 32) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2])
+      }
+      return { empty: seen.size <= 1, colors: seen.size, opaqueRatio: +(opaque / (64 * 64)).toFixed(3) }
+    } catch {
+      return { empty: false, colors: -1, opaqueRatio: null }
+    }
+  }
+
+  /**
+   * 渲染一帧并编码为 dataURL。不落盘、不统计。
+   *
+   * 注意：这里**先同步 drawImage 到 2D canvas 再 toDataURL**，而不是直接
+   * `preview.canvas.toDataURL()`。离屏 preview 在尺寸/投影变化后，
+   * 直接读 WebGL canvas 偶尔会拿到上一帧（或空 buffer）；经由 2D canvas
+   * 中转能拿到确定的最新像素（与 render.sheet 走同一条路径）。
+   */
+  /**
+   * 一次性全局预热：离屏 preview 在本进程内的**第一次**真正渲染必然是空帧，
+   * 与尺寸/相机/参数都无关（实测：同一张 sheet 的第 1 格空、第 2 格正常）。
+   * 每个渲染类 handler 入口调用此函数，确保"第一格"不白给。
+   */
+  /**
+   * 预热离屏 preview。
+   *
+   * 实测事实：`preview.resize()` 之后（以及本进程的首次渲染）第一帧是空帧，
+   * 第二帧才有内容。这里**每次都渲两帧**并丢弃，代价约 1-2ms，
+   * 换取"调用方永远拿到有内容的图"。不做全局门控 —— resize 会重置状态。
+   */
+  /**
+   * 强制离屏 preview 重绘一帧。
+   *
+   * 实测事实（关键）：离屏 preview 的 `render()` 只在**相机位姿相对上次发生变化**
+   * 时才真正重绘；位姿不变时反复 `render()` 会得到空 buffer（sheet 里“第 1 格渲
+   * 4 次都空、第 2 格一次就成”就是这么来的）。
+   * 因此这里先微移相机、再摆回目标位姿，制造一次真实变化。
+   */
+  function forceRedraw(preview, camSpec, bounds) {
+    try {
+      const cam = preview.camera
+      const p = cam.position
+      const dx = p.x + 0.013, dy = p.y + 0.011, dz = p.z + 0.017
+      cam.position.set(dx, dy, dz)
+      cam.updateMatrixWorld(true)
+      preview.render()
+    } catch { /* ignore */ }
+    return applyCamera(preview, camSpec || {}, bounds)
+  }
+
+  /**
+   * 渲染一帧到目标 2D 上下文，并保证拿到**非空**结果。
+   *
+   * 实测事实（踩坑记录）：离屏 preview 在**本进程内的首次渲染**必然为空帧，
+   * 与尺寸/相机/参数都无关；第二次起就正常。所以这里做"空则再来一遍"的
+   * 有界重试（最多 4 遍，单遍约 1-2ms），保证调用方永远拿到有内容的图。
+   *
+   * @returns {{ms:number, probe:{empty:boolean,colors:number}, passes:number}}
+   */
+  /**
+   * 检测 2D canvas 上**某个矩形区域**是否基本为空。
+   *
+   * 拼图必须按格检查：整张 sheet 有别的格子撑着，检查整张永远返回"不空"，
+   * 于是第一格空了也发现不了 —— 这就是"自动附图第 1 格全空"的成因。
+   */
+  function regionLooksEmpty(canvas, x, y, w, h) {
+    try {
+      const sw = Math.max(1, Math.min(64, Math.floor(w)))
+      const sh = Math.max(1, Math.min(64, Math.floor(h)))
+      const c = document.createElement('canvas')
+      c.width = sw
+      c.height = sh
+      const cx = c.getContext('2d', { willReadFrequently: true })
+      cx.drawImage(canvas, x, y, w, h, 0, 0, sw, sh)
+      const d = cx.getImageData(0, 0, sw, sh).data
+      const seen = new Set()
+      let opaque = 0
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] > 8) opaque += 1
+        if (seen.size < 32) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2])
+      }
+      return { empty: seen.size <= 1, colors: seen.size, opaqueRatio: +(opaque / (sw * sh)).toFixed(3) }
+    } catch {
+      return { empty: false, colors: -1, opaqueRatio: null }
+    }
+  }
+
+  function drawFrameReliably(ctx2d, preview, size, background, dx, dy, prepare) {
+    let ms = 0
+    let probe = { empty: true, colors: 0, opaqueRatio: null }
+    let passes = 0
+    while (passes < 3) {
+      passes += 1
+      if (typeof prepare === 'function') { try { prepare() } catch { /* ignore */ } }
+      ms = drawFrameInto(ctx2d, preview, size, background, dx, dy)
+      // 必须按**格子区域**判定：整张 sheet 有别的格子撑着，永远"不空"
+      probe = regionLooksEmpty(ctx2d.canvas, dx, dy, size[0], size[1])
+      if (!probe.empty) break
+    }
+    return { ms, probe, passes }
+  }
+
+  /**
+   * 渲染单帧并保证有内容（单图路径，与 render.sheet 的每格共用同一套重试逻辑）。
+   *
+   * 复用同一块 scratch canvas：每次新建 canvas 反而拿不到内容；
+   * 并复用 drawFrameReliably 的"按区域判空 + 每次重试重跑 resize/applyCamera"。
+   */
+  let scratchCanvas = null
+  let scratchCtx = null
+  function renderFrameReliably(preview, w, h, background, camSpec, bounds) {
+    if (!scratchCanvas) {
+      scratchCanvas = document.createElement('canvas')
+      scratchCtx = scratchCanvas.getContext('2d')
+    }
+    if (scratchCanvas.width !== w) scratchCanvas.width = w
+    if (scratchCanvas.height !== h) scratchCanvas.height = h
+    const prepare = () => {
+      preview.resize(w, h)
+      applyCamera(preview, camSpec || {}, bounds)
+    }
+    const { ms, probe, passes } = drawFrameReliably(
+      scratchCtx, preview, [w, h], background, 0, 0, prepare,
+    )
+    return { canvas: scratchCanvas, ms, probe, passes }
+  }
+
+  function renderOneFrame(preview, size, background) {
+    const prevBg = Canvas.scene.background
+    try {
+      if (background === null || background === undefined) {
+        Canvas.scene.background = null
+        preview.renderer?.setClearAlpha?.(0)
+      } else if (colorOk(background)) {
+        Canvas.scene.background = new THREE.Color(background)
+        preview.renderer?.setClearAlpha?.(1)
+      }
+      const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      Canvas.withoutGizmos(() => preview.render())
+
+      const out = document.createElement('canvas')
+      out.width = Math.round(size[0])
+      out.height = Math.round(size[1])
+      const octx = out.getContext('2d')
+      octx.drawImage(preview.canvas, 0, 0, preview.canvas.width, preview.canvas.height,
+        0, 0, out.width, out.height)
+      const dataUrl = out.toDataURL('image/png')
+      const t1 = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+      // 让调用方可以对这个 2D canvas 做空帧检测（与 pixel 同源，最可靠）
+      return { dataUrl, ms: +(t1 - t0).toFixed(2), canvas: out }
+    } finally {
+      Canvas.scene.background = prevBg
+    }
+  }
+
+  /** 取离屏 preview；不可用则抛 ENGINE_DEGRADED。 */
+  function offscreenPreview() {
+    const preview = window.MediaPreview ?? window.Screencam?.NoAAPreview
+    if (!preview) throw err('ENGINE_DEGRADED', 'offscreen preview unavailable', { code: 'ENGINE_DEGRADED' })
+    return preview
+  }
+
+  /** 解析 focus/bounds：focus 元素存在则用元素包围盒，否则用整模型包围盒。 */
+  function resolveBounds(focusRef) {
+    const modelB = modelBounds()
+    if (!modelB) throw err('INVALID_OPERATION', 'model bounds empty', { code: 'INVALID_OPERATION' })
+    if (!focusRef) return modelB
+    const fb = elementBounds(focusRef)
+    if (!fb) throw err('INVALID_REFERENCE', `focus element not found: ${focusRef}`, { code: 'INVALID_REFERENCE' })
+    return fb
+  }
+
+  /** camera.get：读当前位姿。优先读用户主视口（若可用），否则读离屏 preview。 */
+  handlers['camera.get'] = (params = {}) => {
+    ensureProject()
+    const wantSource = params.source === 'main' ? 'main' : 'offscreen'
+    let preview = null
+    let source = wantSource
+    if (wantSource === 'main') {
+      try {
+        const main = (typeof Preview !== 'undefined' ? Preview : window.Preview)
+        if (main?.camera) preview = main
+        else { source = 'offscreen' }
+      } catch { source = 'offscreen' }
+    }
+    if (!preview) {
+      preview = offscreenPreview()
+      source = 'offscreen'
+    }
+    const cam = preview.camera
+    const tgt = preview.controls?.target
+    const b = modelBounds()
+    const center = b ? b.center : [0, 0, 0]
+    const pos = cam.position.toArray()
+    let azimuth = 0, elevation = 0
+    if (tgt) {
+      const d = new THREE.Vector3(pos[0] - tgt.x, pos[1] - tgt.y, pos[2] - tgt.z)
+      const horiz = Math.hypot(d.x, d.z)
+      elevation = (Math.atan2(d.y, horiz) * 180) / Math.PI
+      // 反解 camDir：x=sin(az)cos(el), z=-cos(az)cos(el)
+      azimuth = (Math.atan2(d.x, -d.z) * 180) / Math.PI
+    }
+    return {
+      ok: true,
+      source,
+      azimuth: +azimuth.toFixed(2),
+      elevation: +elevation.toFixed(2),
+      distance: +new THREE.Vector3(pos[0] - (tgt?.x ?? center[0]), pos[1] - (tgt?.y ?? center[1]), pos[2] - (tgt?.z ?? center[2])).length().toFixed(3),
+      position: pos.map((v) => +v.toFixed(3)),
+      target: tgt ? [tgt.x, tgt.y, tgt.z].map((v) => +v.toFixed(3)) : center,
+      zoom: +(cam.zoom ?? 1).toFixed(4),
+      fov: +(cam.fov ?? 40).toFixed(2),
+      projection: cam.isOrthographicCamera ? 'ortho' : 'persp',
+      revision: state.revision,
+      note: source === 'main' ? '用户主视口（只读镜像，不影响用户操作）' : '离屏 preview（AI 自己的视图）',
+    };
+  }
+
+  /** camera.set：设置离屏相机位姿并回读实际值。纯内部状态，不改文档、不 bump revision。 */
+  handlers['camera.set'] = (params = {}) => {
+    ensureProject()
+    const preview = offscreenPreview()
+    const size = Array.isArray(params.size) ? params.size : [preview.width || 640, preview.height || 640]
+    preview.resize(size[0], size[1])
+    const bounds = resolveBounds(params.focus)
+    const camera = applyCamera(preview, params, bounds)
+    return { ok: true, size, camera, revision: state.revision, pending_render: true }
+  }
+
+  /**
+   * render.preview：单帧预览。
+   * 与 render.views 的区别：不落盘、不做 pngStats/缩略图、不参与 changed 判定、elapsed_ms 真实。
+   */
+  handlers['render.preview'] = (params = {}) => {
+    ensureProject()
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    const preview = offscreenPreview()
+    const size = Array.isArray(params.size) ? params.size : [640, 640]
+    const w = Math.max(64, Math.min(4096, Math.round(num(size[0], 640))))
+    const h = Math.max(64, Math.min(4096, Math.round(num(size[1], 640))))
+    const bounds = resolveBounds(params.focus)
+
+    // 关键顺序（踩过的坑）：
+    //   1) resize 必须在 applyCamera 之前（resize 会重置相机与 controls）；
+    //   2) applyCamera 之后必须 primePreview（渲两帧丢弃），
+    //      否则第一帧是空帧，整张图只有底色。
+    preview.resize(w, h)
+
+    const camera = forceRedraw(preview, params.camera || params, bounds)
+    const { canvas: out, ms: renderMs, probe, passes } = renderFrameReliably(preview, w, h, params.background, params.camera || params, bounds)
+    const dataUrl = out.toDataURL('image/png')
+
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    const tEnd = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+    return {
+      ok: true,
+      png: base64,
+      width: w, height: h,
+      bytes: Math.round(base64.length * 0.75),
+      revision: state.revision,
+      camera,
+      focus: params.focus ?? null,
+      render_ms: renderMs,
+      frames_color_probe: probe,
+      render_passes: passes,
+      elapsed_ms: +(tEnd - tStart).toFixed(2),
+    }
+  }
+
+  /**
+   * render.turntable：绕轴转一圈，返回 N 帧。
+   * 用于"自由转头看模型"，替代三视图脑补。默认不落盘。
+   */
+  handlers['render.turntable'] = (params = {}) => {
+    ensureProject()
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    const preview = offscreenPreview()
+    const size = Array.isArray(params.size) ? params.size : [320, 320]
+    const w = Math.max(64, Math.min(2048, Math.round(num(size[0], 320))))
+    const h = Math.max(64, Math.min(2048, Math.round(num(size[1], 320))))
+    const steps = Math.max(2, Math.min(24, Math.round(num(params.steps, 8))))
+    const from = num(params.from, 0)
+    const to = num(params.to, 360)
+    const elevation = num(params.elevation, 15)
+    const axis = params.axis === 'x' ? 'x' : 'y'
+    const bounds = resolveBounds(params.focus)
+
+    preview.resize(w, h)
+
+    const frames = []
+    for (let i = 0; i < steps; i++) {
+      const t = steps === 1 ? 0 : i / steps   // 不重复首尾
+      const angle = from + (to - from) * t
+      const cam = axis === 'y'
+        ? { azimuth: angle, elevation, projection: params.projection, padding: params.padding }
+        : { azimuth: num(params.azimuth, 0), elevation: angle, projection: params.projection, padding: params.padding }
+      const camActual = applyCamera(preview, cam, bounds)
+      const frame = renderOneFrame(preview, [w, h], params.background)
+      const b64 = frame.dataUrl.slice(frame.dataUrl.indexOf(',') + 1)
+      frames.push({
+        index: i,
+        azimuth: camActual.azimuth,
+        elevation: camActual.elevation,
+        png: b64,
+        bytes: Math.round(b64.length * 0.75),
+        render_ms: frame.ms,
+      })
+    }
+    const tEnd = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    return {
+      ok: true,
+      axis, from, to, steps, elevation,
+      width: w, height: h,
+      revision: state.revision,
+      frames,
+      total_bytes: frames.reduce((n, f) => n + f.bytes, 0),
+      elapsed_ms: +(tEnd - tStart).toFixed(2),
+    }
+  }
+
+  /**
+   * render.animation_frame：在指定动画的时间轴上采样若干帧。
+   *
+   * 风险（docs/07 R5）：Timeline.time / Animation.selected 是 GUI 全局状态，
+   * 因此全程保存并恢复，且 GUI 可见时直接拒绝（不抢占用户的视图与状态）。
+   */
+  handlers['render.animation_frame'] = (params = {}) => {
+    ensureProject()
+    if (state.guiVisible) {
+      throw err('GUI_BUSY', 'user is inspecting Blockbench; hide the GUI first', { code: 'GUI_BUSY', hint: 'run /hide then retry' })
+    }
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    const preview = offscreenPreview()
+
+    const animName = params.animation ?? params.name ?? null
+    const anim = animName
+      ? (Animation.all.find((a) => a.name === animName || a.uuid === animName) ?? null)
+      : Animation.selected
+    if (!anim) throw err('INVALID_REFERENCE', `animation not found: ${animName}`, { code: 'INVALID_REFERENCE' })
+
+    const size = Array.isArray(params.size) ? params.size : [320, 320]
+    const w = Math.max(64, Math.min(2048, Math.round(num(size[0], 320))))
+    const h = Math.max(64, Math.min(2048, Math.round(num(size[1], 320))))
+    const samples = Math.max(2, Math.min(16, Math.round(num(params.samples, 4))))
+    const len = Math.max(0.001, num(anim.length, 1))
+    const t0s = num(params.from, 0)
+    const t1s = num(params.to, len)
+    const bounds = resolveBounds(params.focus)
+
+    preview.resize(w, h)
+
+    // ---- 保存 GUI 全局状态
+    const savedTime = Timeline.time
+    const savedSelected = Animation.selected
+    const savedPlaying = Animation.all.filter((a) => a.playing).map((a) => a.uuid)
+    state.suppressUserEdit = true
+
+    const frames = []
+    try {
+      anim.select?.()
+      try { Canvas.withoutGizmos(() => preview.render()) } catch { /* warm-up */ }
+
+      for (let i = 0; i < samples; i++) {
+        const frac = samples === 1 ? 0 : i / (samples - 1)
+        const time = t0s + (t1s - t0s) * frac
+        Timeline.time = time
+        try {
+          Animator.showDefaultPose(true)
+          Animator.stackAnimations([anim], false)
+          Animator.displayMeshDeformation?.()
+        } catch { /* 部分格式无骨骼变形 */ }
+        const frame = renderOneFrame(preview, [w, h], params.background)
+        const b64 = frame.dataUrl.slice(frame.dataUrl.indexOf(',') + 1)
+        frames.push({
+          index: i,
+          time: +time.toFixed(3),
+          png: b64,
+          bytes: Math.round(b64.length * 0.75),
+          render_ms: frame.ms,
+        })
+      }
+    } finally {
+      // ---- 恢复 GUI 全局状态（即使中途抛错）
+      try { Timeline.time = savedTime } catch { /* ignore */ }
+      try {
+        if (savedSelected) savedSelected.select?.()
+        Animator.showDefaultPose(true)
+        Animator.stackAnimations(
+          Animation.all.filter((a) => savedPlaying.includes(a.uuid)),
+          false,
+        )
+        Animator.displayMeshDeformation?.()
+      } catch { /* ignore */ }
+      state.suppressUserEdit = false
+    }
+
+    const tEnd = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    return {
+      ok: true,
+      animation: anim.name,
+      length: +len.toFixed(3),
+      from: +t0s.toFixed(3), to: +t1s.toFixed(3), samples,
+      width: w, height: h,
+      revision: state.revision,
+      frames,
+      total_bytes: frames.reduce((n, f) => n + f.bytes, 0),
+      elapsed_ms: +(tEnd - tStart).toFixed(2),
+    }
+  }
+
+  /**
+   * render.sheet：**一次性把 N 个视角/时刻渲染并合成为一张 PNG**。
+   *
+   * 为什么在 renderer 内合成（而不是 Host 侧）：
+   *   1) 只回传 1 张 PNG，而不是 N 张 —— WS 是 text JSON、单条上限 8MB；
+   *   2) Host 侧（纯 Node 测试环境）没有 canvas，合成要额外依赖；
+   *   3) 一张图装 4 帧与装 1 帧 token 同价，"多留一帧"几乎免费。
+   *
+   * cells 每项支持三种来源（可混用）：
+   *   { view: 'front' }                        固定机位
+   *   { camera: { azimuth, elevation, ... } }  参数化相机
+   *   { time: 0.5 }                            动画时间点（需 animation 参数）
+   *   { texture: { name, scale, region } }     贴图放大（type:'texture' 时）
+   */
+  handlers['render.sheet'] = async (params = {}) => {
+    ensureProject()
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    const preview = offscreenPreview()
+
+    const cellsIn = Array.isArray(params.cells) && params.cells.length
+      ? params.cells.slice(0, 16)
+      : [{ view: 'front' }, { view: 'iso_fr' }]
+
+    const count = cellsIn.length
+    const gap = Math.max(0, Math.min(8, Math.round(num(params.gap, 1))))
+    const cellPx = Math.max(64, Math.min(1024, Math.round(num(params.cell, 320))))
+
+    // 布局：默认按接近 4:3 排（ceil(sqrt(n*1.33)) 列），而不是竖排长条
+    let cols = Math.max(1, Math.round(num(params.cols, 0)))
+    if (!cols) cols = Math.max(1, Math.ceil(Math.sqrt(count * 1.33)))
+    cols = Math.min(cols, count)
+    const rows = Math.ceil(count / cols)
+
+    const sheetW = cols * cellPx
+    const sheetH = rows * cellPx
+    const sheet = document.createElement('canvas')
+    sheet.width = sheetW
+    sheet.height = sheetH
+    const sctx = sheet.getContext('2d')
+    sctx.imageSmoothingEnabled = true
+    sctx.imageSmoothingQuality = 'high'
+
+    // 底色：不透明底色能避免"透明=黑"被误读，也让多格之间有清晰边界
+    const bg = colorOk(params.background) ? params.background : null
+    if (bg) { sctx.fillStyle = bg; sctx.fillRect(0, 0, sheetW, sheetH) }
+
+    // 动画准备（所有 cell 共用同一个动画上下文）
+    const animName = params.animation ?? null
+    let anim = null
+    if (cellsIn.some((c) => c && c.time !== undefined)) {
+      if (state.guiVisible) throw err('GUI_BUSY', 'user is inspecting Blockbench; hide the GUI first', { code: 'GUI_BUSY', hint: 'run /hide then retry' })
+      anim = animName
+        ? (Animation.all.find((a) => a.name === animName || a.uuid === animName) ?? null)
+        : Animation.selected
+      if (!anim) throw err('INVALID_REFERENCE', `animation not found: ${animName}`, { code: 'INVALID_REFERENCE' })
+    }
+
+    const bounds = resolveBounds(params.focus)
+    const savedTime = (typeof Timeline !== 'undefined') ? Timeline.time : 0
+    const savedSelected = (typeof Animation !== 'undefined') ? Animation.selected : null
+    const savedPlaying = (typeof Animation !== 'undefined') ? Animation.all.filter((a) => a.playing).map((a) => a.uuid) : []
+    if (anim) state.suppressUserEdit = true
+
+    const cells = []
+    try {
+      preview.resize(cellPx, cellPx)
+        if (anim) { try { anim.select?.() } catch { /* ignore */ } }
+
+      for (let i = 0; i < count; i++) {
+        const cell = cellsIn[i] || {}
+        const r = Math.floor(i / cols)
+        const c = i % cols
+        const dx = c * cellPx, dy = r * cellPx
+
+        // 动画姿势
+        if (anim && cell.time !== undefined) {
+          try {
+            Timeline.time = cell.time
+            Animator.showDefaultPose(true)
+            Animator.stackAnimations([anim], false)
+            Animator.displayMeshDeformation?.()
+          } catch { /* 部分格式无骨骼变形 */ }
+        }
+
+        // 相机：view 优先，其次 camera
+        let camSpec = cell.camera || null
+        if (!camSpec && cell.view && VIEW_DIRS[cell.view]) {
+          const [vx, vy, vz] = VIEW_DIRS[cell.view]
+          // 由方向向量反解方位/俯仰，保持与 camDir 一致
+          const horiz = Math.hypot(vx, vz) || 1e-9
+          camSpec = {
+            azimuth: (Math.atan2(vx, -vz) * 180) / Math.PI,
+            elevation: (Math.atan2(vy, horiz) * 180) / Math.PI,
+            projection: params.projection,
+            padding: params.padding,
+          }
+        }
+        // 关键顺序（踩过的坑）：resize 与 applyCamera 必须**紧贴**在 draw 之前，
+        // 中间插任何别的调用都会拿到空 buffer。所以把这两步包成 prepare，
+        // 交给 drawFrameReliably 在每次重试前重跑。
+        const cellBounds = cell.focus ? resolveBounds(cell.focus) : bounds
+        const prepareCell = () => {
+          preview.resize(cellPx, cellPx)
+          return applyCamera(preview, camSpec || {}, cellBounds)
+        }
+        let camActual = prepareCell()
+        const { ms: coreMs, probe: cellProbe, passes: cellPasses } =
+          drawFrameReliably(sctx, preview, [cellPx, cellPx], bg, dx, dy, () => { camActual = prepareCell() })
+
+        // 格号（左上角），便于模型引用"第几格"
+        if (params.labels !== false) {
+          const label = String(i + 1)
+          sctx.font = `${Math.max(10, Math.round(cellPx * 0.06))}px sans-serif`
+          const tw = sctx.measureText(label).width
+          sctx.fillStyle = 'rgba(0,0,0,0.55)'
+          sctx.fillRect(dx + 2, dy + 2, tw + 8, Math.round(cellPx * 0.09) + 4)
+          sctx.fillStyle = '#ffffff'
+          sctx.fillText(label, dx + 6, dy + Math.round(cellPx * 0.09))
+        }
+
+        cells.push({
+          index: i,
+          view: cell.view ?? null,
+          time: cell.time ?? null,
+          camera: camActual,
+          render_ms: coreMs,
+          colors: cellProbe.colors,
+          empty: cellProbe.empty,
+          passes: cellPasses,
+        })
+
+        // 格间细线
+        if (gap > 0 && c < cols - 1) {
+          sctx.fillStyle = 'rgba(255,255,255,0.15)'
+          sctx.fillRect(dx + cellPx - gap, dy, gap, cellPx)
+        }
+      }
+    } finally {
+      if (anim) {
+        try { Timeline.time = savedTime } catch { /* ignore */ }
+        try {
+          if (savedSelected) savedSelected.select?.()
+          Animator.showDefaultPose(true)
+          Animator.stackAnimations(Animation.all.filter((a) => savedPlaying.includes(a.uuid)), false)
+          Animator.displayMeshDeformation?.()
+        } catch { /* ignore */ }
+        state.suppressUserEdit = false
+      }
+    }
+
+    const dataUrl = sheet.toDataURL('image/png')
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    const tEnd = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+    return {
+      ok: true,
+      png: base64,
+      width: sheetW, height: sheetH,
+      bytes: Math.round(base64.length * 0.75),
+      cols, rows, cell: cellPx,
+      count,
+      animation: anim ? anim.name : null,
+      revision: state.revision,
+      cells,
+      elapsed_ms: +(tEnd - tStart).toFixed(2),
+    }
+  }
+
+  /**
+   * render.texture_sheet：贴图区域的像素级放大，可多块拼一张。
+   * 用于"精修核对"——小改动往往只有几个像素，整模型渲染看不出来。
+   */
+  handlers['render.texture_sheet'] = (params = {}) => {
+    ensureProject()
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    const regions = Array.isArray(params.regions) && params.regions.length
+      ? params.regions.slice(0, 8)
+      : [params.region ?? null]
+    const scale = Math.max(1, Math.min(16, Math.round(num(params.scale, 8))))
+    const bg = colorOk(params.background) ? params.background : null
+
+    const panels = []
+    for (const spec of regions) {
+      const tex = findTexture(spec?.texture ?? params.texture)
+      if (!tex) throw err('INVALID_REFERENCE', `texture not found: ${spec?.texture ?? params.texture}`, { code: 'INVALID_REFERENCE' })
+      const region = spec?.region ?? spec ?? [0, 0, tex.width - 1, tex.height - 1]
+      const sw = Math.max(1, region[2] - region[0] + 1)
+      const sh = Math.max(1, region[3] - region[1] + 1)
+      panels.push({ tex, region, sw, sh })
+    }
+
+    // 所有面板统一缩放到同一格边（保住"像素放大"观感，用最近邻）
+    const maxSide = Math.max(...panels.map((p) => Math.max(p.sw, p.sh)))
+    const cell = Math.max(64, Math.min(1024, maxSide * scale))
+    const cols = Math.max(1, Math.round(num(params.cols, panels.length > 2 ? 2 : panels.length)))
+    const rows = Math.ceil(panels.length / cols)
+
+    const sheet = document.createElement('canvas')
+    sheet.width = cols * cell
+    sheet.height = rows * cell
+    const ctx = sheet.getContext('2d')
+    ctx.imageSmoothingEnabled = false   // 像素放大必须最近邻
+    if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, sheet.width, sheet.height) }
+
+    panels.forEach((p, i) => {
+      const r = Math.floor(i / cols), c = i % cols
+      const dx = c * cell, dy = r * cell
+      // 等比放大，居中
+      const s = Math.min(cell / p.sw, cell / p.sh)
+      const w = Math.round(p.sw * s), h = Math.round(p.sh * s)
+      const ox = dx + Math.round((cell - w) / 2)
+      const oy = dy + Math.round((cell - h) / 2)
+      ctx.drawImage(p.tex.canvas, p.region[0], p.region[1], p.sw, p.sh, ox, oy, w, h)
+      if (params.labels !== false) {
+        ctx.font = `${Math.max(10, Math.round(cell * 0.055))}px sans-serif`
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'
+        const label = `${i + 1}:${p.tex.name}`
+        const tw = ctx.measureText(label).width
+        ctx.fillRect(dx + 2, dy + 2, tw + 6, Math.round(cell * 0.075) + 4)
+        ctx.fillStyle = '#fff'
+        ctx.fillText(label, dx + 5, dy + Math.round(cell * 0.075))
+      }
+    })
+
+    const dataUrl = sheet.toDataURL('image/png')
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    const tEnd = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+    return {
+      ok: true,
+      png: base64,
+      width: sheet.width, height: sheet.height,
+      bytes: Math.round(base64.length * 0.75),
+      cols, rows, cell, count: panels.length,
+      panels: panels.map((p, i) => ({ index: i, texture: p.tex.name, region: p.region, w: p.sw, h: p.sh })),
+      revision: state.revision,
+      elapsed_ms: +(tEnd - tStart).toFixed(2),
+    }
+  }
+
   handlers['render.texture'] = (params = {}) => {
     ensureProject()
     const tex = findTexture(params.texture)
     if (!tex) throw err('INVALID_REFERENCE', `texture not found: ${params.texture}`, { code: 'INVALID_REFERENCE' })
     const scale = Math.min(16, Math.max(1, Number(params.scale) || 8))
     const region = params.region ?? [0, 0, tex.width - 1, tex.height - 1]
-    const sw = region[2] - region[0] + 1, sh = region[3] - region[1] + 1
+    const sw = Math.max(1, region[2] - region[0] + 1), sh = Math.max(1, region[3] - region[1] + 1)
     const c = document.createElement('canvas')
     c.width = sw * scale; c.height = sh * scale
     const ctx = c.getContext('2d')
     ctx.imageSmoothingEnabled = false
+    // 透明区域垫一层深色底，否则拼图/观察时"透明=黑"会误判为缺像素
+    if (colorOk(params.background)) {
+      ctx.fillStyle = params.background
+      ctx.fillRect(0, 0, c.width, c.height)
+    }
     ctx.drawImage(tex.canvas, region[0], region[1], sw, sh, 0, 0, c.width, c.height)
+    const dataUrl = c.toDataURL('image/png')
+
+    // inline=true：不落盘、直接回 base64（供 bb_render_texture 拼图与"精修核对"用）
+    if (params.inline === true) {
+      const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+      return {
+        ok: true,
+        inline: true,
+        texture: tex.name,
+        png: base64,
+        width: c.width, height: c.height,
+        bytes: Math.round(base64.length * 0.75),
+        scale, region,
+        revision: state.revision,
+      }
+    }
+
     const dir = workspacePath('artifacts', 'texture-previews')
     ensureDir(dir)
     const file = `${dir}${dir.includes('\\') ? '\\' : '/'}${tex.name}_x${scale}.png`
-    const dataUrl = c.toDataURL('image/png')
     writeBlockbenchFile(file, dataUrl, 'image')
-    return { revision: state.revision, path: `artifacts/texture-previews/${tex.name}_x${scale}.png`, workspace_path: file, width: c.width, height: c.height }
+    return { revision: state.revision, path: `artifacts/texture-previews/${tex.name}_x${scale}.png`, workspace_path: file, width: c.width, height: c.height, scale, region }
   }
 
   // ---- validate / save / export -----------------------------------------

@@ -4,6 +4,9 @@ dist/
 node_modules/
 *.log
 
+# archived test / reference material (kept on disk, never distributed)
+_archive/
+
 # upstream clones (keep out of VCS; re-clone per research docs)
 vendor/
 

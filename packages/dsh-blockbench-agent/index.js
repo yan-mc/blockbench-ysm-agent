@@ -10,6 +10,8 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createWsServer } from './lib/ws-server.js'
+import { imageTokens } from './lib/viewsheet.js'
+import { offloadSessionImages, countLiveImages } from './lib/imageprune.js'
 import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -40,12 +42,43 @@ const DEFAULTS = {
   imageMaxDimension: 512,
   exposeGuiTools: false,
   bridgeTransport: 'auto',
+
+  // ---- 视口实时反馈（docs/07）----
+  /** 写操作后自动附图（A 眼）。可一键关闭。 */
+  autoLook: true,
+  /** 每 N 次写操作附一次图；1 = 每次（同 step 仍会合并）。 */
+  autoLookEvery: 1,
+  /** 自动附图的画布边长（单格）。320 → 2 格 640×320 ≈ 180 token。 */
+  autoLookCell: 320,
+  /** 自动附图强制不透明底色，避免"透明=黑"被误读（docs/07 R4）。 */
+  autoLookBackground: '#1b1b1b',
+  /** 单会话累计附图上限；超过后自动关闭 autoLook 并在状态里提示。 */
+  sessionImageBudget: 40,
+  /** 图史压缩：最多保留多少张"活图"（L1 触发阈值）。 */
+  maxLiveImages: 6,
+  /** 图史压缩：永远保留的最新图片数。 */
+  keepImages: 2,
+  /** 图史压缩：单次最多改写多少条 tool result（控制前缀缓存失效范围）。 */
+  offloadMaxNodes: 4,
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
 
 function textBlocks(value) {
   return [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }]
+}
+
+/**
+ * 通用输出渲染：文本 + （若存在）自动附图块。
+ * 写操作工具经 withAutoLook 包装后，结果里带 `__autoLookBlocks`；
+ * 这里把它转成真正的 image block 附在文本之后（docs/07 眼睛 A）。
+ */
+function renderWithAutoLook(value) {
+  if (!value || typeof value !== 'object' || !Array.isArray(value.__autoLookBlocks)) {
+    return textBlocks(value)
+  }
+  const { __autoLookBlocks, __autoLook, ...rest } = value
+  return [...textBlocks(rest), ...__autoLookBlocks]
 }
 
 export function apply(ctx, config = {}) {
@@ -55,9 +88,11 @@ export function apply(ctx, config = {}) {
   const userDataDir = path.join(workspace, '.bb', `userdata-${runtimeTag}`)
   const attachments = ctx.get?.('attachments')
 
-  fs.mkdirSync(workspace, { recursive: true })
-  fs.mkdirSync(path.join(workspace, 'logs'), { recursive: true })
-  fs.mkdirSync(path.join(workspace, 'artifacts'), { recursive: true })
+  // 运行时目录：插件在会话中会持续写入，缺失会导致写日志/落盘失败。
+  // 每次 apply 都重建（recursive 幂等），避免被外部清理后崩溃。
+  for (const sub of ['', 'logs', 'artifacts', 'checkpoints', path.join('.bb')]) {
+    try { fs.mkdirSync(path.join(workspace, sub), { recursive: true }) } catch { /* 只读盘等场景不阻断加载 */ }
+  }
 
   const state = {
     server: null, rpcUrl: '', token: '', child: null, connected: false,
@@ -186,9 +221,22 @@ export function apply(ctx, config = {}) {
         env: childEnv,
       })
       const child = state.child
-      const logStream = fs.createWriteStream(path.join(workspace, 'logs', 'runtime.log'), { flags: 'a' })
-      child.stdout?.on('data', (d) => logStream.write(d))
-      child.stderr?.on('data', (d) => logStream.write(d))
+      // 目录可能在运行期被清理（例如归档/手动删除），必须每次 spawn 前确保存在；
+      // 且 WriteStream 的 'error' 必须有监听器 —— 否则 ENOENT 会以未捕获异常
+      // 冒泡到宿主进程，直接把 dsh 打崩（2026-11-06 实报过一次）。
+      const logsDir = path.join(workspace, 'logs')
+      let logStream = null
+      try {
+        fs.mkdirSync(logsDir, { recursive: true })
+        logStream = fs.createWriteStream(path.join(logsDir, 'runtime.log'), { flags: 'a' })
+        logStream.on('error', (error) => log('runtime log stream error:', error?.message))
+      } catch (error) {
+        log('cannot open runtime log:', error?.message)
+      }
+      if (logStream) {
+        child.stdout?.on('data', (d) => { try { logStream.write(d) } catch { /* ignore */ } })
+        child.stderr?.on('data', (d) => { try { logStream.write(d) } catch { /* ignore */ } })
+      }
       child.on('exit', (code, signal) => {
         log(`runtime exited code=${code} signal=${signal}${code === 3 ? ' (instance conflict / stale userData lock)' : ''}`)
         state.connected = false
@@ -369,12 +417,243 @@ export function apply(ctx, config = {}) {
     }
   }
 
+  // ------------------------------------------------------------ 视口实时反馈辅助（docs/07）
+
+  /** 会话级图片计数（用于 sessionImageBudget 与 /bb-status）。 */
+  const lookStats = { images: 0, autolook: 0, offloaded: 0, lastError: null, disabledByBudget: false }
+
+  /**
+   * 把 renderer 返回的 inline base64 直接存成附件（不落盘）。
+   * 失败返回 null —— 视觉反馈永远不能影响主流程（docs/07 D9）。
+   */
+  async function saveInlineAttachment(base64, name) {
+    if (!attachments || !base64) return null
+    try {
+      const data = Buffer.from(base64, 'base64')
+      if (data.length > cfg.imageMaxBytes) {
+        log(`inline attachment skipped: ${data.length}B > ${cfg.imageMaxBytes}B`)
+        return null
+      }
+      return await attachments.saveImage({ data, mediaType: 'image/png', name })
+    } catch (error) {
+      log('inline attachment failed:', error?.message)
+      return null
+    }
+  }
+
+  /**
+   * 渲染一张视图拼图并返回 { ok, attachment, meta }。
+   * 所有"看图"工具共用这一条路径：调用 bridge `render.sheet` → 一张 PNG → 一个附件。
+   *
+   * @param {object} p
+   * @param {string} p.tool               调用来源（用于 stats/命名）
+   * @param {object[]} p.cells            见 bridge render.sheet
+   * @param {number} [p.cell=320]         单格像素
+   * @param {string|null} [p.background]  底色
+   * @param {number} [p.timeoutMs=30000]
+   * @param {AbortSignal} [p.signal]
+   */
+  async function renderSheet(p) {
+    const t0 = Date.now()
+    const params = {
+      cells: p.cells,
+      cell: p.cell ?? cfg.autoLookCell,
+      background: p.background === undefined ? cfg.autoLookBackground : p.background,
+      cols: p.cols,
+      gap: p.gap,
+      labels: p.labels,
+      projection: p.projection,
+      padding: p.padding,
+      animation: p.animation,
+      focus: p.focus,
+    }
+    const result = await raceAbort(call('render.sheet', params, p.timeoutMs ?? 30000), p.signal)
+
+    const attachment = await saveInlineAttachment(result.png, `${p.tool}-${Date.now()}.png`)
+    if (!attachment) {
+      return { ok: false, code: 'ATTACHMENT_FAILED', message: '渲染成功但附件提交失败', result }
+    }
+
+    const tokens = imageTokens(result.width, result.height)
+    lookStats.images += 1
+    const meta = {
+      tool: p.tool,
+      revision: result.revision,
+      views: (result.cells ?? []).map((c) => c.view ?? (c.time !== null ? `t=${c.time}` : 'custom')),
+      cells: result.count,
+      width: result.width, height: result.height,
+      tokens_est: tokens,
+      render_ms: result.elapsed_ms,
+      total_ms: Date.now() - t0,
+    }
+    return { ok: true, attachment, meta, result }
+  }
+
+  /** 触发一次图史压缩（L1）。失败只记日志，永不抛出（docs/07 R2）。 */
+  function maybeOffloadImages(reason) {
+    try {
+      const session = currentSession()
+      if (!session) return null
+      const before = countLiveImages(session)
+      if (before.images <= cfg.maxLiveImages) return null
+      const r = offloadSessionImages({
+        session,
+        tokenMeter: ctx.get?.('tokenMeter') ?? null,
+        keepImages: cfg.keepImages,
+        maxNodes: cfg.offloadMaxNodes,
+        protectSeqs: currentStepSeqs(),
+      })
+      if (r.imagesRemoved > 0) {
+        lookStats.offloaded += r.imagesRemoved
+        log(`[图史压缩/${reason}] 剥离 ${r.imagesRemoved} 张图，改写 ${r.nodesRewritten} 条 tool result`)
+      }
+      return r
+    } catch (error) {
+      lookStats.lastError = error?.message ?? String(error)
+      log('image offload failed:', lookStats.lastError)
+      return null
+    }
+  }
+
+  /** 当前 agent 的 Session（拿不到返回 null，纯 Node 测试环境就是 null）。 */
+  function currentSession() {
+    try {
+      const agent = ctx.get?.('agents')?.currentInitiator?.()
+      if (!agent) return null
+      const sessions = ctx.get?.('sessions')
+      if (!sessions?.get) return null
+      return sessions.get(agent.id) ?? null
+    } catch { return null }
+  }
+
+  /** 当前 step 产生的 surface 节点（这些图永不被剥离）。 */
+  function currentStepSeqs() {
+    const seqs = new Set()
+    try {
+      const session = currentSession()
+      if (!session) return seqs
+      const n = session.surface?.nodes ?? []
+      // 取尾部 20 个节点作为"当前窗口"保守保护区
+      for (const s of n.slice(-20)) seqs.add(s)
+    } catch { /* ignore */ }
+    return seqs
+  }
+
   // ------------------------------------------------------------ tool registry
   const registered = []
   const registeredTools = new Map()
   const tool = (definition) => {
-    try { registeredTools.set(definition.name, definition) } catch { /* ignore */ }
-    registered.push(ctx.tools.register(defineTool(definition)))
+    // 写操作工具统一套一层"编辑即看"（docs/07 眼睛 A）
+    const def = AUTO_LOOK_TOOLS.has(definition.name) && definition.execute
+      ? withAutoLook(definition)
+      : definition
+    try { registeredTools.set(def.name, def) } catch { /* ignore */ }
+    registered.push(ctx.tools.register(defineTool(def)))
+  }
+
+  // ---- 编辑即看（docs/07 眼睛 A）--------------------------------------------
+  // 写操作完成后自动附加一张小拼图。关键约束：
+  //   1) 同一 step 内连续写操作**合并成一张**（D2）—— 避免 set_uv 连点刷图；
+  //   2) 失败绝不影响写操作结果（D9）；
+  //   3) 可一键关闭（D8），且受 sessionImageBudget 限制。
+
+  /** 需要自动附图的写操作工具。 */
+  const AUTO_LOOK_TOOLS = new Set([
+    'bb_apply_model_patch',
+    'bb_texture_patch',
+    'bb_texture_create',
+    'bb_texture_import_png',
+    'bb_texture_pbr',
+    'bb_animation_create',
+    'bb_animation_patch',
+    'bb_project_open',
+    'bb_session_start',
+  ])
+
+  /** step 级合并：<turn:step, { at, count }>。 */
+  const autoLookSteps = new Map()
+  let autoLookWrites = 0
+
+  /**
+   * 给一次写操作的结果附加"改完的样子"。
+   * 返回额外的 content blocks（可能为空数组）。
+   */
+  async function autoLookFor(toolName, exec) {
+    if (!cfg.autoLook) return { blocks: [], reason: 'disabled' }
+    if (lookStats.disabledByBudget) return { blocks: [], reason: 'budget' }
+    if (!AUTO_LOOK_TOOLS.has(toolName)) return { blocks: [], reason: 'not-write-tool' }
+
+    autoLookWrites += 1
+    const every = Math.max(1, Math.round(cfg.autoLookEvery) || 1)
+    if (autoLookWrites % every !== 0) return { blocks: [], reason: 'skipped-by-frequency' }
+
+    // step 级合并：同一个 step 里只保留最后一次（后续替换前一次的附图）
+    const stepKey = `${exec?.log?.turn ?? 0}:${exec?.log?.step ?? 0}`
+    const prev = autoLookSteps.get(stepKey)
+    const merged = Boolean(prev)
+
+    const t0 = Date.now()
+    try {
+      const r = await renderSheet({
+        tool: 'autolook',
+        cells: [{ view: 'front' }, { view: 'iso_fr' }],
+        cell: cfg.autoLookCell,
+        background: cfg.autoLookBackground,
+        signal: exec?.signal,
+      })
+      if (!r.ok) {
+        lookStats.lastError = r.message ?? 'render failed'
+        return { blocks: [], reason: 'render-failed' }
+      }
+      autoLookSteps.set(stepKey, { at: Date.now(), count: (prev?.count ?? 0) + 1 })
+      lookStats.autolook += 1
+
+      // 预算：附图后立即检查是否需要压缩历史图
+      maybeOffloadImages('autolook')
+
+      if (lookStats.images >= cfg.sessionImageBudget) {
+        lookStats.disabledByBudget = true
+        log(`autoLook disabled: session image budget ${cfg.sessionImageBudget} reached`)
+      }
+
+      const blocks = [
+        {
+          type: 'text',
+          text: `【改完的样子】revision ${r.meta.revision} · ${r.meta.tokens_est} token`
+            + (merged ? `（本步第 ${(prev?.count ?? 0) + 1} 次写操作，已合并）` : '')
+            + `· ${Date.now() - t0}ms`,
+        },
+        { type: 'image', attachment: r.attachment },
+      ]
+      return { blocks, meta: r.meta }
+    } catch (error) {
+      lookStats.lastError = error?.message ?? String(error)
+      log('autoLook failed:', lookStats.lastError)
+      return { blocks: [], reason: 'exception' }
+    }
+  }
+
+  /**
+   * 包装一个写操作工具：执行后自动附图。
+   * 附图失败或超时都只影响"有没有图"，不影响工具本身的返回值与错误语义。
+   */
+  function withAutoLook(definition) {
+    const inner = definition.execute
+    return {
+      ...definition,
+      async execute(args, exec) {
+        const value = await inner(args, exec)
+        try {
+          // 写操作失败 / 明确 ok:false 时不附图（没有可看的新状态）
+          if (value && value.ok === false) return value
+          const extra = await autoLookFor(definition.name, exec)
+          if (!extra.blocks.length) return value
+          return { ...value, __autoLook: extra.meta ?? true, __autoLookBlocks: extra.blocks }
+        } catch {
+          return value
+        }
+      },
+    }
   }
 
   tool({
@@ -389,7 +668,7 @@ export function apply(ctx, config = {}) {
       pack_dir: { type: 'string', description: 'workspace 内相对路径（默认 pack；mode=open_pack 时必填）' },
       overwrite: { type: 'boolean', description: 'pack 已存在时是否覆盖（危险）' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
       try {
         const method = args.mode === 'open_pack' ? 'project.open_pack' : 'project.create_ysm'
@@ -404,7 +683,7 @@ export function apply(ctx, config = {}) {
     parameters: {
       pack_dir: { type: 'string', required: true, description: 'workspace 内相对路径' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
       try { return await callTool('bb_project_open', 'project.open_pack', args, { timeoutMs: 120000, signal: exec?.signal }) } catch (error) { return errorResult(error) }
     },
@@ -414,7 +693,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_session_status',
     description: '查看 Blockbench 引擎状态、当前项目 revision、连接与健康信息；卡住或怀疑降级时先调用。',
     parameters: {},
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute() {
       if (!state.connected) {
         return { ok: false, code: 'PROJECT_NOT_OPEN', message: 'Blockbench runtime not connected', rpcUrl: state.rpcUrl, lastError: state.lastError }
@@ -432,7 +711,7 @@ export function apply(ctx, config = {}) {
       limit: { type: 'number', description: '分页大小 1-100' },
       include_uv: { type: 'boolean' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args) { try { return await call('project.get_scene', args, 10000) } catch (error) { return errorResult(error) } },
   })
 
@@ -443,7 +722,7 @@ export function apply(ctx, config = {}) {
       id: { type: 'string', required: true },
       include_uv: { type: 'boolean' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args) { try { return await call('project.get_element', args, 5000) } catch (error) { return errorResult(error) } },
   })
 
@@ -454,7 +733,7 @@ export function apply(ctx, config = {}) {
       note: { type: 'string', description: '写入 Undo 标签的说明' },
       ops: { type: 'array', description: 'ops 数组，见 docs/03 §3.6', required: true },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_apply_model_patch', 'model.apply_patch', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -467,7 +746,7 @@ export function apply(ctx, config = {}) {
       height: { type: 'number', description: '默认 128' },
       fill: { type: 'string', description: '#RRGGBB 或 #RRGGBBAA' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_texture_create', 'texture.create', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -480,7 +759,7 @@ export function apply(ctx, config = {}) {
       note: { type: 'string' },
       ops: { type: 'array', description: '绘制 ops 数组，见 docs/03 §3.8', required: true },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_texture_patch', 'texture.apply_patch', args, { timeoutMs: 60000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -494,7 +773,7 @@ export function apply(ctx, config = {}) {
       max_cells: { type: 'number' },
       max_colors: { type: 'number' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args) { try { return await call('texture.read', args, 10000) } catch (error) { return errorResult(error) } },
   })
 
@@ -508,7 +787,7 @@ export function apply(ctx, config = {}) {
       layer: { type: 'string', description: 'select/delete 时的图层 id 或名字' },
       fill: { type: 'string', description: 'create 时的填充色 #RRGGBB' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
       try {
         const method = { list: 'texture.layer_list', create: 'texture.layer_create', select: 'texture.layer_select', delete: 'texture.layer_delete', flatten: 'texture.layer_flatten' }[args.op]
@@ -530,11 +809,182 @@ export function apply(ctx, config = {}) {
       channel: { type: 'string', description: 'normal|specular' },
       fill: { type: 'string', description: '可选填充色' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
       try {
         const method = args.op === 'create' ? 'texture.pbr_create' : 'texture.pbr_list'
         return await callTool('bb_texture_pbr', method, args, { timeoutMs: 30000, signal: exec?.signal, mutating: args.op === 'create' })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  // ---- 视口实时反馈工具（docs/07 眼睛 A/B）--------------------------------
+
+  const LOOK_OUTPUT = {
+    schema: { type: 'object', additionalProperties: true },
+    render: (_a, v) => {
+      if (!v || v.ok === false) return textBlocks(v ?? 'look failed')
+      const { attachment, ...rest } = v
+      const { result, ...clean } = rest
+      const blocks = textBlocks(clean)
+      if (attachment) blocks.push({ type: 'image', attachment })
+      return blocks
+    },
+  }
+
+  tool({
+    name: 'bb_look',
+    description: '【最常用】看一眼当前模型。可指定任意相机角度或固定机位，多格合成为一张图返回。'
+      + '用于确认造型、比例、配色、以及"刚改完到底长什么样"。返回一张拼图（约 180-260 token），比调三次 bb_render_views 便宜得多。'
+      + 'cells 每项可为 {view:"front"} 或 {camera:{azimuth,elevation}}；不传则默认 front + iso_fr。',
+    parameters: {
+      cells: { type: 'array', description: '格子列表：[{view:"front"} | {camera:{azimuth:45,elevation:15}}]；默认 front+iso_fr' },
+      camera: { type: 'object', description: '统一相机：{azimuth,elevation,distance,projection:"ortho"|"persp",fov,padding}', additionalProperties: false },
+      focus: { type: 'string', description: '聚焦元素名（骨骼/方块），如 "Head"' },
+      cell: { type: 'number', description: '单格像素，默认 320；要看清细节用 512/640' },
+      cols: { type: 'number', description: '列数；默认自动接近正方形' },
+      background: { type: 'string', description: '底色 #RRGGBB；传 "transparent" 用透明背景' },
+      attach: { type: 'boolean', description: '是否附图（默认 true）' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const cells = Array.isArray(args.cells) && args.cells.length
+          ? args.cells
+          : [{ view: 'front' }, { view: 'iso_fr' }]
+        const bg = args.background === 'transparent' ? null : args.background
+        const autoCols = args.cols ?? Math.max(1, Math.ceil(Math.sqrt(cells.length * 1.33)))
+        const r = await renderSheet({
+          tool: 'bb_look', cells, cell: args.cell, cols: autoCols,
+          background: bg, focus: args.focus, signal: exec?.signal,
+        })
+        if (!r.ok) return r
+        if (args.attach === false) return { ok: true, meta: r.meta }
+        return { ok: true, ...r.meta, attachment: r.attachment }
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_camera',
+    description: '读或设置 AI 自己的离屏相机位姿。get 返回当前角度，便于"接着上次的角度继续看"；'
+      + '设置后相机保持，后续 bb_look 不传相机就沿用。不改变用户在 Blockbench GUI 里的视角。',
+    parameters: {
+      get: { type: 'boolean', description: 'true = 只读当前位姿，不做设置' },
+      azimuth: { type: 'number', description: '方位角：0=正前，90=右侧，180=背后（度，顺时针）' },
+      elevation: { type: 'number', description: '俯仰角：0=水平，90=正上方（度）' },
+      distance: { type: 'number', description: '相机距离；不传按模型尺寸自动' },
+      projection: { type: 'string', description: 'ortho（默认）| persp' },
+      fov: { type: 'number', description: '透视视角（projection=persp 时生效）' },
+      focus: { type: 'string', description: '以某元素为中心' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
+    async execute(args, exec) {
+      try {
+        if (args.get === true || (args.azimuth === undefined && args.elevation === undefined)) {
+          return await call('camera.get', { source: 'offscreen' }, 10000)
+        }
+        return await call('camera.set', args, 15000)
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_orbit',
+    description: '【自由转动】绕模型转一圈，把 N 个角度合成为一张拼图（默认 8 个角度 360°）。'
+      + '替代"靠三视图脑补"：一次调用就能从任意方位核对轮廓、对称性、背面和侧面穿模。'
+      + '每格角落有编号，可以直接说"第 5 格背面有问题"。',
+    parameters: {
+      steps: { type: 'number', description: '角度个数，默认 8（2-24）' },
+      from: { type: 'number', description: '起始角度，默认 0' },
+      to: { type: 'number', description: '结束角度，默认 360' },
+      elevation: { type: 'number', description: '俯仰角，默认 15（略俯视）' },
+      axis: { type: 'string', description: 'y（默认，水平转）| x（上下翻）' },
+      cell: { type: 'number', description: '单格像素，默认 320' },
+      focus: { type: 'string', description: '围绕某元素转' },
+      background: { type: 'string', description: '底色 #RRGGBB；默认深灰' },
+      attach: { type: 'boolean', description: '是否附图（默认 true）' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const steps = Math.max(2, Math.min(24, Math.round(Number(args.steps) || 8)))
+        const from = Number.isFinite(args.from) ? args.from : 0
+        const to = Number.isFinite(args.to) ? args.to : 360
+        const elevation = Number.isFinite(args.elevation) ? args.elevation : 15
+        const cells = []
+        for (let i = 0; i < steps; i++) {
+          const t = i / steps
+          const angle = from + (to - from) * t
+          cells.push(args.axis === 'x'
+            ? { camera: { azimuth: 0, elevation: angle } }
+            : { camera: { azimuth: angle, elevation } })
+        }
+        const bg = args.background === 'transparent' ? null : args.background
+        // 自动列数：让整体接近 4:3，避免 8 格竖排成长条（320×2560）
+        const autoCols = args.cols ?? Math.max(1, Math.ceil(Math.sqrt(steps * 1.33)))
+        const r = await renderSheet({
+          tool: 'bb_orbit', cells, cell: args.cell, cols: autoCols,
+          background: bg, focus: args.focus, signal: exec?.signal,
+        })
+        if (!r.ok) return r
+        if (args.attach === false) return { ok: true, meta: r.meta }
+        return {
+          ok: true, ...r.meta,
+          hint: `第 1 格是方位 ${from}°，每格间隔 ${((to - from) / steps).toFixed(0)}°，共 ${steps} 格。`,
+          attachment: r.attachment,
+        }
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_anim_check',
+    description: '【动作检查】把某个动画在时间轴上采样若干帧、合成为一张拼图，用来确认动作幅度、起止姿势、有无穿模。'
+      + 'YSM 自带基础动画，建模完成后可用它逐个检查动作。',
+    parameters: {
+      animation: { type: 'string', description: '动画名，如 "animation.main.wave"；不传用当前选中动画' },
+      from: { type: 'number', description: '起始时间（秒），默认 0' },
+      to: { type: 'number', description: '结束时间（秒），默认整段长度' },
+      samples: { type: 'number', description: '采样帧数，默认 4（2-16）' },
+      cell: { type: 'number', description: '单格像素，默认 320' },
+      camera: { type: 'object', description: '统一相机角度（默认 iso_fr 略俯视）', additionalProperties: false },
+      focus: { type: 'string', description: '聚焦元素' },
+      background: { type: 'string', description: '底色' },
+      attach: { type: 'boolean', description: '是否附图（默认 true）' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        // 先查动画长度，用于默认 to
+        let to = args.to
+        if (!Number.isFinite(to)) {
+          const list = await call('animation.list', {}, 10000).catch(() => null)
+          // 注意：bridge 的 animation.list 字段名是 `animation`（不是 name）
+          const hit = (list?.animations ?? []).find((a) => (a.animation ?? a.name) === args.animation)
+          to = hit?.length ?? 1
+        }
+        const samples = Math.max(2, Math.min(16, Math.round(Number(args.samples) || 4)))
+        const from = Number.isFinite(args.from) ? args.from : 0
+        const cells = []
+        for (let i = 0; i < samples; i++) {
+          const t = samples === 1 ? 0 : from + ((to - from) * i) / (samples - 1)
+          cells.push({ time: +t.toFixed(3), camera: args.camera ?? { azimuth: 135, elevation: 15 } })
+        }
+        const bg = args.background === 'transparent' ? null : args.background
+        const r = await renderSheet({
+          tool: 'bb_anim_check', cells, cell: args.cell,
+          background: bg, focus: args.focus, animation: args.animation, signal: exec?.signal,
+        })
+        if (!r.ok) return r
+        if (args.attach === false) return { ok: true, meta: r.meta }
+        return {
+          ok: true, ...r.meta,
+          animation: args.animation ?? null,
+          span: [from, to],
+          hint: `按时间顺序：${cells.map((c) => `${c.time}s`).join(' → ')}`,
+          attachment: r.attachment,
+        }
       } catch (error) { return errorResult(error) }
     },
   })
@@ -614,12 +1064,22 @@ export function apply(ctx, config = {}) {
     },
     async execute(args, exec) {
       try {
-        const result = await raceAbort(call('render.texture', args, 30000), exec?.signal)
-        if (attachments && args.attach_image !== false) {
-          const withAttachment = await saveImageAttachment({ ...result, view: result.texture ?? 'texture' })
-          return withAttachment
+        // inline 模式：不落盘、直接回 base64，走统一的"一张图"交付路径（docs/07 B3）
+        const result = await raceAbort(call('render.texture', {
+          ...args,
+          inline: true,
+          background: args.background ?? cfg.autoLookBackground,
+        }, 30000), exec?.signal)
+        if (!result?.png) return result
+        const attachment = await saveInlineAttachment(result.png, `texture-${result.texture ?? 'tex'}-${Date.now()}.png`)
+        if (!attachment) return { ...result, png: undefined, attachment_error: 'attachment failed' }
+        lookStats.images += 1
+        const { png, ...rest } = result
+        return {
+          ok: true, ...rest,
+          tokens_est: imageTokens(result.width, result.height),
+          attachment,
         }
-        return result
       } catch (error) { return errorResult(error) }
     },
   })
@@ -628,7 +1088,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_validate',
     description: '按 YSM 规范校验当前项目；A 级定位组缺失=error，B 级默认层级偏离=warning。导出前必须调用。',
     parameters: { strict: { type: 'boolean' } },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args) { try { return await call('project.validate', args, 30000) } catch (error) { return errorResult(error) } },
   })
 
@@ -636,7 +1096,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_checkpoint',
     description: '把当前项目保存为 .bbmodel 检查点，并同步内嵌当前贴图像素；若 arm tab 打开也一并快照。大改或导出前调用。',
     parameters: { label: { type: 'string' }, note: { type: 'string' } },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_checkpoint', 'project.checkpoint', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -644,7 +1104,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_revisions',
     description: '列出最近的 .bbmodel 检查点与当前 revision。',
     parameters: { limit: { type: 'number' } },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args) { try { return await call('project.revisions', args, 10000) } catch (error) { return errorResult(error) } },
   })
 
@@ -655,7 +1115,7 @@ export function apply(ctx, config = {}) {
       revision: { type: 'number', required: true },
       confirm: { type: 'boolean', description: '必须为 true' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_restore', 'project.restore', args, { timeoutMs: 60000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -663,7 +1123,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_save_project',
     description: '把当前项目显式写回 workspace/pack：模型 JSON、动画、控制器、贴图 PNG 与 ysm.json。',
     parameters: {},
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(_args, exec) { try { return await callTool('bb_save_project', 'project.save', {}, { timeoutMs: 120000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -675,7 +1135,7 @@ export function apply(ctx, config = {}) {
       validate: { type: 'boolean', description: '导出前校验（默认 true）' },
       zip: { type: 'boolean', description: '是否生成 zip（默认 true）' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_export_ysm', 'project.export_ysm', args, { timeoutMs: 300000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -683,7 +1143,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_project_close',
     description: '关闭当前项目（先保存/检查点自行负责）；force=true 跳过未保存提示。',
     parameters: { force: { type: 'boolean', description: '默认 true' } },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_project_close', 'project.close', args, { timeoutMs: 15000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -691,7 +1151,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_animation_list',
     description: '列出动画名、时长、循环方式、路径与关键帧数量；含控制器/状态及已绑定动画。',
     parameters: {},
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute() { try { return await call('animation.list', {}, 10000) } catch (error) { return errorResult(error) } },
   })
 
@@ -704,7 +1164,7 @@ export function apply(ctx, config = {}) {
       loop: { type: 'string', description: 'loop | once | hold，默认 loop' },
       file: { type: 'string', description: '包内动画文件路径，默认 animations/main.animation.json' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_animation_create', 'animation.create', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -715,7 +1175,7 @@ export function apply(ctx, config = {}) {
       note: { type: 'string' },
       ops: { type: 'array', description: '动画 ops 数组，见 docs/03 §3.10', required: true },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_animation_patch', 'animation.apply_patch', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -723,7 +1183,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_animation_delete',
     description: '删除一个动画。',
     parameters: { animation: { type: 'string', required: true } },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_animation_delete', 'animation.delete', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -734,7 +1194,7 @@ export function apply(ctx, config = {}) {
       texture: { type: 'string' },
       out_dir: { type: 'string', description: 'workspace 相对目录，默认 artifacts/textures' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args) { try { return await call('texture.export_png', args, 30000) } catch (error) { return errorResult(error) } },
   })
 
@@ -748,7 +1208,7 @@ export function apply(ctx, config = {}) {
       at: { type: 'array', description: '[x,y] 目标纹理坐标，默认 [0,0]' },
       region: { type: 'array', description: '[x1,y1,x2,y2] 源图裁剪区域（可选）' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_texture_import_png', 'texture.import_png', args, { timeoutMs: 60000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
   })
 
@@ -759,12 +1219,32 @@ export function apply(ctx, config = {}) {
       calls: { type: 'array', description: '[{tool:"bb_...", args:{...}}]', required: true },
       stop_on_error: { type: 'boolean', description: '默认 true' },
     },
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
       const calls = Array.isArray(args.calls) ? args.calls : []
       if (!calls.length) return { ok: false, code: 'INVALID_PARAMS', message: 'calls is empty' }
       if (calls.length > 16) return { ok: false, code: 'RESOURCE_LIMIT', message: 'max 16 calls per batch' }
       const results = []
+      // 子调用可能带图片块（bb_look / bb_render_views / bb_render_texture / 自动附图）。
+      // 以前整包塞进 JSON 会把 image block 丢掉，模型看不到图；这里统一收集到最后。
+      const imageBlocks = []
+      const collect = (value, toolName) => {
+        if (!value || typeof value !== 'object') return
+        // 1) 自动附图块
+        if (Array.isArray(value.__autoLookBlocks)) {
+          for (const b of value.__autoLookBlocks) if (b?.type === 'image') imageBlocks.push(b)
+        }
+        // 2) 普通 attachment（bb_look / bb_render_texture / bb_orbit / bb_anim_check）
+        if (value.attachment?.attachmentId) {
+          imageBlocks.push({ type: 'image', attachment: value.attachment })
+        }
+        // 3) bb_render_views 的 images[]
+        if (Array.isArray(value.images)) {
+          for (const img of value.images) {
+            if (img?.attachment?.attachmentId) imageBlocks.push({ type: 'image', attachment: img.attachment })
+          }
+        }
+      }
       for (const item of calls) {
         if (!item?.tool || item.tool === 'bb_batch') {
           results.push({ tool: item?.tool, ok: false, code: 'INVALID_PARAMS', message: 'nested/unknown tool' })
@@ -779,14 +1259,42 @@ export function apply(ctx, config = {}) {
         }
         try {
           const result = await definition.execute(item.args ?? {}, exec)
-          results.push({ tool: item.tool, ok: result?.ok !== false, result })
+          collect(result, item.tool)
+          // 结果里去掉图片块与 base64，只保留可读摘要（避免 JSON 体积暴涨）
+          const slim = result && typeof result === 'object'
+            ? (() => {
+              const { __autoLookBlocks, __autoLook, png, data_url, attachment, ...rest } = result
+              const out = { ...rest }
+              if (Array.isArray(out.images)) {
+                out.images = out.images.map(({ attachment: _a, ...i }) => i)
+              }
+              if (attachment) out.attachment = { attached: true, bytes: attachment.bytes }
+              return out
+            })()
+            : result
+          results.push({ tool: item.tool, ok: result?.ok !== false, result: slim })
           if (result?.ok === false && args.stop_on_error !== false) break
         } catch (error) {
           results.push({ tool: item.tool, ok: false, ...errorResult(error) })
           if (args.stop_on_error !== false) break
         }
       }
-      return { ok: results.every((r) => r.ok), revision: state.revision, results, rolled_back: false }
+      // 注意：bb_batch 本身不是写操作工具，不会触发 withAutoLook，
+      // 所以这里收集的子图不会被重复包装。
+      const value = {
+        ok: results.every((r) => r.ok),
+        revision: state.revision,
+        results,
+        rolled_back: false,
+      }
+      if (imageBlocks.length) {
+        // 复用 __autoLookBlocks 通道，由 renderWithAutoLook 统一转成 image block
+        value.__autoLookBlocks = [
+          { type: 'text', text: `【批量结果附图】共 ${imageBlocks.length} 张` },
+          ...imageBlocks,
+        ]
+      }
+      return value
     },
   })
 
@@ -794,7 +1302,7 @@ export function apply(ctx, config = {}) {
     name: 'bb_diagnostics',
     description: '输出 Blockbench Agent 的运行诊断：连接/进程/端口/版本/最近心跳/日志尾部，用于排障。',
     parameters: {},
-    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute() {
       const tails = {}
       for (const [name, file] of [['runtime', 'runtime.log'], ['agent', 'agent.log']]) {
@@ -823,14 +1331,14 @@ export function apply(ctx, config = {}) {
       name: 'bb_show_gui',
       description: '显示后台 Blockbench 窗口，把控制权交给用户；期间写操作会被冻结。',
       parameters: { mode: { type: 'string', description: 'inspect | edit' } },
-      output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+      output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
       async execute(args) { try { return await call('gui.show', args, 10000) } catch (error) { return errorResult(error) } },
     })
     tool({
       name: 'bb_hide_gui',
       description: '隐藏 Blockbench 窗口并同步用户改动。',
       parameters: {},
-      output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+      output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
       async execute() { try { return await call('gui.hide', {}, 15000) } catch (error) { return errorResult(error) } },
     })
   }
@@ -874,9 +1382,20 @@ export function apply(ctx, config = {}) {
   })
   command('bb-status', '查看 Blockbench Agent 连接与运行状态', async () => {
     try {
-      if (!state.connected) return { kind: 'success', text: `未连接。rpc=${state.rpcUrl || '(not started)'} lastError=${JSON.stringify(state.lastError)}` }
+      const look = {
+        autoLook: cfg.autoLook,
+        disabledByBudget: lookStats.disabledByBudget,
+        imagesThisSession: lookStats.images,
+        budget: cfg.sessionImageBudget,
+        autolookRenders: lookStats.autolook,
+        offloadedImages: lookStats.offloaded,
+        lastError: lookStats.lastError,
+      }
+      if (!state.connected) {
+        return { kind: 'success', text: `未连接。rpc=${state.rpcUrl || '(not started)'} lastError=${JSON.stringify(state.lastError)}\n看图：${JSON.stringify(look)}` }
+      }
       const result = await call('session.status', {}, 5000)
-      return { kind: 'success', text: JSON.stringify(result) }
+      return { kind: 'success', text: `${JSON.stringify(result)}\n看图：${JSON.stringify(look)}` }
     } catch (error) { return { kind: 'error', text: `查询失败：${error?.message ?? error}` } }
   })
   command('bb-start', '启动/重启 Blockbench Agent Runtime', async () => {
@@ -892,6 +1411,7 @@ export function apply(ctx, config = {}) {
       '- bb_scene / bb_get_element / bb_apply_model_patch',
       '- bb_texture_create / bb_texture_patch / bb_texture_read / bb_texture_export_png / bb_texture_import_png',
       '- bb_animation_list / bb_animation_create / bb_animation_patch / bb_animation_delete',
+      '- bb_look / bb_camera / bb_orbit / bb_anim_check（新：看模型的四只眼睛）',
       '- bb_render_views / bb_render_texture',
       '- bb_validate / bb_checkpoint / bb_revisions / bb_restore',
       '- bb_save_project / bb_export_ysm / bb_batch / bb_diagnostics',

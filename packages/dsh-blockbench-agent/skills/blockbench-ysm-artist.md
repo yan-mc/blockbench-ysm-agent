@@ -6,7 +6,7 @@
 
 - **不猜结构**：先 `bb_scene(scope="summary")` / `scope="bones"` / `scope="cube"` 看真实层级与尺寸；不要凭空编 bone 名。
 - **小步修改**：一次 `bb_apply_model_patch` 只做一类事（加骨/加方块/改 UV）；大改前先 `bb_checkpoint`。
-- **每次可见改动后必须渲染**：`bb_render_views(["front","iso_fr"])`，看图确认；不要连续改 3 次才看一次。
+- **每次可见改动后必须看图**：写操作会自动附 `front + iso_fr` 拼图；不够就 `bb_look` / `bb_orbit` 补。不要连续改 3 次才看一次。
 - **预算意识**：会话有 edit/render/restore 预算；查看用 `bb_session_status`。渲染次数少而准。
 - **不要空转**：渲染返回 `review.verdict`；连续多次 `no_visible_change` 时停止叠加，检查或回滚。
 - **导出前必校验**：`bb_validate` → `bb_save_project` → `bb_export_ysm`。
@@ -55,13 +55,31 @@
 
 ## 5. 渲染自检
 
-- 标准两视图：`bb_render_views({views:["front","iso_fr"], size:[768,768]})`。
-- 局部细节：`bb_render_views({views:["closeup"], focus:{element:"Head"}, antialias:"ssaa", size:[512,512]})`；`iso_fl`、`iso_br`、`top` 也可用。
-- 贴图细节：`bb_render_texture({texture:"default", scale:8, region:[x1,y1,x2,y2]})`。
-- 结果带 `changed_any` 与 `review`（watchdog-v2）：`verdict` 可能是 `visible_change` / `visible_change_clipped` / `no_visible_change` / `no_change_expected` / `empty_render`；`metrics` 有逐图 alpha/bbox/diff；`checks`/`suggestions` 给结构化建议。连续 3 次 no-visible-change 会触发 no-progress，先 `bb_restore` 或换策略。
+**默认用拼图工具，不要一上来就 `bb_render_views` 多图**（3 张 512² ≈552 token，
+一张 2 格拼图只要 ≈211 token）。
+
+- **编辑即看**：写操作（`bb_apply_model_patch` / `bb_texture_patch` / `bb_animation_*`）
+  成功后会自动附一张 `front + iso_fr` 小拼图，**改完直接看图**，通常不需要再单独渲染。
+- 想看更多角度：`bb_look({cells:[{view:"front"},{view:"iso_fr"},{view:"back"}]})`。
+- 任意角度：`bb_look({camera:{azimuth:135, elevation:20, projection:"persp"}})`；
+  先用 `bb_camera({get:true})` 看当前位姿，设置的相机会保持。
+- **转台查穿模/对称**：`bb_orbit({steps:8, elevation:15})` —— 8 个角度一张图，每格带编号；
+  背面对称性、裙摆穿腿、手臂穿身这类问题基本靠它发现。
+- **动画检查**：`bb_anim_check({animation:"walk", samples:4})` —— 时间点采样成一张图，
+  看幅度、起止姿势、有无穿模。
+- **贴图精修**：`bb_render_texture({texture:"default", scale:12, region:[x1,y1,x2,y2]})`
+  最近邻放大，核对 1-2 像素级的微小改动。
+- 局部细节仍可用 `bb_render_views({views:["closeup"], focus:{element:"Head", padding:1.0}, antialias:"ssaa"})`
+  （`padding` 越大视野越宽；closeup 触边时增大它）。
+- 结果带 `changed_any` 与 `review`（watchdog-v2）：`verdict` 可能是 `visible_change` /
+  `visible_change_clipped` / `no_visible_change` / `no_change_expected` / `empty_render`；
+  `metrics` 有逐图 alpha/bbox/diff；`checks`/`suggestions` 给结构化建议。
+  连续 3 次 no-visible-change 会触发 no-progress，先 `bb_restore` 或换策略。
 - 画面触边（`edge_touch=true`）说明可能被裁切，用 `focus` 或缩小模型/调整机位。
-- 判断：颜色/形状/位置是否与意图一致；如果 `changed_any=false` 或出现 `NO_VISIBLE_CHANGE`，先查 revision 是否增加、UV 是否真的指到涂色区域。
-- 背景透明，不要用“背景色没变”判断失败；`EMPTY_RENDER` 表示整张图全透明，通常是相机/几何/GPU 问题。规则判定不是 VLM：造型/配色/意图仍要模型看图自己判断。
+- 判断：颜色/形状/位置是否与意图一致；如果 `changed_any=false` 或出现 `NO_VISIBLE_CHANGE`，
+  先查 revision 是否增加、UV 是否真的指到涂色区域。
+- 背景透明，不要用"背景色没变"判断失败；`EMPTY_RENDER` 表示整张图全透明，通常是相机/几何/GPU 问题。
+  规则判定不是 VLM：造型/配色/意图仍要模型看图自己判断。
 
 ## 6. 保存/导出/回滚
 

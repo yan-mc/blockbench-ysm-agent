@@ -71,7 +71,7 @@ dsh Host 插件  ── WebSocket / HTTP+SSE ──►  BAE（隐藏 Electron + 
 | **双传输** | WebSocket 主链路；HTTP+SSE 回退（`--transport=auto/ws/http`） |
 | **安全/预算** | revision 前置校验、编辑/渲染/restore 预算、GUI 可见时冻结写操作 |
 | **Client UI** | dsh Web composer dock 的 Blockbench 状态 pill（需刷新页面加载） |
-| **工具规模** | 30 个 `bb_*` 工具 + 5 个命令 + 1 个 Skill |
+| **工具规模** | 34 个 `bb_*` 工具 + 5 个命令 + 1 个 Skill |
 
 ---
 
@@ -299,10 +299,20 @@ bb_project_open({ pack_dir: "deepseek-fish" })
 
 | 工具 | 说明 |
 |---|---|
-| `bb_render_views` | `views`, `size`, `antialias:off/msaa/ssaa`, `focus`, `attach_images` |
-| `bb_render_texture` | 贴图局部放大检查 |
+| `bb_look` | **首选**。多机位/多格合成一张图；可传 `cells`、`camera`、`focus`、`cell`、`cols`、`background` |
+| `bb_orbit` | 环绕转台：`steps`（默认 8）、`from`/`to`（默认 0/360）、`elevation`（默认 15）、`axis` |
+| `bb_camera` | 读/设离屏相机：`get`、`azimuth`、`elevation`、`distance`、`projection`、`fov`、`focus` |
+| `bb_anim_check` | 动画采样：`animation`、`from`/`to`、`samples`（默认 4）、`camera` |
+| `bb_render_views` | 固定机位多图：`views`, `size`, `antialias:off/msaa/ssaa`, `focus`, `attach_images` |
+| `bb_render_texture` | 贴图局部放大检查（inline 拼图路径，不落盘） |
 
 `views`：`front/back/left/right/top/bottom/iso_fr/iso_fl/iso_br/iso_bl/closeup`。
+
+**编辑即看**：`bb_apply_model_patch` / `bb_texture_patch` / `bb_animation_*` 等写操作完成后，
+会自动附一张 `front + iso_fr` 小拼图（同一 step 内合并成一张）。可用插件配置 `autoLook:false` 关闭。
+
+**成本参考**：一张 2 格 320² 拼图 ≈211 token；8 角度转台 1280×640 ≈514 token；
+3 张 512² 单图 ≈552 token。因此"多格拼图"比"多次单图"更省。
 
 返回重点：
 

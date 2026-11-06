@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-blockbench-agent",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "dsh Host plugin: semantic Blockbench modeling/texturing tools with headless render feedback",
@@ -14,7 +14,7 @@
   "files": [
     "index.js",
     "client.js",
-    "lib/ws-server.js",
+    "lib/",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
@@ -32,7 +32,7 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-tools": "*",
     "@deepseek-ai/cordis": "*"
   }
 }

@@ -1,0 +1,125 @@
+{
+  "spec": 2,
+  "metadata": {
+    "name": "deepseek-fish",
+    "tips": "默认模型",
+    "license": {
+      "type": "CC 0"
+    },
+    "authors": [
+      {
+        "name": "无名氏",
+        "role": "作者",
+        "avatar": "avatar/null.png",
+        "contact": {
+          "Bilibili": "https://www.bilibili.com/"
+        },
+        "comment": "喵喵喵喵喵~"
+      }
+    ],
+    "link": {
+      "home": "https://modrinth.com/mod/yes-steve-model",
+      "donate": "https://afdian.com/a/ysmmod"
+    }
+  },
+  "properties": {
+    "height_scale": 0.7,
+    "width_scale": 0.7,
+    "extra_animation": {
+      "extra0": "#extra_config",
+      "extra1": "",
+      "extra2": "",
+      "extra3": "",
+      "extra4": "",
+      "extra5": "",
+      "extra6": "",
+      "extra7": ""
+    },
+    "extra_animation_buttons": [
+      {
+        "id": "extra_config",
+        "name": "0",
+        "config_forms": [
+          {
+            "type": "checkbox",
+            "title": "Headdress",
+            "description": "Used to hide/show the red bow headdress",
+            "value": "v.red_bow_headdress"
+          }
+        ]
+      }
+    ],
+    "extra_animation_classify": [],
+    "preview_animation": "gui",
+    "disable_preview_rotation": true,
+    "gui_no_lighting": false,
+    "gui_foreground": "textures/gui/foreground.png",
+    "gui_background": "textures/gui/background.png",
+    "default_texture": "default",
+    "render_layers_first": false,
+    "free": true
+  },
+  "files": {
+    "player": {
+      "model": {
+        "main": "models/main.json",
+        "arm": "models/arm.json"
+      },
+      "animation": {
+        "main": "animations/main.animation.json",
+        "arm": "animations/arm.animation.json",
+        "extra": "animations/extra.animation.json",
+        "tac": "animations/tac.animation.json",
+        "carryon": "animations/carryon.animation.json",
+        "parcool": "animations/parcool.animation.json",
+        "swem": "animations/swem.animation.json",
+        "slashblade": "animations/slashblade.animation.json",
+        "tlm": "animations/tlm.animation.json",
+        "fp_arm": "animations/fp.arm.animation.json"
+      },
+      "animation_controllers": [
+        "controller/main.animation_controllers.json"
+      ],
+      "texture": [
+        "textures/default.png",
+        "textures/blue.png"
+      ]
+    },
+    "projectiles": [
+      {
+        "match": [
+          "minecraft:arrow"
+        ],
+        "model": "models/arrow.json",
+        "animation": "animations/arrow.animation.json",
+        "texture": "textures/arrow.png"
+      },
+      {
+        "match": [
+          "minecraft:fishing_bobber"
+        ],
+        "model": "models/fishing_bobber.json",
+        "texture": "textures/fishing_bobber.png"
+      }
+    ],
+    "vehicles": [
+      {
+        "match": [
+          "minecraft:boat"
+        ],
+        "model": "models/boat.json",
+        "animation": "animations/boat.animation.json",
+        "texture": "textures/boat.png"
+      },
+      {
+        "match": [
+          "minecraft:minecart"
+        ],
+        "model": "models/minecart.json",
+        "texture": "textures/minecart.png"
+      }
+    ],
+    "sound_path": "sounds",
+    "function_path": "functions"
+  }
+}

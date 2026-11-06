@@ -18,7 +18,8 @@ fs.mkdirSync(path.join(testRoot, 'plugin', 'lib'), { recursive: true })
 fs.mkdirSync(path.join(testRoot, 'plugin', 'node_modules', '@deepseek-ai', 'dsh-tools'), { recursive: true })
 fs.mkdirSync(path.join(testRoot, 'logs'), { recursive: true })
 fs.cpSync(path.join(PACKAGE_ROOT, 'index.js'), path.join(testRoot, 'plugin', 'index.js'))
-fs.cpSync(path.join(PACKAGE_ROOT, 'lib', 'ws-server.js'), path.join(testRoot, 'plugin', 'lib', 'ws-server.js'))
+// 整个 lib/ 一起复制（新增了 viewsheet.js / imageprune.js）
+fs.cpSync(path.join(PACKAGE_ROOT, 'lib'), path.join(testRoot, 'plugin', 'lib'), { recursive: true })
 fs.writeFileSync(path.join(testRoot, 'plugin', 'package.json'), JSON.stringify({ name: 'hosttest-plugin', type: 'module' }, null, 2))
 fs.writeFileSync(path.join(testRoot, 'plugin', 'node_modules', '@deepseek-ai', 'dsh-tools', 'package.json'), JSON.stringify({
   name: '@deepseek-ai/dsh-tools', version: '0.0.0-test', type: 'module', exports: { '.': './index.js' },
@@ -64,6 +65,12 @@ const exec = async (name, args = {}) => {
   if (!def) throw new Error(`tool missing: ${name}`)
   return def.execute(args, { signal: new AbortController().signal })
 }
+/** 与 exec 相同，但保留原始返回（含 __autoLookBlocks），用于验证"编辑即看"。 */
+const execRaw = async (name, args = {}) => {
+  const def = tools.get(name)
+  if (!def) throw new Error(`tool missing: ${name}`)
+  return def.execute(args, { signal: new AbortController().signal, log: { turn: 1, step: 1 } })
+}
 const command = async (name) => {
   const def = commands.get(name)
   if (!def) throw new Error(`command missing: ${name}`)
@@ -89,7 +96,7 @@ try {
   if (!scene?.counts) throw new Error('bb_scene failed')
   step('bb_scene', { counts: scene.counts })
 
-  const patch = await exec('bb_apply_model_patch', {
+  const patch = await execRaw('bb_apply_model_patch', {
     note: 'hosttest',
     ops: [
       { op: 'add_bone', parent: 'UpperBody', name: 'HostTest_Arm', pivot: [5, 22, 0] },
@@ -98,6 +105,11 @@ try {
   })
   if (!patch?.changed?.length) throw new Error(`bb_apply_model_patch failed: ${JSON.stringify(patch)}`)
   step('bb_apply_model_patch', { revision: patch.revision, changed: patch.changed.length })
+  // 编辑即看（docs/07 眼睛 A）：写操作应自带一张"改完的样子"拼图
+  const autoBlocks = Array.isArray(patch.__autoLookBlocks) ? patch.__autoLookBlocks : []
+  const autoImages = autoBlocks.filter((b) => b.type === 'image').length
+  step('autolook on write', { autoImages, blocks: autoBlocks.length, meta: patch.__autoLook ?? null })
+  if (autoImages !== 1) throw new Error(`autolook 未附图：autoImages=${autoImages}`)
 
   const texture = await exec('bb_texture_create', { name: 'default', width: 128, height: 128, fill: '#224488' })
   if (!texture?.id) throw new Error('bb_texture_create failed')
@@ -117,6 +129,34 @@ try {
   if (imageBlocks !== render.images.filter((i) => i.attachment).length) throw new Error(`image block mismatch ${imageBlocks}`)
   if (imageBlocks < 2) throw new Error(`expected >=2 image attachments, got ${imageBlocks}`)
   step('bb_render_views', { images: render.images.length, imageBlocks, savedImages: savedImages.length })
+
+  // ---- 视口实时反馈（docs/07 眼睛 B）
+  const look = await exec('bb_look', { cell: 320 })
+  const lookBlocks = tools.get('bb_look').output.render({}, look)
+  const lookImages = lookBlocks.filter((b) => b.type === 'image').length
+  if (lookImages !== 1) throw new Error(`bb_look 未返回图片：${lookImages}`)
+  step('bb_look', { tokens: look.tokens_est, cells: look.cells, imageBlocks: lookImages })
+
+  const orbit = await exec('bb_orbit', { steps: 8, cell: 320 })
+  if (orbit?.cells !== 8) throw new Error(`bb_orbit cells=${orbit?.cells}`)
+  step('bb_orbit', { cells: orbit.cells, width: orbit.width, height: orbit.height, tokens: orbit.tokens_est })
+
+  const camGet = await exec('bb_camera', { get: true })
+  if (!Array.isArray(camGet?.position)) throw new Error('bb_camera get failed')
+  step('bb_camera', { azimuth: camGet.azimuth, projection: camGet.projection })
+
+  const animList2 = await exec('bb_animation_list', {})
+  const anims2 = animList2?.animations ?? []
+  const animName = anims2.find((a) => (a.animation ?? a.name) === 'idle') ? 'idle' : (anims2[0]?.animation ?? anims2[0]?.name)
+  if (animName) {
+    const animCheck = await exec('bb_anim_check', { animation: animName, samples: 4, cell: 320 })
+    if (animCheck?.cells !== 4) throw new Error(`bb_anim_check cells=${animCheck?.cells}`)
+    step('bb_anim_check', { animation: animName, cells: animCheck.cells, tokens: animCheck.tokens_est })
+  }
+
+  const texSheet = await exec('bb_render_texture', { texture: 'default', scale: 8, attach_image: true })
+  if (!texSheet?.attachment) throw new Error('bb_render_texture 未附图')
+  step('bb_render_texture attach', { bytes: texSheet.attachment.bytes, width: texSheet.width, height: texSheet.height })
 
   const checkpoint = await exec('bb_checkpoint', { label: 'hosttest' })
   if (!checkpoint?.checkpoint) throw new Error('bb_checkpoint failed')
@@ -256,6 +296,21 @@ try {
   const batch = await exec('bb_batch', { calls: [{ tool: 'bb_scene', args: { scope: 'summary' } }, { tool: 'bb_validate', args: {} }] })
   if (!batch?.results?.length || batch.results.length !== 2) throw new Error(`bb_batch failed: ${JSON.stringify(batch)}`)
   step('bb_batch', { results: batch.results.length, ok: batch.ok })
+
+  // bb_batch 内调用会出图的工具，图片块必须被收集而不是丢进 JSON
+  const batchLook = await exec('bb_batch', {
+    calls: [
+      { tool: 'bb_look', args: { cell: 256 } },
+      { tool: 'bb_scene', args: { scope: 'summary' } },
+    ],
+  })
+  const batchBlocks = tools.get('bb_batch').output.render({}, batchLook)
+  const batchImages = batchBlocks.filter((b) => b.type === 'image').length
+  if (batchImages < 1) throw new Error(`bb_batch 内图片块丢失：images=${batchImages}`)
+  // 结果里不应残留 base64/attachment 原件
+  const rawJson = JSON.stringify(batchLook)
+  if (rawJson.includes('"png"') || rawJson.length > 200000) throw new Error('bb_batch 结果仍残留 base64')
+  step('bb_batch 内图片块', { imageBlocks: batchImages, jsonBytes: rawJson.length })
 
   const diagnostics = await exec('bb_diagnostics', {})
   if (!diagnostics?.ok || !diagnostics.runtime?.connected) throw new Error(`bb_diagnostics failed: ${JSON.stringify(diagnostics)}`)

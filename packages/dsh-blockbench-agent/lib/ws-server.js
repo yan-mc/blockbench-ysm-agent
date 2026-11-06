@@ -278,6 +278,10 @@ export function createWsServer({ token, methods, logger = console, defaultTimeou
       }
     }
 
+    // 分片重组状态（RFC 6455 §5.4）：浏览器对 >64KB 的消息强制分片。
+    let fragments = null
+    let fragmentsBytes = 0
+
     socket.on('data', (chunk) => {
       buffer = Buffer.concat([buffer, chunk])
       while (buffer.length >= 2) {
@@ -293,10 +297,13 @@ export function createWsServer({ token, methods, logger = console, defaultTimeou
         } else if (length === 127) {
           if (buffer.length < 10) return
           const big = buffer.readBigUInt64BE(2)
-          if (big > BigInt(MAX_MESSAGE)) { closeWith(1009, 'too large'); return }
+          if (big > BigInt(MAX_MESSAGE)) {
+            logger.warn?.(`[bb-ws] frame too large: ${big} bytes > ${MAX_MESSAGE}; closing 1009`)
+            closeWith(1009, 'too large')
+            return
+          }
           length = Number(big); offset = 10
         }
-        if (!fin || opcode === 0x0) { closeWith(1003, 'fragmentation unsupported'); return }
         const maskOffset = offset
         if (masked) offset += 4
         if (buffer.length < offset + length) return
@@ -308,11 +315,35 @@ export function createWsServer({ token, methods, logger = console, defaultTimeou
           payload = un
         }
         buffer = buffer.subarray(offset + length)
+
+        // ---- 控制帧：可穿插在分片中间
         if (opcode === 0x8) { closeWith(1000); return }
         if (opcode === 0x9) { try { socket.write(encodeFrame(payload, 0xA)) } catch { /* ignore */ } continue }
         if (opcode === 0xA) continue
-        if (opcode !== 0x1) { closeWith(1003, 'text only'); return }
-        void handleMessage(payload.toString('utf8'))
+        if (opcode !== 0x1 && opcode !== 0x0) { closeWith(1003, 'text only'); return }
+
+        // ---- 消息分片重组（RFC 6455 §5.4）
+        // 浏览器 WebSocket 对 >64KB 的消息会强制分片；以前这里直接 1003 断开，
+        // 导致任何稍大的渲染响应（base64 PNG）都会把连接打掉。现在按规范重组。
+        if (opcode === 0x1) {
+          if (fragments) { closeWith(1002, 'unexpected new message inside fragment'); return }
+          fragments = [payload]
+          fragmentsBytes = payload.length
+        } else { // opcode === 0x0 continuation
+          if (!fragments) { closeWith(1002, 'continuation without start'); return }
+          fragments.push(payload)
+          fragmentsBytes += payload.length
+          if (fragmentsBytes > MAX_MESSAGE) { closeWith(1009, 'too large'); return }
+        }
+
+        if (!fin) continue   // 等后续分片
+
+        const message = fragments.length === 1
+          ? fragments[0]
+          : Buffer.concat(fragments, fragmentsBytes)
+        fragments = null
+        fragmentsBytes = 0
+        void handleMessage(message.toString('utf8'))
       }
     })
     socket.on('error', () => closeWith(1006, 'socket error'))
