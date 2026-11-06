@@ -246,6 +246,15 @@
 | `update_bone` | `bone`, `pivot?`, `rotation?`, `name?` | 修改骨骼属性。**不支持 `scale`**（Blockbench 不做骨骼缩放渲染/导出，传了会报 `UNSUPPORTED_FIELD`；要改体量请用 `update_cube` 改几何或加中间骨骼） |
 | `reparent` | `bone`, `parent` | 改父级（保持世界变换或局部变换，默认局部） |
 | `add_cube` | `bone`, `name?`, `origin`, `size`, `rotation?`, `pivot?`, `uv?`, `texture?`, `inflate?` | 加方块；`uv` 省略时自动按 Box UV 放置并避让已占用区域 |
+**`uv` 的三种写法**（`add_cube` / `set_uv` 同）：
+
+| 写法 | 效果 |
+|---|---|
+| 省略 | 自动 Box UV，避让已占用区域（像素级排布，适合新建方块） |
+| `{mode:"box", offset:[x,y], size:[w,h]}` | Box UV，且**把采样区拉伸到 w×h**。注意：box UV 的天然采样面积恒等于几何尺寸（1 像素/单位），所以想要大区域必须给 `size`，否则只会采到几像素（表现为"贴图糊/大面积纯色"）。 |
+| `{mode:"faces", faces:{north:[x,y],...}, sizes:{north:[w,h],...}}` | 逐面精确 UV。**`sizes` 是可选的逐面尺寸覆盖**，省略时按几何尺寸。做眼睛/装饰这类小面积高分辨率贴图必须用这个。 |
+
+> 实现要点：`Cube` 上**没有** `uv_size` accessor，box 模式的尺寸只能逐面写 `faces[f].uv_size`。直接写 `cube.uv_size` 是静默无效的。
 | `update_cube` | `cube_id`, `origin?`, `size?`, `rotation?`, `pivot?`, `inflate?`, `texture?` | 改方块 |
 | `set_uv` | `ids[]`, `mode:"box"\|"faces"\|"offset"`, `uv?`/`faces?`/`offset?` | 精确设置 UV |
 | `auto_uv` | `ids[]`, `texture?`, `padding?`, `strategy:"pack"\|"grid"` | 自动展开（Box UV） |

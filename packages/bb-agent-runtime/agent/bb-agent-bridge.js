@@ -239,6 +239,34 @@
   function readJsonSync(absPath) {
     return JSON.parse(readTextSync(absPath))
   }
+  /**
+   * 把方块上的 box UV 采样区域拉伸到指定尺寸。
+   *
+   * 为什么必须逐面写：Blockbench 的 box UV 采样面积恒等于几何尺寸（1 像素/单位），
+   * `Cube` 上**没有** `uv_size` accessor —— 直接 `cube.uv_size = [...]` 是静默无效的。
+   * 真正生效的是每个面自己的 `faces[f].uv_size`。
+   */
+  function applyBoxUvSize(cube, boxSize) {
+    const from = vec(cube.from)
+    const to = vec(cube.to)
+    const dims = [to[0] - from[0], to[1] - from[1], to[2] - from[2]]
+    const base = {
+      north: [dims[0], dims[1]], south: [dims[0], dims[1]],
+      east: [dims[2], dims[1]], west: [dims[2], dims[1]],
+      up: [dims[0], dims[2]], down: [dims[0], dims[2]],
+    }
+    const scaleX = Number(boxSize[0]) / Math.max(1e-6, Math.max(dims[0], dims[2]))
+    const scaleY = Number(boxSize[1]) / Math.max(1e-6, dims[1])
+    cube.stretch_uv = false
+    for (const faceName of ['north', 'south', 'east', 'west', 'up', 'down']) {
+      const f = cube.faces?.[faceName]
+      if (!f) continue
+      const b = base[faceName]
+      const sy = (faceName === 'up' || faceName === 'down') ? scaleX : scaleY
+      f.uv_size = [b[0] * scaleX, b[1] * sy].map((v) => Math.max(0.01, Math.round(v * 10000) / 10000))
+    }
+  }
+
   function copyDirRecursive(src, dst) {
     if (!nodeFs) throw err('INTERNAL_ERROR', 'fs permission unavailable')
     ensureDir(dst)
@@ -1344,10 +1372,9 @@
               const off = op.uv.uv ?? op.uv.offset ?? op.uv_offset
               if (Array.isArray(off)) cube.uv_offset = [Number(off[0]) || 0, Number(off[1]) || 0]
               const boxSize = op.uv.size ?? op.uv_size
-              cube.stretch_uv = false
-              if (Array.isArray(boxSize) && boxSize.length >= 2) {
-                cube.uv_size = [Number(boxSize[0]) || 0, Number(boxSize[1]) || 0]
-              }
+              // 注意：这里不能写 cube.uv_size（Cube 上没有这个 accessor，写了静默无效），
+              // 必须逐面写 faces[f].uv_size。
+              if (Array.isArray(boxSize) && boxSize.length >= 2) applyBoxUvSize(cube, boxSize)
             } else if (op.uv?.mode === 'faces' && op.uv.faces) {
               cube.box_uv = false
               const faceSize = {
