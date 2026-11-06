@@ -14,6 +14,7 @@ import { imageTokens } from './lib/viewsheet.js'
 import { offloadSessionImages, countLiveImages } from './lib/imageprune.js'
 import { searchRefs, sortCandidates, SOURCES as REF_SOURCES } from './lib/refsearch.js'
 import { collectRefs } from './lib/refcollect.js'
+import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSION } from './lib/spec.js'
 import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
@@ -77,6 +78,10 @@ const DEFAULTS = {
   refCell: 240,
   /** 搜索用的默认源（空 = 全部）。 */
   refSources: [],
+
+  // ---- 建模规格（docs/12）----
+  /** spec 落盘子目录（位于 workspace 下）。 */
+  specDir: 'specs',
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -1125,6 +1130,24 @@ export function apply(ctx, config = {}) {
     } catch { return 64 }
   }
 
+  /**
+   * 去掉 undefined / 非有限数 / 函数，保证返回值是「无损 JSON」。
+   * DSH 会校验工具输出能否 JSON 往返 —— 带 undefined 字段的对象会被判为 lossy 而整次调用失败。
+   */
+  function lossless(value) {
+    if (Array.isArray(value)) return value.map(lossless)
+    if (value && typeof value === 'object') {
+      const out = {}
+      for (const [k, v] of Object.entries(value)) {
+        if (v === undefined || typeof v === 'function') continue
+        out[k] = lossless(v)
+      }
+      return out
+    }
+    if (typeof value === 'number' && !Number.isFinite(value)) return null
+    return value
+  }
+
   tool({
     name: 'bb_ref_search',
     description: '按角色名在多个图片源搜索**造型参考图**（正面/侧面/背面的官方立绘、设定集、动画截图）。'
@@ -1158,7 +1181,7 @@ export function apply(ctx, config = {}) {
         lastRefSearch = { character: args.character, candidates: sorted, sources: res.sources, queries: res.queries }
         const limit = Math.max(1, Math.min(200, args.limit ?? 60))
         const okSources = res.sources.filter((s) => s.ok)
-        return {
+        return lossless({
           ok: true,
           character: args.character,
           total: sorted.length,
@@ -1172,14 +1195,14 @@ export function apply(ctx, config = {}) {
             url: c.url,
             source: c.source,
             kind: c.kind,
-            size: c.width && c.height ? `${c.width}x${c.height}` : undefined,
-            page: c.pageUrl,
-            query: c.query,
+            size: c.width && c.height ? `${c.width}x${c.height}` : null,
+            page: c.pageUrl ?? null,
+            query: c.query ?? null,
           })),
           hint: sorted.length
             ? '下一步：bb_ref_collect（不传 urls 会用这次结果）'
             : '所有源都没结果：换角色名（日文/英文）或显式传 queries 再试一次；仍为空就说明网上确实没有',
-        }
+        })
       } catch (error) { return errorResult(error) }
     },
   })
@@ -1318,7 +1341,7 @@ export function apply(ctx, config = {}) {
           if (attachment) lookStats.images += 1
         }
 
-        return {
+        return lossless({
           ok: true,
           dir: relDir,
           count: images.length,
@@ -1332,7 +1355,121 @@ export function apply(ctx, config = {}) {
             + '并把判断写成结论。编号就是 images[].index。',
           ...(attachment ? { attachment } : {}),
           ...(attachment ? {} : { attachment_error: 'attachment failed' }),
+        })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_spec_save',
+    description: '保存「建模规格」（spec）：把看参考图得到的结论固化成结构化数据，并校验是否符合语料规律。'
+      + '校验项：部位/骨骼/方块数是否完整、配色是否合法、方块总数与头部占比是否落在实测区间、'
+      + '**缺背面参考时是否在 gaps 里记录**（没记录会直接报错）。'
+      + '通过后返回构建计划（按什么顺序建、每个骨骼给多少方块、贴图怎么分区），后续按计划调用 bb_* 建模。',
+    parameters: {
+      spec: { type: 'object', description: '规格对象：{character, references, palette, parts, budget, gaps, notes}', required: true },
+      name: { type: 'string', description: '文件名（默认用 character.name）' },
+      write_markdown: { type: 'boolean', description: '同时写一份人读 .md，默认 true' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args) {
+      try {
+        const check = validateSpec(args.spec)
+        if (!check.ok) {
+          return lossless({
+            ok: false,
+            code: 'SPEC_INVALID',
+            message: `规格校验失败：${check.errors.length} 个错误`,
+            errors: check.errors,
+            warnings: check.warnings,
+            hint: '按 errors 改 spec 再保存；gaps 里要写明"缺背面参考"这类缺口',
+          })
         }
+        const plan = derivePlan(check.spec)
+        const md = renderSpecMarkdown(check.spec, plan)
+        const baseName = slugify(args.name || check.spec.character.name || 'model')
+        const relDir = `${cfg.specDir}`.replace(/\\/g, '/')
+        const absDir = path.resolve(workspace, relDir)
+        if (!absDir.startsWith(workspace + path.sep) && absDir !== workspace) {
+          return { ok: false, code: 'INVALID_PARAMS', message: `specDir escapes workspace: ${relDir}` }
+        }
+        await fsp.mkdir(absDir, { recursive: true })
+        const jsonAbs = path.join(absDir, `${baseName}.json`)
+        await fsp.writeFile(jsonAbs, JSON.stringify({ ...check.spec, plan }, null, 2), 'utf8')
+        if (args.write_markdown !== false) {
+          await fsp.writeFile(path.join(absDir, `${baseName}.md`), md, 'utf8')
+        }
+        return lossless({
+          ok: true,
+          version: SPEC_VERSION,
+          path: `${relDir}/${baseName}.json`,
+          markdown: args.write_markdown !== false ? `${relDir}/${baseName}.md` : null,
+          warnings: check.warnings,
+          totals: plan.totals,
+          order: plan.order,
+          bones: plan.bones,
+          texture: plan.texture,
+          hint: '按 order 顺序建；每个 bone 用 plan.bones 里的方块数做预算。'
+            + '建的过程中用 bb_look / bb_orbit 对照参考图核对。',
+        })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_spec_load',
+    description: '读取已保存的建模规格，重新校验并返回构建计划（spec + plan + 人读 markdown）。'
+      + '换会话/隔天继续时用它恢复上下文，不用重新看图。',
+    parameters: {
+      name: { type: 'string', description: '规格文件名（不含扩展名）；省略则列出 specs/ 下所有规格' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args) {
+      try {
+        const relDir = `${cfg.specDir}`.replace(/\\/g, '/')
+        const absDir = path.resolve(workspace, relDir)
+        if (!fs.existsSync(absDir)) {
+          return { ok: false, code: 'SPEC_NOT_FOUND', message: `还没有规格目录：${relDir}`, hint: '先调用 bb_spec_save' }
+        }
+        if (!args.name) {
+          const files = fs.readdirSync(absDir).filter((f) => f.endsWith('.json'))
+          return lossless({
+            ok: true,
+            dir: relDir,
+            specs: files.map((f) => {
+              let meta = null
+              try {
+                const d = JSON.parse(fs.readFileSync(path.join(absDir, f), 'utf8'))
+                meta = {
+                  character: d?.character?.name ?? null,
+                  parts: Array.isArray(d?.parts) ? d.parts.length : null,
+                  cubes: d?.plan?.totals?.cubes ?? null,
+                  headShare: d?.plan?.totals?.headShare ?? null,
+                }
+              } catch { /* ignore */ }
+              return { name: f.replace(/\.json$/, ''), file: f, ...(meta ?? {}) }
+            }),
+            hint: 'bb_spec_load({name:"..."}) 载入某一份',
+          })
+        }
+        const base = slugify(args.name)
+        const jsonAbs = path.join(absDir, `${base}.json`)
+        if (!fs.existsSync(jsonAbs)) {
+          return { ok: false, code: 'SPEC_NOT_FOUND', message: `找不到 ${relDir}/${base}.json` }
+        }
+        const stored = JSON.parse(await fsp.readFile(jsonAbs, 'utf8'))
+        const check = validateSpec(stored)
+        const plan = derivePlan(check.spec)
+        return lossless({
+          ok: true,
+          path: `${relDir}/${base}.json`,
+          valid: check.ok,
+          errors: check.errors,
+          warnings: check.warnings,
+          spec: check.spec,
+          plan,
+          markdown: renderSpecMarkdown(check.spec, plan),
+        })
       } catch (error) { return errorResult(error) }
     },
   })

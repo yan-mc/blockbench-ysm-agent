@@ -472,6 +472,35 @@ TOOLS = [
         }),
     },
     {
+        "name": "bb_spec_save",
+        "title_zh": "保存建模规格",
+        "description": "把看参考图得到的结论固化成结构化「建模规格」并校验：部位/骨骼/方块数完整性、"
+                       "配色合法性、方块总数与头部占比是否落在语料实测区间、"
+                       "缺背面参考时是否在 gaps 记录（未记录直接报错）。通过后返回构建计划。",
+        "mutating": False, "requires_project": False, "concurrency_safe": True,
+        "protocol_method": None, "timeout_ms": 10000,
+        "returns": "SpecSaveResult", "attachments": False,
+        "errors": ["INVALID_PARAMS", "SPEC_INVALID"],
+        "parameters": obj({
+            "spec": {"type": "object", "description": "{character, references, palette, parts, budget, gaps, notes}"},
+            "name": {"type": "string", "description": "文件名，默认 character.name"},
+            "write_markdown": {"type": "boolean", "default": True},
+        }, ["spec"]),
+    },
+    {
+        "name": "bb_spec_load",
+        "title_zh": "读取建模规格",
+        "description": "读取已保存的建模规格，重新校验并返回 spec + 构建计划 + 人读 markdown。"
+                       "换会话继续时用它恢复上下文，不必重新看图。",
+        "mutating": False, "requires_project": False, "concurrency_safe": True,
+        "protocol_method": None, "timeout_ms": 10000,
+        "returns": "SpecLoadResult", "attachments": False,
+        "errors": ["SPEC_NOT_FOUND", "INVALID_PARAMS"],
+        "parameters": obj({
+            "name": {"type": "string", "description": "规格文件名（不含扩展名）；省略则列出全部"},
+        }),
+    },
+    {
         "name": "bb_validate",
         "title_zh": "YSM 规范校验",
         "description": "按 YSM 规范与几何规则校验；导出前必须调用。A 级定位组缺失/改名=error，B 级默认层级偏离=warning。",
