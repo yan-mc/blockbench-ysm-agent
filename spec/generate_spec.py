@@ -556,6 +556,27 @@ TOOLS = [
         }),
     },
     {
+        "name": "bb_seg_run",
+        "title_zh": "完整分层（See-through）",
+        "description": "把立绘送进 ComfyUI 的 See-through 管线，输出 24 层（body 13 + head 11）"
+                       "+ 深度序 + 遮挡补全 + 分层 PSD。前置：ComfyUI 运行中且装了 See-through 节点。"
+                       "首次运行下载约 3GB 权重，可能十几分钟。",
+        "mutating": False, "requires_project": False, "concurrency_safe": False,
+        "protocol_method": None, "timeout_ms": 3600000,
+        "returns": "SegRunResult", "attachments": True,
+        "errors": ["COMFY_UNREACHABLE", "NODE_MISSING", "NOT_FOUND", "INVALID_PARAMS", "REQUEST_CANCELLED"],
+        "parameters": obj({
+            "file": {"type": "string", "description": "workspace 内相对路径的图片"},
+            "resolution": {"type": "integer", "minimum": 512, "maximum": 1280, "default": 832},
+            "steps": {"type": "integer", "minimum": 4, "maximum": 100, "default": 28},
+            "tblr_split": {"type": "boolean", "default": True},
+            "use_lama": {"type": "boolean", "default": False},
+            "seed": {"type": "integer", "minimum": 0},
+            "timeout_sec": {"type": "integer", "minimum": 60, "default": 3600},
+            "attach": {"type": "boolean", "default": True},
+        }, ["file"]),
+    },
+    {
         "name": "bb_validate",
         "title_zh": "YSM 规范校验",
         "description": "按 YSM 规范与几何规则校验；导出前必须调用。A 级定位组缺失/改名=error，B 级默认层级偏离=warning。",

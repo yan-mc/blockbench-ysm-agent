@@ -18,6 +18,10 @@ import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSI
 import { probeEnvironment, planInstall } from './lib/segprobe.js'
 import { inspectInstall, runInstall } from './lib/seginstall.js'
 import {
+  pingComfy, listSeeThroughNodes, uploadImage, buildWorkflow,
+  queuePrompt, waitForPrompt, fetchOutputImages, DEFAULT_RESOLUTION,
+} from './lib/segcomfy.js'
+import {
   findPython, modelsReady, downloadModels, ensureOnnxruntime, runSegmentation,
   SEG_MODEL_TOTAL_MB, PLUGIN_ROOT,
 } from './lib/seglite.js'
@@ -99,6 +103,8 @@ const DEFAULTS = {
   pythonExe: '',
   /** T1：SAM2 模型缓存目录（空 = ~/.dsh-blockbench-agent/sam2）。 */
   segModelDir: '',
+  /** T2：ComfyUI 输出目录（空 = 从 segInstallDir 推导）。 */
+  comfyOutputDir: '',
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -1703,6 +1709,156 @@ export function apply(ctx, config = {}) {
           hint: r.ok
             ? '用 paths.startCommand 启动 ComfyUI（保持运行），然后把 comfyUrl 写进插件配置；首次跑分层会自动下载约 3GB 权重'
             : '看 steps 里哪一步失败；已完成的步骤会保留，修好后可重跑（幂等）',
+        })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_seg_run',
+    description: 'T2 完整分层：把立绘送进 ComfyUI 的 See-through 管线，输出 **24 层**'
+      + '（body 13 + head 11）+ 深度序 + 遮挡补全 + 分层 PSD。'
+      + '前置：ComfyUI 必须在运行且装了 See-through 节点（用 bb_seg_probe / bb_seg_install）。'
+      + '**首次运行会下载约 3GB 权重，可能等十几分钟**；之后每次约 1-3 分钟。'
+      + '返回预览图附件 + 产物路径（PSD/各层 PNG 在 ComfyUI 的 output 目录）。',
+    parameters: {
+      file: { type: 'string', required: true, description: 'workspace 内相对路径的图片' },
+      resolution: { type: 'number', description: `推理分辨率，默认 ${DEFAULT_RESOLUTION}（12GB 显存推荐；>=16GB 可 1024）` },
+      steps: { type: 'number', description: '采样步数，默认 28' },
+      tblr_split: { type: 'boolean', description: '是否做上/下/左/右拆分，默认 true' },
+      use_lama: { type: 'boolean', description: '遮挡补全是否用 LaMa，默认 false' },
+      seed: { type: 'number', description: '随机种子（可复现）' },
+      timeout_sec: { type: 'number', description: '等待上限，默认 3600 秒' },
+      attach: { type: 'boolean', description: '是否附预览图，默认 true' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const comfyUrl = cfg.comfyUrl
+        const ping = await pingComfy(comfyUrl)
+        if (!ping.ok) {
+          return {
+            ok: false, code: 'COMFY_UNREACHABLE',
+            message: `ComfyUI 不可达: ${comfyUrl}`,
+            hint: '先 bb_seg_install 安装，再用返回的 startCommand 启动 ComfyUI',
+          }
+        }
+        const nodes = await listSeeThroughNodes(comfyUrl)
+        if (!nodes.length) {
+          return {
+            ok: false, code: 'NODE_MISSING',
+            message: 'ComfyUI 在跑，但没装 See-through 节点',
+            hint: 'bb_seg_install({confirm:true})',
+          }
+        }
+
+        const rel = String(args.file || '').replace(/\\/g, '/').replace(/^\/+/, '')
+        const abs = path.resolve(workspace, rel)
+        if (!abs.startsWith(workspace + path.sep) && abs !== workspace) {
+          return { ok: false, code: 'INVALID_PARAMS', message: `file escapes workspace: ${rel}` }
+        }
+        if (!fs.existsSync(abs)) return { ok: false, code: 'NOT_FOUND', message: `图片不存在: ${rel}` }
+
+        const t0 = Date.now()
+        const up = await raceAbort(uploadImage(comfyUrl, abs, { subfolder: 'seethrough' }), exec?.signal)
+
+        const base = path.basename(rel, path.extname(rel))
+        const prefix = `seethrough_${slugify(base)}_${Date.now().toString(36)}`
+        const { workflow, seed, resolution } = buildWorkflow({
+          image: up.name,
+          subfolder: up.subfolder,
+          resolution: args.resolution ?? DEFAULT_RESOLUTION,
+          steps: args.steps,
+          seed: args.seed,
+          tblrSplit: args.tblr_split,
+          useLama: args.use_lama,
+          prefix,
+          previewPrefix: `${prefix}_preview`,
+        })
+        const { promptId } = await queuePrompt(comfyUrl, workflow, { signal: exec?.signal })
+        const { outputs, elapsedMs } = await waitForPrompt(comfyUrl, promptId, {
+          timeoutMs: (args.timeout_sec ?? 3600) * 1000,
+          pollMs: 5000,
+          onLog: log,
+          signal: exec?.signal,
+        })
+
+        const outRel = `seg/${base}-layers`
+        const images = await fetchOutputImages(comfyUrl, outputs, path.resolve(workspace, outRel))
+
+        // See-through 的 SavePSD 把「各层 PNG + layers.json」写到 ComfyUI 的 output 目录，
+        // 且 STRING 输出不会进 /history，所以按唯一前缀去磁盘找。
+        const comfyOut = cfg.comfyOutputDir
+          || path.join(cfg.segInstallDir || path.join(os.homedir(), '.dsh-seethrough'),
+            'ComfyUI_windows_portable', 'ComfyUI', 'output')
+        let layers = []
+        let layerDir = null
+        try {
+          const found = fs.readdirSync(comfyOut).filter((f) => f.startsWith(prefix) && f.endsWith('_layers.json'))
+          if (found.length) {
+            const meta = JSON.parse(fs.readFileSync(path.join(comfyOut, found[0]), 'utf8'))
+            layers = (meta.layers ?? []).map((l) => ({
+              name: l.name,
+              file: l.filename,
+              bbox: [l.left, l.top, l.right, l.bottom],
+              width: l.right - l.left,
+              height: l.bottom - l.top,
+            }))
+            // 把各层 PNG 拷进 workspace，便于后续查看/复用
+            layerDir = path.resolve(workspace, outRel, 'layers')
+            fs.mkdirSync(layerDir, { recursive: true })
+            for (const l of layers) {
+              const src = path.join(comfyOut, l.file)
+              if (fs.existsSync(src)) {
+                fs.copyFileSync(src, path.join(layerDir, l.file))
+                l.local = path.relative(workspace, path.join(layerDir, l.file)).split(path.sep).join('/')
+              }
+            }
+          }
+        } catch (error) { log('layers 解析失败:', error?.message) }
+
+        // 用已有的 ref.sheet 把各层拼成一张对照图（复用而非新写）
+        let layerSheet = null
+        if (layers.length && layerDir) {
+          const pick = layers.filter((l) => l.local).slice(0, 24)
+          try {
+            const sheet = await raceAbort(call('ref.sheet', {
+              files: pick.map((l) => l.local),
+              cell: 180,
+              background: '#141418',
+              labels: true,
+              hash: false,
+            }, 120000), exec?.signal)
+            layerSheet = await saveInlineAttachment(sheet.png, `seethrough-layers-${base}.png`)
+            if (layerSheet) lookStats.images += 1
+          } catch (error) { log('layer sheet failed:', error?.message) }
+        }
+
+        let attachment = null
+        const first = images[0]
+        if (args.attach !== false && first && fs.existsSync(first.path)) {
+          const buf = await fsp.readFile(first.path)
+          attachment = await saveInlineAttachment(buf.toString('base64'), `seethrough-${base}.png`)
+          if (attachment) lookStats.images += 1
+        }
+
+        return lossless({
+          ok: true,
+          file: rel,
+          prompt_id: promptId,
+          seed, resolution,
+          nodes_available: nodes.length,
+          comfy: { url: comfyUrl, version: ping.version },
+          layer_count: layers.length,
+          layers,
+          preview: images.map((i) => ({ filename: i.filename, path: path.relative(workspace, i.path).split(path.sep).join('/'), bytes: i.bytes })),
+          out_dir: outRel,
+          comfy_output_dir: comfyOut,
+          elapsed_ms: elapsedMs,
+          hint: 'layers 是 See-through 的语义分层（名字即部件，bbox 为原图坐标）。'
+            + '带 _depth 后缀的是深度图。这是 T2：**遮挡区已补全**，可直接作为建模的部件依据。',
+          ...(attachment ? { attachment } : {}),
+          ...(layerSheet ? { layer_sheet: layerSheet } : {}),
         })
       } catch (error) { return errorResult(error) }
     },

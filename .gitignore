@@ -33,3 +33,6 @@ media/*.log
 
 # 参考图是搜索下载的第三方版权素材，**只留在本地，绝不分发**
 models/*/refs/
+# T1/T2 分层产物（来自 ComfyUI，体积大且是派生物）
+models/*/seg/
+
