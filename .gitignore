@@ -31,3 +31,5 @@ media/*.mp4
 media/*.wav
 media/*.log
 
+# 参考图是搜索下载的第三方版权素材，**只留在本地，绝不分发**
+models/*/refs/
