@@ -6,6 +6,23 @@
 
 ![cover](docs/assets/cover.png)
 
+## ⚠️ 使用方式（重要）
+
+**不要在主对话里直接调用 `bb_*` 工具。** 正确姿势：
+
+```
+用户提需求 → 主代理判定任务类型（不碰 bb_*）
+           → 按 templates 拉起子智能体，附上完善过的任务书
+           → 子智能体先 promote（补全任务书、输出计划），再执行
+           → 主代理验收产物并汇总
+```
+
+原因：渲染图非常吃 token（单张 200–900）、长任务容易打断主线、事故无法隔离。
+
+- 协议：`docs/17-子智能体委派规范.md`
+- 任务书模板：`packages/dsh-blockbench-agent/assets/delegation-brief.md`
+- 技能里也写了强制规则（`blockbench-ysm-artist` §0-A）
+
 ## 目录
 
 1. [这是什么](#1-这是什么)

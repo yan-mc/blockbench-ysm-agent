@@ -1091,6 +1091,106 @@
         textures: Texture.all.map((t) => ({ id: t.uuid, name: t.name })),
       }
     }
+    if (scope === 'uv') {
+      // UV 占用分析。
+      //
+      // 存在的理由：auto-UV 会把不同骨骼的方块交错排布，所以「按骨骼 bbox 涂色」
+      // 极容易圈进别人的 island —— 实测因此误伤 36 个面（头发上出现黑色缺口）。
+      // 这里给出每个骨骼的 UV 矩形与**会和谁重叠**，调用方据此决定：
+      // 能安全用 bbox，还是必须逐面精确涂。
+      const texParam = params.texture ? findTexture(String(params.texture)) : (Texture.getDefault?.() ?? Texture.selected ?? Texture.all[0])
+      const texSize = [texParam?.width ?? 0, texParam?.height ?? 0]
+      const rectOf = (cube) => {
+        const out = []
+        const push = (uv, sz) => {
+          const u = vec(uv), s = vec(sz)
+          if (!s[0] || !s[1]) return
+          out.push({ x: u[0], y: u[1], w: s[0], h: s[1] })
+        }
+        if (cube.box_uv) {
+          // box UV：由 uv_offset 与几何尺寸推出六面区域（Blockbench 的 box 展开）
+          const from = vec(cube.from), to = vec(cube.to)
+          const dx = Math.abs(to[0] - from[0]), dy = Math.abs(to[1] - from[1]), dz = Math.abs(to[2] - from[2])
+          const o = vec(cube.uv_offset)
+          push([o[0] + dz, o[1] + dz], [dx * 2, dy])
+          push([o[0] + dz + dx, o[1]], [dz * 2, dz + dy])
+        } else {
+          for (const face of Object.values(cube.faces ?? {})) {
+            if (!face?.uv) continue
+            push(face.uv, face.uv_size ?? [0, 0])
+          }
+        }
+        return out
+      }
+      const bones = []
+      for (const g of Group.all) {
+        const cubes = Cube.all.filter((c) => c.parent === g)
+        if (!cubes.length) continue
+        const rects = []
+        for (const c of cubes) for (const r of rectOf(c)) rects.push(r)
+        if (!rects.length) continue
+        const bbox = [
+          Math.min(...rects.map((r) => r.x)), Math.min(...rects.map((r) => r.y)),
+          Math.max(...rects.map((r) => r.x + r.w)), Math.max(...rects.map((r) => r.y + r.h)),
+        ]
+        bones.push({ bone: g.name, id: g.uuid, cubes: cubes.length, faces: rects.length, rects, bbox })
+      }
+      const areaOf = (a, b) => {
+        const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1])
+        const x2 = Math.min(a[2], b[2]), y2 = Math.min(a[3], b[3])
+        return x2 > x1 && y2 > y1 ? (x2 - x1) * (y2 - y1) : 0
+      }
+      const rectIntersect = (a, b) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y)
+      const usedPx = new Set()
+      for (const b of bones) for (const r of b.rects) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) usedPx.add(`${x},${y}`)
+      const totalPx = texSize[0] * texSize[1]
+      const enriched = bones.map((b) => {
+        const overlaps = []
+        for (const other of bones) {
+          if (other === b) continue
+          let shared = 0
+          for (const r of b.rects) for (const o of other.rects) if (rectIntersect(r, o)) shared += 1
+          const bboxShared = other.bbox && areaOf(b.bbox, other.bbox) > 0
+          if (shared > 0 || bboxShared) {
+            // bbox 层是否会误伤：别的骨骼的矩形是否落进我的 bbox
+            const hits = other.rects.filter((o) => rectIntersect({ x: b.bbox[0], y: b.bbox[1], w: b.bbox[2] - b.bbox[0], h: b.bbox[3] - b.bbox[1] }, o))
+            if (hits.length) overlaps.push({ bone: other.bone, intruding_rects: hits.length })
+          }
+        }
+        return {
+          bone: b.bone, id: b.id, cubes: b.cubes, faces: b.faces,
+          bbox: b.bbox, bbox_px: (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]),
+          overlaps,
+          safe_bbox: overlaps.length === 0,
+        }
+      })
+      const unsafe = enriched.filter((b) => !b.safe_bbox)
+      const full = params.full === true
+      // 默认返回摘要：这个模型 42 根骨骼全量 overlaps 有几百行，会把上下文吃光。
+      // 需要逐骨骼细看时传 full:true。
+      const compact = full ? enriched : enriched.map((b) => ({
+        bone: b.bone, cubes: b.cubes, faces: b.faces,
+        bbox: b.bbox, bbox_px: b.bbox_px,
+        overlap_count: b.overlaps.reduce((a, o) => a + o.intruding_rects, 0),
+        overlap_bones: b.overlaps.length,
+        safe_bbox: b.safe_bbox,
+        top: b.overlaps.slice(0, 3).map((o) => `${o.bone}:${o.intruding_rects}`),
+      }))
+      return {
+        ...base,
+        texture: { name: texParam?.name ?? null, size: texSize },
+        saturation: totalPx ? +(usedPx.size / totalPx).toFixed(4) : 0,
+        used_px: usedPx.size,
+        bones: compact,
+        unsafe_count: unsafe.length,
+        unsafe_bboxes: unsafe.map((b) => b.bone),
+        detail: full ? 'full' : 'summary（要逐骨骼完整 overlaps 传 full:true）',
+        hint: unsafe.length
+          ? `${unsafe.length}/${enriched.length} 个骨骼的 UV bbox 会圈进别人的岛，**别按 bbox 大面积涂色**；`
+            + `改用 bb_scene(scope="cube", include_uv:true) 拿逐面矩形精确写，或参考本结果的 bbox 判断覆盖范围`
+          : '所有骨骼的 UV bbox 都独占，可以安全按 bbox 涂色',
+      }
+    }
     if (scope === 'textures') {
       return { ...base, textures: Texture.all.map((t) => ({ texture: t.name, id: t.uuid, size: [t.width, t.height] })) }
     }
