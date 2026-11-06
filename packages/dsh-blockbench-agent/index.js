@@ -135,9 +135,31 @@ export function apply(ctx, config = {}) {
 
   // 运行时目录：插件在会话中会持续写入，缺失会导致写日志/落盘失败。
   // 每次 apply 都重建（recursive 幂等），避免被外部清理后崩溃。
-  for (const sub of ['', 'logs', 'artifacts', 'checkpoints', path.join('.bb')]) {
+  //
+  // 注意 userdata-<tag> 与其下的 thumbnails 必须在这里就建好：全新安装时
+  // Blockbench 渲染进程会去 scandir 这个目录，缺失会让首次 bb_session_start 直接 ENOENT
+  // （实测于全新用户演练）。main.js 也会建，但两层都建才稳。
+  const runtimeDirs = [
+    '',
+    'logs',
+    'artifacts',
+    'checkpoints',
+    path.join('.bb'),
+    path.join('.bb', `userdata-${runtimeTag}`),
+    path.join('.bb', `userdata-${runtimeTag}`, 'thumbnails'),
+  ]
+  for (const sub of runtimeDirs) {
     try { fs.mkdirSync(path.join(workspace, sub), { recursive: true }) } catch { /* 只读盘等场景不阻断加载 */ }
   }
+  // 兜底：历史遗留的 .bb/userdata-* 目录可能缺 thumbnails（旧版本没建）。
+  // Blockbench 渲染进程会 scandir 这些目录，缺一个就会让首启直接 ENOENT —— 实测踩过。
+  try {
+    const bbRoot = path.join(workspace, '.bb')
+    for (const entry of fs.readdirSync(bbRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !entry.name.startsWith('userdata-')) continue
+      try { fs.mkdirSync(path.join(bbRoot, entry.name, 'thumbnails'), { recursive: true }) } catch { /* ignore */ }
+    }
+  } catch { /* .bb 不存在或无权限，忽略 */ }
 
   const state = {
     server: null, rpcUrl: '', token: '', child: null, connected: false,
@@ -724,13 +746,28 @@ export function apply(ctx, config = {}) {
 
   tool({
     name: 'bb_project_open',
-    description: '打开已有的 YSM 资源包目录（workspace 内相对路径），加载 main/arm、贴图、动画与控制器。',
+    description: '打开已有的 YSM 资源包目录（workspace 内相对路径），加载 main/arm、贴图、动画与控制器。'
+      + '注意 pack_dir 相对的是**插件 workspace**（即 models/<项目名>/），不是仓库根——'
+      + '报错会回显解析后的绝对路径，路径不对时按它修正。',
     parameters: {
-      pack_dir: { type: 'string', required: true, description: 'workspace 内相对路径' },
+      pack_dir: { type: 'string', required: true, description: 'workspace 内相对路径（不是仓库根相对，如 "sakiko"）' },
     },
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
-      try { return await callTool('bb_project_open', 'project.open_pack', args, { timeoutMs: 120000, signal: exec?.signal }) } catch (error) { return errorResult(error) }
+      const resolved = path.resolve(workspace, String(args.pack_dir ?? ''))
+      try {
+        const r = await callTool('bb_project_open', 'project.open_pack', args, { timeoutMs: 120000, signal: exec?.signal })
+        return { ...r, resolved_dir: resolved }
+      } catch (error) {
+        const e = errorResult(error)
+        return {
+          ...e,
+          resolved_dir: resolved,
+          workspace_root: workspace,
+          hint: `pack_dir 相对 workspace=${workspace}；你传的 "${args.pack_dir}" 解析成 ${resolved}，`
+            + `该目录${fs.existsSync(resolved) ? '存在' : '不存在'}。若你手上有仓库根相对路径，去掉前缀 "models/<项目名>/" 再传。`,
+        }
+      }
     },
   })
 

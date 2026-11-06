@@ -42,7 +42,11 @@ const offline = !flag('online')
 const selftestPack = path.resolve(arg('selftest-pack', ''))
 const selftestOut = path.join(workspace, 'artifacts', 'm0')
 
-for (const dir of [workspace, userData, path.join(workspace, 'logs'), selftestOut, path.join(userData, 'thumbnails')]) fs.mkdirSync(dir, { recursive: true })
+// 逐目录建，单个失败不连坐：全新安装 / 只读盘 / 权限受限时也要能起来。
+// thumbnails 尤其关键 —— Blockbench 渲染进程会去 scandir 它，缺失会让首启 ENOENT。
+for (const dir of [workspace, userData, path.join(workspace, 'logs'), selftestOut, path.join(userData, 'thumbnails')]) {
+  try { fs.mkdirSync(dir, { recursive: true }) } catch (error) { log?.(`mkdir failed ${dir}: ${error?.message}`) }
+}
 // 预授权 bridge 插件的 fs 权限，避免 BB5 首次 requireNativeModule('fs') 弹原生权限框
 try {
   fs.writeFileSync(path.join(userData, 'plugin_permissions.json'), JSON.stringify({

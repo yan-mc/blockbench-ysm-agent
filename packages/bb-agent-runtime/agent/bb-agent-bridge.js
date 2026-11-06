@@ -140,6 +140,34 @@
   const joinPath = (...parts) => (pathModule ? pathModule.join(...parts) : parts.join('\\').replace(/\\+/g, '\\'))
   const packAbsolute = (packDir, rel) => joinPath(packDir, ...String(rel).split(/[\\/]+/).filter(Boolean))
 
+  /**
+   * 收敛 pack_dir，防止「workspace 被拼了两次」。
+   *
+   * 实测事故：调用方传了仓库根相对的 `models/<项目>/sakiko`，它被当成 workspace 相对路径
+   * 再拼一次 workspace，得到 `.../models/<项目>/models/<项目>/sakiko`。
+   * bb_save_project 于是每次都往这个陈旧双拼路径写一份旧内容 —— 不报错，只污染工作区。
+   *
+   * 判定依据：路径里 workspace 尾段再次出现，且其后紧跟 `models` 段（重复拼接的signature）。
+   */
+  function normalizePackDir(input) {
+    const ws = String(cfg.workspace || '')
+    const raw = String(input ?? 'pack')
+    const abs = (pathModule && pathModule.isAbsolute(raw)) ? raw : packAbsolute(ws, raw)
+    if (!ws || !pathModule) return abs
+    const sep = abs.includes('\\') ? '\\' : '/'
+    const parts = abs.split(/[\\/]+/).filter(Boolean)
+    const wsParts = ws.split(/[\\/]+/).filter(Boolean)
+    const tail = wsParts[wsParts.length - 1]
+    const hits = []
+    for (let i = 0; i < parts.length; i++) if (parts[i] === tail) hits.push(i)
+    // 只有出现 ≥2 次、且第二次之后紧跟 models 才是双拼
+    const dup = hits.length >= 2 && parts[hits[1] + 1] === 'models'
+    if (!dup) return abs
+    const fixed = [...wsParts, ...parts.slice(hits[hits.length - 1] + 1)].join(sep)
+    console.warn(`[bb-agent] pack_dir 双拼已收敛: ${abs} -> ${fixed}`)
+    return fixed
+  }
+
   function readTextSync(absPath) {
     if (!nodeFs?.readFileSync) throw err('INTERNAL_ERROR', 'fs permission unavailable')
     return nodeFs.readFileSync(absPath, 'utf8')
@@ -937,7 +965,7 @@
 
   handlers['project.create_ysm'] = async (params = {}) => {
     const name = String(params.name || 'agent_model')
-    const packDir = params.pack_dir ? packAbsolute(String(cfg.workspace || ''), params.pack_dir) : workspacePath('pack')
+    const packDir = params.pack_dir ? normalizePackDir(params.pack_dir) : workspacePath('pack')
     if (nodeFs.existsSync(packDir)) {
       if (params.overwrite !== true) throw err('PACK_EXISTS', `pack already exists: ${packDir}`, { code: 'PACK_EXISTS', hint: 'pass overwrite:true to replace' })
       nodeFs.rmSync(packDir, { recursive: true, force: true })
@@ -1094,6 +1122,7 @@
     const aspects = undoAspects()
     Undo.initEdit(aspects)
     const changed = []
+    const warnings = []
     let success = false
     try {
       for (const op of ops) {
@@ -1169,6 +1198,20 @@
           case 'update_bone': {
             const bone = findGroup(op.bone ?? op.bone_id ?? op.id)
             if (!bone) throw err('INVALID_REFERENCE', `bone not found: ${op.bone ?? op.bone_id ?? op.id}`, { code: 'INVALID_REFERENCE' })
+            // 未知字段必须报错，不能静默忽略。
+            // 实战教训：调用方传 {op:'update_bone', scale:[0.8,1,1]} 想收窄发团，
+            // 返回 ok 且 revision+1，但骨骼 scale 不进渲染/导出，渲染 sha256 完全不变
+            // —— 界面上「改成功了」，实际是空操作，白白浪费一轮迭代。
+            const KNOWN = new Set(['op', 'bone', 'bone_id', 'id', 'pivot', 'rotation', 'name'])
+            const unknown = Object.keys(op).filter((k) => !KNOWN.has(k))
+            if (unknown.length) {
+              const hint = unknown.includes('scale')
+                ? '骨骼 scale 不被 Blockbench 渲染/导出支持；要改体量请用 update_cube 改方块几何，或加一根中间骨骼再改其子方块'
+                : '可用字段: pivot / rotation / name'
+              throw err('UNSUPPORTED_FIELD', `update_bone 不支持字段: ${unknown.join(', ')}`, {
+                code: 'UNSUPPORTED_FIELD', fields: unknown, hint,
+              })
+            }
             if (op.pivot) bone.origin = vec(op.pivot)
             if (op.rotation) bone.rotation = vec(op.rotation)
             if (op.name) bone.name = op.name
@@ -1244,11 +1287,35 @@
             break
           }
           case 'delete': {
-            for (const ref of op.refs ?? []) {
+            // 两种写法都接受：
+            //   {op:'delete', refs:[{kind,id}, ...]}   ← 正式语法
+            //   {op:'delete', kind:'cube', id:'...'}   ← 单目标简写
+            // 之前只认 refs，用简写会被静默当成「没有要删的东西」而返回 ok，
+            // 实测导致「以为删掉了、其实还在」的错误状态被后续操作继承。
+            let refs = op.refs
+            if (!Array.isArray(refs) || refs.length === 0) {
+              if (op.id) refs = [{ kind: op.kind ?? 'cube', id: op.id }]
+              else {
+                throw err('INVALID_PARAMS',
+                  'delete 需要 refs:[{kind,id}] 或 id（+可选 kind）',
+                  { code: 'INVALID_PARAMS' })
+              }
+            }
+            const missed = []
+            for (const ref of refs) {
               const el = ref.kind === 'bone' ? findGroup(ref.id) : findCube(ref.id)
-              if (!el) continue
+              if (!el) { missed.push(ref); continue }
               try { el.remove?.() } catch { /* ignore */ }
               changed.push({ kind: ref.kind, id: ref.id, op: 'delete' })
+            }
+            // 目标不存在时不能静默成功：明确报出来，调用方才知道状态没变
+            if (missed.length && changed.length === 0) {
+              throw err('INVALID_REFERENCE',
+                `delete 目标都不存在: ${missed.map((r) => `${r.kind}:${r.id}`).join(', ')}`,
+                { code: 'INVALID_REFERENCE' })
+            }
+            if (missed.length) {
+              warnings.push({ code: 'DELETE_PARTIAL', message: `部分目标不存在: ${missed.map((r) => r.id).join(', ')}` })
             }
             break
           }
@@ -1261,7 +1328,7 @@
       const revision = bump('agent', changed)
       state.counters.edits += 1
       success = true
-      return { ok: true, revision, changed, warnings: [], digest: { revision, bones: Group.all.length, cubes: Cube.all.length } }
+      return { ok: true, revision, changed, warnings, digest: { revision, bones: Group.all.length, cubes: Cube.all.length } }
     } catch (error) {
       try { Undo.cancelEdit?.(true) } catch { /* ignore */ }
       throw error
@@ -2871,7 +2938,7 @@
   }
 
   handlers['project.open_pack'] = async (params = {}) => {
-    const packDir = packAbsolute(String(cfg.workspace || ''), params.pack_dir || 'pack')
+    const packDir = normalizePackDir(params.pack_dir || 'pack')
     if (!nodeFs.existsSync(joinPath(packDir, 'ysm.json'))) {
       throw err('PACK_INVALID', `ysm.json missing: ${packDir}`, { code: 'PACK_INVALID' })
     }
@@ -2938,7 +3005,7 @@
     try { ensureProject() } catch (error) {
       throw err('PROJECT_NOT_OPEN', `no project open (Project=${typeof Project}:${Project ? (Project.name ?? 'obj') : String(Project)}, window.Project=${typeof window.Project}:${window.Project ? (window.Project.name ?? 'obj') : String(window.Project)}, tabs=${ModelProject.all.length})`)
     }
-    const packDir = state.project?.pack_dir || workspacePath('pack')
+    const packDir = normalizePackDir(state.project?.pack_dir || workspacePath('pack'))
     if (!state.project) state.project = { pack_dir: packDir, ysmJson: normalizeYsm({}) }
     const ysmJson = state.project.ysmJson ?? normalizeYsm({})
     const files = saveYsmPack(packDir, ysmJson)
@@ -2950,7 +3017,7 @@
 
   handlers['project.export_ysm'] = (params = {}) => {
     ensureProject()
-    const packDir = state.project?.pack_dir || workspacePath('pack')
+    const packDir = normalizePackDir(state.project?.pack_dir || workspacePath('pack'))
     const ysmJson = state.project?.ysmJson ?? normalizeYsm({})
     // 先显式保存回工作副本，再复制到发布目录
     saveYsmPack(packDir, ysmJson)
@@ -3331,7 +3398,7 @@
     }
     tex.name = name
     tex.pbr_channel = channel
-    const packDir = state.project?.pack_dir || workspacePath('pack')
+    const packDir = normalizePackDir(state.project?.pack_dir || workspacePath('pack'))
     tex.path = packAbsolute(packDir, `textures/${name}.png`)
     tex.updateChangesAfterEdit?.()
     state.counters.edits += 1
@@ -3347,7 +3414,7 @@
     state.suppressUserEdit = true
     setTimeout(() => { state.suppressUserEdit = false }, 2000)
     if (params.confirm !== true) throw err('INVALID_OPERATION', 'restore requires confirm:true (destructive)', { code: 'INVALID_OPERATION' })
-    const packDir = state.project?.pack_dir || workspacePath('pack')
+    const packDir = normalizePackDir(state.project?.pack_dir || workspacePath('pack'))
     const revision = Number(params.revision)
     if (!Number.isFinite(revision) || revision < 0) throw err('INVALID_PARAMS', 'revision required', { code: 'INVALID_PARAMS' })
     const base = `r${String(revision).padStart(4, '0')}`
