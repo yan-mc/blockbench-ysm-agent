@@ -428,6 +428,50 @@ TOOLS = [
         }),
     },
     {
+        "name": "bb_ref_search",
+        "title_zh": "参考图多源搜索",
+        "description": "按角色名在多个图片源搜索造型参考图（正面/侧面/背面的官方立绘、设定集、动画截图）。"
+                       "内置 Bing / 360 / 萌娘百科图库；单源失败自动跳过并在 sources 报告状态。"
+                       "结果按「信息密度」先验排序（设定集/全身立绘 > 一般图）。",
+        "mutating": False, "requires_project": False, "concurrency_safe": True,
+        "protocol_method": None, "timeout_ms": 120000,
+        "returns": "RefSearchResult", "attachments": False,
+        "errors": ["INVALID_PARAMS", "REQUEST_CANCELLED"],
+        "parameters": obj({
+            "character": {"type": "string", "description": "角色名（中文/日文/英文均可）"},
+            "queries": {"type": "array", "items": {"type": "string"},
+                        "description": "自定义查询词；省略用内置模板"},
+            "sources": {"type": "array", "items": {"enum": ["bing", "so360", "moegirl"]},
+                        "description": "源 id 白名单；省略用全部"},
+            "per_source": {"type": "integer", "minimum": 5, "maximum": 50, "default": 30},
+            "max_queries": {"type": "integer", "minimum": 1, "maximum": 10, "default": 6},
+            "timeout_ms": {"type": "integer", "minimum": 1000, "default": 20000},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 60},
+        }, ["character"]),
+    },
+    {
+        "name": "bb_ref_collect",
+        "title_zh": "参考图下载与对照表",
+        "description": "把候选参考图下载到本地并拼成一张带编号的对照表返回（一张图，省 token）。"
+                       "做格式校验、精确去重（sha256）、感知去重（dHash 汉明距离），清单写成 refs.json。"
+                       "编号可直接用来指认角度。",
+        "mutating": False, "requires_project": False, "concurrency_safe": True,
+        "protocol_method": "ref.sheet", "timeout_ms": 180000,
+        "returns": "RefCollectResult", "attachments": True,
+        "errors": ["INVALID_PARAMS", "NO_CANDIDATES", "DOWNLOAD_FAILED", "REQUEST_CANCELLED"],
+        "parameters": obj({
+            "urls": {"type": "array", "items": {"type": "string"},
+                     "description": "图片 URL 数组；省略则用上一次 bb_ref_search 的结果"},
+            "max_images": {"type": "integer", "minimum": 1, "maximum": 80, "default": 24},
+            "out_dir": {"type": "string", "description": "workspace 下子目录；默认 refs/<角色名>"},
+            "cell": {"type": "integer", "minimum": 96, "maximum": 1024, "default": 240},
+            "cols": {"type": "integer", "minimum": 1, "maximum": 12},
+            "concurrency": {"type": "integer", "minimum": 1, "maximum": 12, "default": 6},
+            "dedupe": {"type": "boolean", "default": True},
+            "attach": {"type": "boolean", "default": True},
+        }),
+    },
+    {
         "name": "bb_validate",
         "title_zh": "YSM 规范校验",
         "description": "按 YSM 规范与几何规则校验；导出前必须调用。A 级定位组缺失/改名=error，B 级默认层级偏离=warning。",
@@ -812,6 +856,7 @@ BRIDGE_METHODS = [
     m("camera.get", timeout=10000),
     m("camera.set", timeout=15000),
     m("render.texture", kind="long", timeout=30000, idempotent=True),
+    m("ref.sheet", kind="long", timeout=120000, idempotent=True),
     m("render.cancel", timeout=5000),
     m("render.artifacts", timeout=5000),
     m("gui.show", kind="write", timeout=10000, idempotent=False),

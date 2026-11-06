@@ -2552,6 +2552,141 @@
     }
   }
 
+  // ------------------------------------------------------------ 参考图工具
+  // 把磁盘上的参考图拼成一张带编号的对照表，顺带算 dHash 供感知去重。
+  // 放在 bridge 而不是 host 的原因：只有 renderer 有 canvas 能解码 PNG/JPEG，
+  // host 侧无原生图像库（见 docs/11）。
+
+  function refImageMime(p) {
+    const low = String(p || '').toLowerCase()
+    if (low.endsWith('.png')) return 'image/png'
+    if (low.endsWith('.webp')) return 'image/webp'
+    if (low.endsWith('.gif')) return 'image/gif'
+    if (low.endsWith('.bmp')) return 'image/bmp'
+    return 'image/jpeg'
+  }
+
+  function loadImageFromFile(abs) {
+    return new Promise((resolve, reject) => {
+      let buf = null
+      try { buf = nodeFs.readFileSync(abs) } catch (error) { reject(error); return }
+      if (!buf || !buf.length) { reject(new Error('empty file')); return }
+      const dataUrl = `data:${refImageMime(abs)};base64,${buf.toString('base64')}`
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error('image decode failed'))
+      img.src = dataUrl
+    })
+  }
+
+  /** 64 位 dHash（9x8 灰度水平差分）→ 16 进制。用于发现"同一张图不同来源"。 */
+  function dHashOf(img) {
+    try {
+      const c = document.createElement('canvas')
+      c.width = 9; c.height = 8
+      const ctx1 = c.getContext('2d')
+      ctx1.drawImage(img, 0, 0, 9, 8)
+      const d = ctx1.getImageData(0, 0, 9, 8).data
+      const gray = new Array(72)
+      for (let i = 0; i < 72; i++) {
+        gray[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]
+      }
+      let bits = ''
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) bits += gray[y * 9 + x] > gray[y * 9 + x + 1] ? '1' : '0'
+      }
+      return { bits, hex: BigInt(`0b${bits}`).toString(16).padStart(16, '0') }
+    } catch { return null }
+  }
+
+  handlers['ref.sheet'] = async (params = {}) => {
+    const files = (Array.isArray(params.files) ? params.files : []).filter(Boolean).map(String)
+    if (!files.length) throw err('INVALID_PARAMS', 'files required', { code: 'INVALID_PARAMS' })
+    const cellPx = Math.min(1024, Math.max(96, Number(params.cell) || 240))
+    // 注意：Number(undefined) 是 NaN，而 `NaN ?? 6` 仍是 NaN —— 必须显式判有限。
+    const gapRaw = Number(params.gap)
+    const gap = Number.isFinite(gapRaw) ? Math.min(24, Math.max(0, gapRaw)) : 6
+    const cols = Math.min(12, Math.max(1, Number(params.cols) || Math.min(6, Math.ceil(Math.sqrt(files.length * 1.4)))))
+    const rows = Math.ceil(files.length / cols)
+    const withLabels = params.labels !== false
+    const wantHash = params.hash !== false
+    const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+    const sheet = document.createElement('canvas')
+    sheet.width = cols * (cellPx + gap) - gap
+    sheet.height = rows * (cellPx + gap) - gap
+    const sctx = sheet.getContext('2d')
+    if (colorOk(params.background)) {
+      sctx.fillStyle = params.background
+      sctx.fillRect(0, 0, sheet.width, sheet.height)
+    }
+
+    const images = []
+    // 关键：逐张 load → draw → hash → 丢弃引用。4000px 的设定集原图若一次性全留在内存，
+    // 24 张就能吃掉 1GB+，所以不能先全载入再画。
+    for (let i = 0; i < files.length; i++) {
+      const cx = (i % cols) * (cellPx + gap)
+      const cy = Math.floor(i / cols) * (cellPx + gap)
+      const rec = { index: i, file: files[i], ok: false }
+      try {
+        const abs = packAbsolute(String(cfg.workspace || ''), files[i])
+        const img = await loadImageFromFile(abs)
+        const w = img.naturalWidth || img.width
+        const h = img.naturalHeight || img.height
+        const s = Math.min(cellPx / Math.max(1, w), cellPx / Math.max(1, h))
+        const dw = Math.max(1, Math.round(w * s))
+        const dh = Math.max(1, Math.round(h * s))
+        const dx = cx + Math.floor((cellPx - dw) / 2)
+        const dy = cy + Math.floor((cellPx - dh) / 2)
+        // 透明底垫一层，避免 PNG 透明区在深色底上看起来像"缺块"
+        sctx.fillStyle = '#141418'
+        sctx.fillRect(cx, cy, cellPx, cellPx)
+        sctx.drawImage(img, dx, dy, dw, dh)
+        if (withLabels) {
+          const label = String(i)
+          sctx.font = `${Math.max(11, Math.round(cellPx * 0.075))}px sans-serif`
+          const tw = sctx.measureText(label).width
+          sctx.fillStyle = 'rgba(0,0,0,0.6)'
+          sctx.fillRect(cx + 2, cy + 2, tw + 8, Math.round(cellPx * 0.1) + 2)
+          sctx.fillStyle = '#ffd84d'
+          sctx.fillText(label, cx + 6, cy + Math.round(cellPx * 0.09))
+        }
+        rec.ok = true
+        rec.width = w
+        rec.height = h
+        rec.ratio = +(w / Math.max(1, h)).toFixed(3)
+        if (wantHash) {
+          const hash = dHashOf(img)
+          if (hash) { rec.dhash = hash.hex; rec.dhash_bits = hash.bits }
+        }
+      } catch (error) {
+        rec.error = error?.message ?? String(error)
+        sctx.fillStyle = '#2a1d1d'
+        sctx.fillRect(cx, cy, cellPx, cellPx)
+        sctx.fillStyle = '#b06060'
+        sctx.font = `${Math.max(10, Math.round(cellPx * 0.06))}px sans-serif`
+        sctx.fillText('load failed', cx + 6, cy + cellPx / 2)
+      }
+      images.push(rec)
+    }
+
+    const dataUrl = sheet.toDataURL('image/png')
+    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    const tEnd = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+    return {
+      ok: true,
+      png: base64,
+      width: sheet.width,
+      height: sheet.height,
+      bytes: Math.round(base64.length * 0.75),
+      cols, rows, cell: cellPx, gap,
+      count: files.length,
+      loaded: images.filter((x) => x.ok).length,
+      images,
+      elapsed_ms: +(tEnd - tStart).toFixed(1),
+    }
+  }
+
   handlers['render.texture'] = (params = {}) => {
     ensureProject()
     const tex = findTexture(params.texture)

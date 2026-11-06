@@ -765,6 +765,21 @@
       "description": ""
     },
     {
+      "name": "ref.sheet",
+      "direction": "client_to_server",
+      "kind": "long",
+      "idempotent": true,
+      "timeout_ms": 120000,
+      "type": "sync",
+      "params": {
+        "type": "object"
+      },
+      "result": {
+        "type": "object"
+      },
+      "description": ""
+    },
+    {
       "name": "render.cancel",
       "direction": "client_to_server",
       "kind": "read",

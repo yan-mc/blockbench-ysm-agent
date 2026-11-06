@@ -12,8 +12,11 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createWsServer } from './lib/ws-server.js'
 import { imageTokens } from './lib/viewsheet.js'
 import { offloadSessionImages, countLiveImages } from './lib/imageprune.js'
+import { searchRefs, sortCandidates, SOURCES as REF_SOURCES } from './lib/refsearch.js'
+import { collectRefs } from './lib/refcollect.js'
 import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { createRequire } from 'node:module'
@@ -60,6 +63,20 @@ const DEFAULTS = {
   keepImages: 2,
   /** 图史压缩：单次最多改写多少条 tool result（控制前缀缓存失效范围）。 */
   offloadMaxNodes: 4,
+
+  // ---- 参考图收集（docs/11，零安装）----
+  /** 参考图落盘子目录（位于 workspace 下）。 */
+  refDir: 'refs',
+  /** 单次收集最多保留多少张。 */
+  refMaxImages: 24,
+  /** 下载并发。 */
+  refConcurrency: 6,
+  /** 单图下载超时（ms）。 */
+  refTimeoutMs: 20000,
+  /** 参考图对照表单格像素。 */
+  refCell: 240,
+  /** 搜索用的默认源（空 = 全部）。 */
+  refSources: [],
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -1079,6 +1096,242 @@ export function apply(ctx, config = {}) {
           ok: true, ...rest,
           tokens_est: imageTokens(result.width, result.height),
           attachment,
+        }
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  // ---- 参考图收集（docs/11，零安装）---------------------------------------
+
+  /** 上一次搜索结果，供 bb_ref_collect 免传 urls。 */
+  let lastRefSearch = null
+
+  /** 角色名 → 安全的目录名。 */
+  function slugify(s) {
+    return String(s || 'ref')
+      .replace(/[\\/:*?"<>|\s]+/g, '_')
+      .replace(/^[._]+|[._]+$/g, '')
+      .slice(0, 48) || 'ref'
+  }
+
+  /** dHash 汉明距离（16 进制字符串 XOR 后数 1）。 */
+  function hammingHex(a, b) {
+    try {
+      const x = BigInt(`0x${a}`) ^ BigInt(`0x${b}`)
+      let n = 0n
+      let v = x
+      while (v > 0n) { if (v & 1n) n += 1n; v >>= 1n }
+      return Number(n)
+    } catch { return 64 }
+  }
+
+  tool({
+    name: 'bb_ref_search',
+    description: '按角色名在多个图片源搜索**造型参考图**（正面/侧面/背面的官方立绘、设定集、动画截图）。'
+      + '内置 Bing / 360 / 萌娘百科图库三个源，单源失败自动跳过并在 sources 里报告状态。'
+      + '结果按「信息密度」先验排序：设定集/全身立绘 > 一般图。'
+      + '拿到列表后调用 bb_ref_collect 下载并拼成对照表。找不到的源会明确写 error，不要谎报成功。',
+    parameters: {
+      character: { type: 'string', required: true, description: '角色名（中文/日文/英文都可以）' },
+      queries: { type: 'array', description: '自定义查询词数组；省略则用内置模板（设定集/三视图/全身立绘/背面/日英版本）' },
+      sources: { type: 'array', description: `源 id 白名单，可选：${REF_SOURCES.map((s) => s.id).join(' / ')}；省略用全部` },
+      per_source: { type: 'number', description: '每个源每次查询取多少条，默认 30（5-50）' },
+      max_queries: { type: 'number', description: '最多用几个查询词，默认 6' },
+      timeout_ms: { type: 'number', description: '单次请求超时，默认 20000' },
+      limit: { type: 'number', description: '返回给模型的候选条数上限，默认 60' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => textBlocks(v) },
+    async execute(args, exec) {
+      try {
+        const t0 = Date.now()
+        const res = await raceAbort(searchRefs({
+          character: args.character,
+          extraQueries: Array.isArray(args.queries) ? args.queries : undefined,
+          sources: Array.isArray(args.sources) && args.sources.length ? args.sources : (cfg.refSources?.length ? cfg.refSources : undefined),
+          perSource: args.per_source,
+          maxQueries: args.max_queries,
+          timeoutMs: args.timeout_ms ?? cfg.refTimeoutMs,
+          signal: exec?.signal,
+          onLog: log,
+        }), exec?.signal)
+        const sorted = sortCandidates(res.candidates)
+        lastRefSearch = { character: args.character, candidates: sorted, sources: res.sources, queries: res.queries }
+        const limit = Math.max(1, Math.min(200, args.limit ?? 60))
+        const okSources = res.sources.filter((s) => s.ok)
+        return {
+          ok: true,
+          character: args.character,
+          total: sorted.length,
+          queries: res.queries,
+          sources: res.sources,
+          sources_ok: okSources.length,
+          sources_total: res.sources.length,
+          elapsed_ms: Date.now() - t0,
+          candidates: sorted.slice(0, limit).map((c, i) => ({
+            i,
+            url: c.url,
+            source: c.source,
+            kind: c.kind,
+            size: c.width && c.height ? `${c.width}x${c.height}` : undefined,
+            page: c.pageUrl,
+            query: c.query,
+          })),
+          hint: sorted.length
+            ? '下一步：bb_ref_collect（不传 urls 会用这次结果）'
+            : '所有源都没结果：换角色名（日文/英文）或显式传 queries 再试一次；仍为空就说明网上确实没有',
+        }
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_ref_collect',
+    description: '把候选参考图**下载到本地并拼成一张带编号的对照表**返回（一张图，省 token）。'
+      + '会做格式校验、精确去重（sha256）、感知去重（dHash 汉明距离），并把清单写成 refs.json。'
+      + '拿到的编号可以直接用来指认角度（例如"#3 是背面"），后续再据此定建模方案。'
+      + '**必须真的看图判断**：这张表里的图是不是同一角色、各自是什么角度，不能靠 URL 猜。',
+    parameters: {
+      urls: { type: 'array', description: '要下载的图片 URL 数组；省略则用上一次 bb_ref_search 的结果' },
+      max_images: { type: 'number', description: '最多保留几张，默认 24（1-80）' },
+      out_dir: { type: 'string', description: 'workspace 下的子目录名；默认 refs/<角色名>' },
+      cell: { type: 'number', description: '对照表单格像素，默认 240' },
+      cols: { type: 'number', description: '列数；省略自动' },
+      concurrency: { type: 'number', description: '下载并发，默认 6' },
+      dedupe: { type: 'boolean', description: '是否做感知去重，默认 true' },
+      attach: { type: 'boolean', description: '是否附图（默认 true）' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const t0 = Date.now()
+        const hasUrls = Array.isArray(args.urls) && args.urls.length > 0
+        if (!hasUrls && !lastRefSearch?.candidates?.length) {
+          return {
+            ok: false, code: 'NO_CANDIDATES',
+            message: '还没有候选图：先调用 bb_ref_search，或直接传 urls',
+            hint: 'bb_ref_search({character:"角色名"}) → bb_ref_collect()',
+          }
+        }
+        const candidates = hasUrls
+          ? args.urls.map((url) => ({ url: String(url), kind: 'custom' }))
+          : lastRefSearch.candidates
+        const relDir = String(args.out_dir || path.posix.join(cfg.refDir, slugify(lastRefSearch?.character || 'ref')))
+          .replace(/\\/g, '/')
+          .replace(/^\/+/, '')
+        const absDir = path.resolve(workspace, relDir)
+        if (!absDir.startsWith(workspace + path.sep) && absDir !== workspace) {
+          return { ok: false, code: 'INVALID_PARAMS', message: `out_dir escapes workspace: ${relDir}` }
+        }
+
+        const collected = await raceAbort(collectRefs({
+          candidates,
+          outDir: absDir,
+          fsp,
+          maxImages: args.max_images ?? cfg.refMaxImages,
+          concurrency: args.concurrency ?? cfg.refConcurrency,
+          timeoutMs: cfg.refTimeoutMs,
+          signal: exec?.signal,
+          onLog: log,
+        }), exec?.signal)
+
+        if (!collected.images.length) {
+          return {
+            ok: false, code: 'DOWNLOAD_FAILED',
+            message: `候选 ${collected.attempted} 个，全部下载失败或不合格`,
+            hint: '换源/换查询词；很多图站对非浏览器请求返回 403',
+          }
+        }
+
+        // 转成 workspace 相对路径给 bridge
+        const toRel = (abs) => path.relative(workspace, abs).split(path.sep).join('/')
+        const compose = async (files) => raceAbort(call('ref.sheet', {
+          files,
+          cell: args.cell ?? cfg.refCell,
+          cols: args.cols,
+          background: '#141418',
+          labels: true,
+          hash: true,
+        }, 60000), exec?.signal)
+
+        let sheet = await compose(collected.images.map((im) => toRel(im.file)))
+
+        // 感知去重：dHash 汉明距离 <= 阈值视为同一张图
+        let duplicates = []
+        if (args.dedupe !== false) {
+          const byName = new Map((sheet.images || []).map((r) => [r.file, r]))
+          const kept = []
+          for (const im of collected.images) {
+            const rec = byName.get(toRel(im.file))
+            const h = rec?.dhash
+            if (!h) { kept.push(im); continue }
+            const dupOf = kept.find((k) => k._dhash && hammingHex(k._dhash, h) <= 6)
+            if (dupOf) {
+              duplicates.push({ name: im.name, dupOf: dupOf.name, url: im.url })
+              continue
+            }
+            im._dhash = h
+            kept.push(im)
+          }
+          if (duplicates.length) {
+            collected.images = kept
+            sheet = await compose(kept.map((im) => toRel(im.file)))
+          }
+        }
+
+        const hashByName = new Map((sheet.images || []).map((r) => [r.file, r]))
+        const images = collected.images.map((im, i) => {
+          const rec = hashByName.get(toRel(im.file))
+          return {
+            index: i,
+            name: im.name,
+            // 对照表里的编号 = 数组下标，方便模型直接说 "#3"
+            file: im.file,
+            rel: toRel(im.file),
+            size: im.width && im.height ? `${im.width}x${im.height}` : undefined,
+            bytes: im.bytes,
+            source: im.source,
+            kind: im.kind,
+            dhash: rec?.dhash ?? null,
+            url: im.url,
+            page: im.pageUrl,
+          }
+        })
+
+        // 清单落盘，便于后续标注与复用
+        const manifest = {
+          generatedAt: new Date().toISOString(),
+          character: lastRefSearch?.character ?? null,
+          queries: lastRefSearch?.queries ?? [],
+          sources: lastRefSearch?.sources ?? [],
+          attempted: collected.attempted,
+          duplicates,
+          images,
+        }
+        try {
+          await fsp.writeFile(path.join(absDir, 'refs.json'), JSON.stringify(manifest, null, 2), 'utf8')
+        } catch (error) { log('refs.json write failed:', error?.message) }
+
+        const tokens = imageTokens(sheet.width, sheet.height)
+        let attachment = null
+        if (args.attach !== false) {
+          attachment = await saveInlineAttachment(sheet.png, `refs-${Date.now()}.png`)
+          if (attachment) lookStats.images += 1
+        }
+
+        return {
+          ok: true,
+          dir: relDir,
+          count: images.length,
+          duplicates_removed: duplicates.length,
+          attempted: collected.attempted,
+          sheet: { width: sheet.width, height: sheet.height, cols: sheet.cols, rows: sheet.rows, cell: sheet.cell },
+          tokens_est: tokens,
+          images,
+          elapsed_ms: Date.now() - t0,
+          hint: '看这张对照表：确认哪些是同一角色、各是什么角度（正面/侧面/背面/设定集），'
+            + '并把判断写成结论。编号就是 images[].index。',
+          ...(attachment ? { attachment } : {}),
+          ...(attachment ? {} : { attachment_error: 'attachment failed' }),
         }
       } catch (error) { return errorResult(error) }
     },
