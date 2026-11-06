@@ -41,8 +41,15 @@ function run(cmd, args, opts = {}) {
 
 async function exists(p) { try { await fsp.access(p); return true } catch { return false } }
 
-/** 下载到文件（带进度回调；支持已存在则跳过）。 */
+/**
+ * 下载到文件，**支持断点续传**。
+ *
+ * 之所以要做续传：1.9GB 的包在真实网络里很容易被打断（实测被上游管道提前关闭过一次），
+ * 每次都从头下不可接受。做法是保留 `.part`，用 HTTP Range 从已有长度接着下；
+ * 服务端不支持 Range（返回 200 而非 206）时退回整体重下。
+ */
 async function download(url, dest, { onLog = () => {}, signal, expectMB } = {}) {
+  const part = `${dest}.part`
   if (await exists(dest)) {
     const st = await fsp.stat(dest)
     if (st.size > 1024) {
@@ -50,26 +57,52 @@ async function download(url, dest, { onLog = () => {}, signal, expectMB } = {}) 
       return { skipped: true, path: dest, bytes: st.size }
     }
   }
-  await fsp.mkdir(path.dirname(dest), { recursive: true })
-  onLog(`[install] 下载 ${url}${expectMB ? ` (~${expectMB}MB)` : ''}`)
-  const res = await fetch(url, { signal, redirect: 'follow' })
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`)
-  const total = Number(res.headers.get('content-length') || 0)
-  const tmp = `${dest}.part`
-  const fh = await fsp.open(tmp, 'w')
-  let got = 0
-  let lastLog = 0
+
+  let offset = 0
+  if (await exists(part)) {
+    offset = (await fsp.stat(part)).size
+    if (offset > 1024) onLog(`[install] 发现未完成文件，从 ${(offset / 1048576).toFixed(1)}MB 续传`)
+    else offset = 0
+  }
+
+  onLog(`[install] 下载 ${url}${expectMB ? ` (~${expectMB}MB)` : ''}${offset ? ` (resume @${(offset / 1048576).toFixed(0)}MB)` : ''}`)
+  const headers = offset > 0 ? { Range: `bytes=${offset}-` } : {}
+  const res = await fetch(url, { signal, redirect: 'follow', headers })
+
+  let append = false
+  if (offset > 0 && res.status === 206) {
+    append = true
+  } else if (offset > 0 && res.status === 200) {
+    onLog('[install] 服务端不支持 Range，从头下载')
+    offset = 0
+  } else if (!res.ok) {
+    throw new Error(`HTTP ${res.status} for ${url}`)
+  }
+  if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status} for ${url}`)
+
+  const total = Number(res.headers.get('content-length') || 0) + (append ? offset : 0)
+  const fh = await fsp.open(part, append ? 'a' : 'w')
+  let got = append ? offset : 0
+  let lastLog = got / 1048576
   try {
     for await (const chunk of res.body) {
       await fh.write(chunk)
       got += chunk.length
       const mb = got / 1048576
-      if (mb - lastLog >= 50) { onLog(`[install]   ${mb.toFixed(0)}MB${total ? ` / ${(total / 1048576).toFixed(0)}MB` : ''}`); lastLog = mb }
+      if (mb - lastLog >= 100) { onLog(`[install]   ${mb.toFixed(0)}MB${total ? ` / ${(total / 1048576).toFixed(0)}MB` : ''}`); lastLog = mb }
     }
   } finally {
     await fh.close()
   }
-  await fsp.rename(tmp, dest)
+
+  // 完整性检查：已知总长时要求误差 <1%，否则保留 .part 供续传
+  if (total > 0) {
+    const need = total - (append ? 0 : 0)
+    if (got < need * 0.99) {
+      throw new Error(`下载不完整：${got}/${total} 字节（保留 .part 可续传）`)
+    }
+  }
+  await fsp.rename(part, dest)
   onLog(`[install] 完成 ${path.basename(dest)} (${(got / 1048576).toFixed(1)}MB)`)
   return { skipped: false, path: dest, bytes: got }
 }
