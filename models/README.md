@@ -1,17 +1,41 @@
-# models · 测试模型仓库
+# 模型工程目录
 
-| 模型 | 说明 | 工作区 | 状态 |
-|---|---|---|---|
-| `deepseek-fish/` | DeepSeek「鲸鱼娘 / 蓝色大肥鱼」YSM 模型：建模、贴图、渲染迭代、游戏内加载验证 | `models/deepseek-fish/` | v0.1 完成 |
-| `deepseek-fish/sakiko-final/` | 「丰川祥子 · 月之森制服」：v0.5.0 视口反馈闭环下生成的成品模型（56 骨 / 196 方块，0 error） | 同上 | v1.0 完成 |
+> 这里是 BAE（Blockbench Agent Engine）的工作区根目录，
+> 所有 `bb_project_open({pack_dir})` 的路径都**相对本目录**。
 
-`sakiko-final/` 同时作为**视口实时反馈**（`bb_look` / `bb_orbit` / 编辑即看）的验收样例，
-构建过程见其 [README](deepseek-fish/sakiko-final/README.md)。
+## 当前状态
 
-约定：
+**没有模型工程。** 之前的测试模型已按要求清理。
 
-- 插件配置 `workspaceRoot=models`、`project=<模型名>`，工作区即模型目录；每个模型一个目录。
-- `pack/` 为 YSM 工作副本；`screenshots/` 放关键渲染与游戏内截图；`model-export/` 放可分发 zip；`BUGS.md` 记录问题。
-- **运行时目录**（`logs/`、`artifacts/`、`checkpoints/`、`.bb/`）会被插件持续写入，
-  可清空但不要删除目录本身。
-- 旧 demo/证据在 `_archive/`；发布包在 `release/`（gitignored）。
+目录内容：
+
+| 路径 | 说明 |
+|---|---|
+| `deepseek-fish/` | BAE 工作区（`bb_session_start` 默认建在这里），目前只有说明文档 |
+| `README.md` | 本文件 |
+
+## 约定
+
+1. **每个模型一个目录**，例如 `deepseek-fish/my-character/`
+2. 用 `bb_session_start({mode:"new_ysm", name:"my-character", resolution:[512,512]})` 创建
+3. `resolution` **必须显式指定**，默认 128 是模板遗留，做人物模型太小
+4. 运行时产物（`.bb/`、`artifacts/`、`checkpoints/`、`exports/`）都在 `.gitignore` 里，不进仓库
+5. 参考语料不在本目录，在 `../material/refmodels/`
+
+## 一个 YSM 工程的结构
+
+```
+my-character/
+├── ysm.json
+├── models/main.json         主模型
+├── models/arm.json          第一人称手臂
+├── textures/default.png     主贴图
+├── animations/main.animation.json
+└── controller/
+```
+
+## 参考
+
+- 完整交接说明：`../HANDOVER.md`
+- 建模方法（AI 技能）：`../packages/dsh-blockbench-agent/skills/blockbench-ysm-artist.md`
+- 语料实测规则：`../packages/dsh-blockbench-agent/reference/ysm-corpus-rules.md`

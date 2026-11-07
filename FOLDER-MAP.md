@@ -61,10 +61,6 @@ _archive/
    ├─ .bb/                         # BAE userdata 历史目录
    ├─ checkpoints/  artifacts/  logs/
    ├─ reference/                   # 参考图（版权原因不随仓库分发）
-   ├─ sakiko-iter1/                # 第一轮迭代（默认模板改造）
-   ├─ sakiko-iter1-export/
-   ├─ sakiko-intermediate-export/
-   └─ sakiko-final-release-extracted/
 ```
 
 **注意**：`models/<name>/logs/`、`artifacts/`、`checkpoints/`、`.bb/` 是**运行时目录**，

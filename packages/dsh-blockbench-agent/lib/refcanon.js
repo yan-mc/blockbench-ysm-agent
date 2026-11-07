@@ -138,7 +138,7 @@ export function extractNameVariants(extract, character) {
   for (const m of text.matchAll(/(?:外文名|英文名|日文名|罗马字)[：:\s]*([^\n]{2,60})/g)) {
     for (const w of m[1].matchAll(/[A-Za-z][A-Za-z'’\-]*(?:\s+[A-Za-z][A-Za-z'’\-]*)*/g)) out.add(w[0].trim())
   }
-  // 2) 括号里的拉丁文（常见于首句：丰川祥子（とがわ さきこ / Togawa Sakiko））
+  // 2) 括号里的拉丁文（常见于首句：角色名（罗马音 / 英文名））
   for (const m of text.matchAll(/[（(]([^()（）]{2,80})[)）]/g)) {
     const inner = m[1]
     if (!/[A-Za-z]{3}/.test(inner)) continue
@@ -154,7 +154,7 @@ export function extractNameVariants(extract, character) {
     .filter((s) => s.length >= 3 && s.length <= 40 && /[A-Za-z]/.test(s))
   // 过滤明显的非名字：只要有一个词是"常见非人名词"以外的实词才算候选。
   // 这样 "Anime Season" / "The Band" / "Staff A" 会被丢掉，
-  // 而 "Togawa Sakiko" / "Eiga Sakiko" 保留。
+  // 而 "GivenName FamilyName" / "Name Surname" 保留。
   const STOP = new Set([
     'the', 'a', 'an', 'this', 'that', 'also', 'and', 'or', 'of', 'in', 'on', 'for',
     'japanese', 'english', 'chinese', 'anime', 'manga', 'novel', 'game', 'film', 'movie',

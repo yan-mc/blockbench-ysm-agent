@@ -257,7 +257,7 @@ powershell -File game-test/ingame.ps1     # 启动、进世界、/ysm model set�
 | 视口 E2E（e2e-look） | 10/10 |
 | 协议回归（e2e.mjs） | 通过 |
 | host 插件回归（host-smoke） | 33 项全通过 |
-| 实机建模 | 通过（`sakiko-final`：56 骨 / 196 方块 / 0 error / 导出 38 文件） |
+| 实机建模 | 通过（曾用示例模型完整验证：56 骨 / 196 方块 / 0 error / 导出 38 文件；该模型已清理） |
 
 ### 8.5 已知边界
 

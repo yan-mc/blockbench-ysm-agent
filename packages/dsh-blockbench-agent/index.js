@@ -761,7 +761,7 @@ export function apply(ctx, config = {}) {
       + '注意 pack_dir 相对的是**插件 workspace**（即 models/<项目名>/），不是仓库根——'
       + '报错会回显解析后的绝对路径，路径不对时按它修正。',
     parameters: {
-      pack_dir: { type: 'string', required: true, description: 'workspace 内相对路径（不是仓库根相对，如 "sakiko"）' },
+      pack_dir: { type: 'string', required: true, description: 'workspace 内相对路径（不是仓库根相对，如 "my-character"）' },
     },
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {

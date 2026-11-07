@@ -207,8 +207,8 @@
   /**
    * 收敛 pack_dir，防止「workspace 被拼了两次」。
    *
-   * 实测事故：调用方传了仓库根相对的 `models/<项目>/sakiko`，它被当成 workspace 相对路径
-   * 再拼一次 workspace，得到 `.../models/<项目>/models/<项目>/sakiko`。
+   * 实测事故：调用方传了仓库根相对的完整路径（`models/<项目>/<模型>`），它被当成 workspace 相对路径
+   * 再拼一次 workspace，得到 `.../models/<项目>/models/<项目>/<模型>`。
    * bb_save_project 于是每次都往这个陈旧双拼路径写一份旧内容 —— 不报错，只污染工作区。
    *
    * 判定依据：路径里 workspace 尾段再次出现，且其后紧跟 `models` 段（重复拼接的signature）。

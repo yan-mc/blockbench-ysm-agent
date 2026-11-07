@@ -52,18 +52,11 @@
 
 同时修掉 4 个实机缺陷：WebSocket 分片不支持（>64KB 响应必断连）、离屏渲染 `resize/applyCamera` 顺序导致首帧空图、`set_uv` 的 box 模式静默丢弃 `uv_size`、`bb_batch` 内图片块丢失。当前版本 **v0.5.0**。
 
-### 示例：AI 独立完成的成品模型
+### 实战验证
 
-`models/deepseek-fish/sakiko-final/` 是 v0.5.0 视口反馈闭环下生成的成品 YSM 模型
-（56 骨骼 / 196 方块，0 校验错误）。全程只靠工具与渲染图自我校验，没有人工建模。
-
-| | |
-|---|---|
-| ![8 视角](models/deepseek-fish/sakiko-final/screenshots/_sheet_8views.png) | ![特写](models/deepseek-fish/sakiko-final/screenshots/closeup.png) |
-
-构建记录见 [模型 README](models/deepseek-fish/sakiko-final/README.md)；可分发包在
-[`sakiko-final-release.zip`](models/deepseek-fish/sakiko-final-release.zip)。
-
+在 v0.5.0 视口反馈闭环下做过完整实战验证：从搜参考图、写规格、建模、贴图、
+渲染自检到导出，全程只靠工具与渲染图自我校验，没有人工建模。
+（测试模型已清理，工作区现为空，见 `models/README.md`。）
 
 - 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
 - 完整使用手册：[MANUAL.md](MANUAL.md)

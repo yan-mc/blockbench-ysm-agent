@@ -1,28 +1,26 @@
-﻿model: v12 -- hair colour fixed, hair staggered and thinned; horns and arms still hidden
+﻿docs: handover dossier, workspace cleared, test model removed
 
-Six fixes requested; four landed, two did not.
+Everything now lives under F:\Deepseek_harness\blockbench and is described in one place.
 
-Hair colour was the real complaint and it is fixed. The old build gave every long board its
-own gradient UV, so each segment ran light-to-dark independently and the hair shimmered in
-stripes. Now every cube has exactly one flat colour chosen by its vertical position in the
-strand, so the gradient runs once across the whole head of hair. Palette sampled from the
-official collab artwork (ref_015) rather than guessed: root #7a8ab0, upper #8697be, middle
-#9ea7d4, lower #9aa4d6, tips #a8b0dc, plus #cfd6f2 highlight and #6f7ea6 inner shadow,
-seven steps painted as flat blocks in both 1024 textures with all hair UVs pointing at them.
+HANDOVER.md is the new entry point for whoever takes over: what the project is, the full
+directory map with every path, how to install and reload the plugin (including the difference
+between host code and bridge code and why dist must be synced after killing Electron), the
+43 tools grouped by purpose, how to decode and open the reference corpus, the corpus medians,
+the three measurement traps, the document index, the skill structure, known limitations, the
+development rules that came out of actual failures, a recommended first-day workflow and an
+acceptance checklist.
 
-Back hair went from three equal-length chains to four groups of length 15.0 / 19.0 / 17.0 /
-13.5 with 12 / 10 / 11 / 12 segments, offset 0.1-3.4 in x and 0.05-0.25 in z, so the back
-now shows staggered strand ends instead of a wall. Side hair halved from 58 and 55 cubes to
-3 strands of 10 segments each per side, lengths 20.5 / 18.5 / 22.0, uniform 0.58-0.66
-thickness, pulled back 0.85 off the cheek. Neck strip shortened from 3.0 to 1.1 and switched
-to skin tone. Total 587 to 466 cubes.
+Demo model removed. models/deepseek-fish is now empty apart from documentation: the model
+pack, references, specs, deliverables, exports, checkpoints, screenshots, build scripts and
+the 411MB .bb runtime cache are all gone, as are the temporary parser input and the eye
+sample scratch directory. models/README.md explains that this is the BAE workspace, how
+pack_dir resolves against it, and how to start a new model.
 
-Failed: the horns were rebuilt as nine segments tapering 2.5 to 1.0 along a 260-degree curl
-but the hair mass completely buries them, so only two nubs show above the crown. The arms
-moved from +/-3.23 to +/-3.5 while the torso narrowed 0.86, yet the side hair still covers
-the upper arm in front view.
+Stale references cleaned from code and top-level docs: the bb_project_open parameter example
+now says my-character instead of a deleted project, the pack_dir comment in the bridge keeps
+the double-join lesson without naming a model, the name-variant filter comment uses generic
+placeholders, and README / FOLDER-MAP / ENGINEERING no longer point at removed screenshots,
+archives or model directories. docs/ deliberately keeps the measurement case studies, since
+those numbers are the evidence behind the rules in the skill.
 
-Comparing against the official artwork afterwards found the remaining drift: the reference
-hair is far more voluminous and fluffy than ours, the horns are large dark-blue curled horns
-occupying about half the head height, the eyes are larger and brighter, the chest bow and
-brooch are bigger, and the skirt has more lace layering plus a long train.
+62 tests pass, host-smoke PASSED, contract regenerated, dist synced.
