@@ -7,7 +7,7 @@
     "parameters 是 wire 级 JSON Schema；dsh 侧可用 defineTool 的 DSL 或原始 JSON Schema。",
     "description 为模型可见文本，修改会改变 KV 前缀，需版本化。",
     "returns 使用 $defs 中的命名 schema；attachments=true 表示结果含多模态图片块。",
-    "expected_revision 可省略；DBA 自动填入最近已知 revision。"
+    "expected_revision 不是模型参数：DBA 在 callTool 内自动注入最近已知 revision 并做前置校验。"
   ],
   "$defs": {
     "Color": {
@@ -740,13 +740,6 @@
             "type": "string",
             "description": "workspace 内相对路径（mode=open_pack 必填）"
           },
-          "gender": {
-            "enum": [
-              "male",
-              "female"
-            ],
-            "default": "male"
-          },
           "resolution": {
             "type": "array",
             "items": {
@@ -772,13 +765,6 @@
             "minimum": 0.1,
             "maximum": 2,
             "default": 0.7
-          },
-          "template": {
-            "enum": [
-              "default",
-              "minimal"
-            ],
-            "default": "default"
           },
           "overwrite": {
             "type": "boolean",
@@ -872,9 +858,6 @@
             "type": "string",
             "description": "scope=bone/cube 时必填"
           },
-          "cursor": {
-            "type": "string"
-          },
           "limit": {
             "type": "integer",
             "minimum": 1,
@@ -912,10 +895,6 @@
           "include_uv": {
             "type": "boolean",
             "default": false
-          },
-          "include_siblings": {
-            "type": "boolean",
-            "default": false
           }
         },
         "additionalProperties": false,
@@ -945,15 +924,6 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "期望的 revision；省略时由 DBA 自动填入最近已知值"
-          },
-          "atomic": {
-            "type": "boolean",
-            "default": true
-          },
           "note": {
             "type": "string",
             "maxLength": 200
@@ -1042,11 +1012,6 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "期望的 revision；省略时由 DBA 自动填入最近已知值"
-          },
           "texture": {
             "type": "string",
             "description": "纹理名或 id；省略时为当前激活纹理"
@@ -1244,11 +1209,6 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "期望的 revision；省略时由 DBA 自动填入最近已知值"
-          },
           "note": {
             "type": "string",
             "maxLength": 200
@@ -1309,11 +1269,6 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "期望的 revision；省略时由 DBA 自动填入最近已知值"
-          },
           "views": {
             "type": "array",
             "maxItems": 8,
@@ -1356,13 +1311,6 @@
             "type": "boolean",
             "default": true
           },
-          "background": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null
-          },
           "antialias": {
             "enum": [
               "off",
@@ -1389,28 +1337,24 @@
             },
             "additionalProperties": false
           },
-          "shading": {
-            "type": "boolean",
-            "default": true
+          "isolate": {
+            "type": "string",
+            "description": "只渲染指定部件（骨骼名，多个用英文逗号分隔）；其余隐藏并自动对焦"
           },
-          "show_gizmos": {
-            "type": "boolean",
-            "default": false
-          },
-          "pose": {
-            "enum": [
-              "rest",
-              "current"
-            ],
-            "default": "rest"
-          },
-          "inline": {
-            "type": "boolean",
-            "default": false
+          "zoom": {
+            "type": "number",
+            "description": "配合 isolate 的额外放大倍数，默认 1"
           },
           "attach_images": {
             "type": "boolean",
             "default": true
+          },
+          "attach_size": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 1024,
+            "default": 512,
+            "description": "附件缩略图边长"
           }
         },
         "additionalProperties": false
@@ -1476,6 +1420,14 @@
           "focus": {
             "type": "string",
             "description": "聚焦元素名（骨骼/方块）"
+          },
+          "isolate": {
+            "type": "string",
+            "description": "只渲染指定部件（骨骼名，多个用英文逗号分隔）"
+          },
+          "zoom": {
+            "type": "number",
+            "description": "配合 isolate 的额外放大倍数，默认 1"
           },
           "cell": {
             "type": "integer",
@@ -1737,9 +1689,9 @@
             "minItems": 4,
             "maxItems": 4
           },
-          "grid": {
+          "attach_image": {
             "type": "boolean",
-            "default": false
+            "description": "是否作为图片附件返回（默认 true）"
           }
         },
         "additionalProperties": false
@@ -2028,7 +1980,7 @@
     {
       "name": "bb_seg_probe",
       "title_zh": "分层能力探测",
-      "description": "探测本机能否跑 See-through 分层并给出能力分级与安装计划。T0 零依赖 / T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（24 层 + 遮挡补全）。检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否可达、是否旧架构。只探测不安装；环境不支持会明确说明，不会假装可用。",
+      "description": "探测本机能否跑 See-through 分层并给出能力分级与安装计划。T0 零依赖 / T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（实测 23–29 个语义层，以 layers.json 为准）。检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否可达、是否旧架构。只探测不安装；环境不支持会明确说明，不会假装可用。",
       "mutating": false,
       "requires_project": false,
       "concurrency_safe": true,
@@ -2123,7 +2075,7 @@
     {
       "name": "bb_seg_install",
       "title_zh": "安装分层能力（T2）",
-      "description": "安装 See-through：下载 ComfyUI 便携版 + See-through 节点 + pip 依赖。默认只返回计划与当前状态；confirm:true 才真下载（约 1.8GB+2GB）。每步幂等可续，已存在产物跳过。权重不在这里下（节点首次跑分层时自动拉）。",
+      "description": "安装 See-through：下载 ComfyUI 便携版 + See-through 节点 + pip 依赖。默认只返回计划与当前状态；confirm:true 才真下载（ComfyUI 便携版约 4.6GB + pip 依赖约 1.9GB，合计约 6.5GB）。每步幂等可续，已存在产物跳过。权重不在这里下（节点首次跑分层时自动拉）。",
       "mutating": false,
       "requires_project": false,
       "concurrency_safe": false,
@@ -2151,7 +2103,7 @@
     {
       "name": "bb_seg_run",
       "title_zh": "完整分层（See-through）",
-      "description": "把立绘送进 ComfyUI 的 See-through 管线，输出 24 层（body 13 + head 11）+ 深度序 + 遮挡补全 + 分层 PSD。前置：ComfyUI 运行中且装了 See-through 节点。首次运行下载约 3GB 权重，可能十几分钟。",
+      "description": "把立绘送进 ComfyUI 的 See-through 管线，输出 23–29 个语义层（GenerateLayers 24 → PostProcess 按 depth 拆分/聚类；实测官方立绘 29 层、头部特写 23 层，以 layers.json 为准）+ 深度序 + 遮挡补全。前置：ComfyUI 运行中且装了 See-through 节点。首次运行下载约 12.5GB 权重（HuggingFace），可能十几分钟；不自动产 PSD（需前端/ag-psd）。",
       "mutating": false,
       "requires_project": false,
       "concurrency_safe": false,
@@ -2233,29 +2185,9 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "profile": {
-            "enum": [
-              "ysm",
-              "generic"
-            ],
-            "default": "ysm"
-          },
           "strict": {
             "type": "boolean",
             "default": true
-          },
-          "include": {
-            "type": "array",
-            "items": {
-              "enum": [
-                "bones",
-                "hierarchy",
-                "texture",
-                "uv",
-                "ysm_json",
-                "animation"
-              ]
-            }
           }
         },
         "additionalProperties": false
@@ -2345,12 +2277,7 @@
       ],
       "parameters": {
         "type": "object",
-        "properties": {
-          "checkpoint": {
-            "type": "boolean",
-            "default": false
-          }
-        },
+        "properties": {},
         "additionalProperties": false
       }
     },
@@ -2380,10 +2307,6 @@
           "out_dir": {
             "type": "string",
             "description": "workspace 相对路径；默认 exports/<ts>/"
-          },
-          "include_preview": {
-            "type": "boolean",
-            "default": true
           },
           "validate": {
             "type": "boolean",
@@ -2438,10 +2361,6 @@
               ]
             }
           },
-          "atomic": {
-            "type": "boolean",
-            "default": true
-          },
           "stop_on_error": {
             "type": "boolean",
             "default": true
@@ -2475,10 +2394,6 @@
               "edit"
             ],
             "default": "inspect"
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 300
           }
         },
         "additionalProperties": false
@@ -2499,12 +2414,7 @@
       ],
       "parameters": {
         "type": "object",
-        "properties": {
-          "resync": {
-            "type": "boolean",
-            "default": true
-          }
-        },
+        "properties": {},
         "additionalProperties": false
       }
     },

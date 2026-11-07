@@ -1,7 +1,7 @@
 # 交接班档案 · YSM × Blockbench 无头建模 Agent
 
 > 最后更新：2026-11-07
-> 插件版本：**0.9.1**（43 个工具定义 / 实际暴露 41 个、5 个命令、1 个 Skill、56 个 bridge 方法）
+> 插件版本：**0.9.2**（43 个工具定义 / 实际暴露 41 个、5 个命令、1 个 Skill、56 个 bridge 方法）
 > 本文件是接手这个项目的**第一份必读材料**。设计细节见 `docs/`，使用方法见 `MANUAL.md`，工程实测见 `ENGINEERING.md`。
 
 ---
@@ -24,7 +24,7 @@ F:\Deepseek_harness\blockbench\
 │
 ├── HANDOVER.md              ★ 本文件（交接班档案）
 ├── README.md                  项目介绍与功能列表（含历史设计基线）
-├── MANUAL.md                  使用手册（v0.9.1）
+├── MANUAL.md                  使用手册（v0.9.2）
 ├── SETUP.md                   从零搭建
 ├── ENGINEERING.md             工程状态/实测数据/已知限制
 ├── FOLDER-MAP.md              目录地图与维护约定
@@ -46,7 +46,6 @@ F:\Deepseek_harness\blockbench\
 │   │   └── test/                 6 个单测文件（62 项）+ host-smoke（35 步）
 │   ├── bb-agent-runtime/         BAE 运行时（Electron 主进程 + preload + bridge + scripts）
 │   │   └── agent/bb-agent-bridge.js   ★ 所有 bridge 方法都在这里
-│   └── bb-protocol/              协议常量/共享类型（骨架）
 │
 ├── dist/                      构建产物（bb-agent-app；2026-11-07 重新 assemble，190 文件/36MB）
 ├── vendor/                    第三方（Blockbench 5.2.2、YSM-Utils-Plugins 2.6.0，约 1.54GB）
@@ -67,7 +66,7 @@ F:\Deepseek_harness\blockbench\
 ├── models/                    BAE 工作区根（workspaceRoot），当前验收模型 togawa-sakiko（见 §十）
 ├── research/                  研究证据（Blockbench 核心、YSM 格式、DSH 集成）
 ├── media/                     演示素材
-├── release/                   发布物落点（当前为空；0.9.1 发布包待重打）
+├── release/                   发布物落点（当前为空；0.9.2 发布包待重打）
 └── 根文件                     .gitignore / .gitattributes / LICENSE / package.json / README 等
 ```
 
@@ -238,7 +237,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | **建模知识** | 10 教程精要 / 11 参考图管线 / 12 建模规格 |
 | **分层与委派** | 13 能力探测 / 14 T1 SAM2 / 15 T2 安装 / 16 T2 完整分层 / 17 委派规范 / 18 官方基准与深度搜索 |
 | **★ 现代语料** | **20** 169 模型大规模拆解 / **21** 现代化建模总纲 / **21a** 衣服与裙子 / **21b** 身体曲线 / **21c** 头发与面部 |
-| **测试证据** | `docs/test-evidence/`（0.9.1 复核证据，`README.md` 说明） |
+| **测试证据** | `docs/test-evidence/`（0.9.1/0.9.2 复核证据，`README.md` 说明） |
 
 ### 归档（`docs/archive/`，不随现状维护）
 
@@ -290,7 +289,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | `dist/` 与源码同步 | **手工** | 改 bridge 后必须同步到 dist / 用 assemble 重建，见 §3.3 |
 | `locale/*.json` | 加载未验证 | 插件 package.json 已导出 locale 文件，但 dsh 侧实际加载路径/时机未做端到端验证 |
 | `spec/` 契约漂移 | 已知 | 手工维护契约源，与 `index.js` 存在 17 个工具参数漂移；以 `index.js` 实际 schema 为准 |
-| 发布包 | 待重打 | 0.4.0 为历史发布；0.9.1 发布包待 `package-release.mjs` 重新生成 |
+| 发布包 | 待重打 | 0.4.0 为历史发布；0.9.2 发布包待 `package-release.mjs` 重新生成 |
 
 ---
 
@@ -326,9 +325,9 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 明日方舟 × BanG Dream! Ave Mujica 联动干员 **丰川祥子**（官方罗马音 **Togawa Sakiko**），指定皮肤 **「旋律的主人 / Master of Melodia」**（卡普里尼双大角、黑银冷色演出服）。
 
-| 项 | 实测（T2 修理后） |
+| 项 | 实测（T2 + v2 优化后） |
 |---|---|
-| 骨架 / 方块 | 70 bones / **355 cubes**（首轮 217 → +138） |
+| 骨架 / 方块 | 70 bones / **401 cubes**（首轮 217 → T2 修理 355 → v2 优化 401） |
 | 贴图 | 2 × 512²（default / blue，未改） |
 | 动画 | 303（未触碰） |
 | 校验 | `bb_validate` ok=true、**0 error**；3 warning（512 贴图 ×2、可选 ViewLocator 缺省） |
@@ -339,7 +338,9 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 **T2（See-through 29 层）逐细节修理（2026-11-07）**：T2 已完整安装（ComfyUI 0.44.0 + 权重 12.5GB，`~/.dsh-seethrough`，保持运行）；官方立绘 → 29 语义层 + crop_head 23 层。按层对照后 P1–P5 全部落地：双角重建为 **7.00×7.76 单位/只**（6 棱环+金尖/金根环，42 块）、双马尾 3 层错位垂到 y=17.2、白衬裙整圈 + 21 片落地拖尾、靴筒/鞋跟/2 扣带、胸衣面板改形。详见 [`models/togawa-sakiko/T2-REPAIR.md`](models/togawa-sakiko/T2-REPAIR.md) 与 [`T2-INSTALL-REPORT.md`](models/togawa-sakiko/T2-INSTALL-REPORT.md)。
 
-已知降级（T2 修理后仍存在）：头发仍"薄板/栅栏"感（最大剩余项）、背面拖尾片间有缝、裙蕾丝密度仅 2 层、腿无小腿肚/手臂无肘收放、头身比 6.21 偏 Q、无官方背面参考、`arm.json` 与 `blue.png` 仍是模板。
+已知降级（T2 + v2 优化后仍存在）：头发仍"薄板/栅栏"感、背面发束偏直（最大剩余项）；角已连续但尖端偏钝、金环偏小；背面拖尾片间有缝、裙蕾丝仅 2 层；腿无小腿肚/手臂无肘收放；头身比约 6.5 偏 Q；无官方背面参考；`arm.json` 与 `blue.png` 仍是模板。
+
+**v2 美术优化（2026-11-07 晚）**：双角改为**正面连续扁平螺旋带**（每侧 25 块：20 段带片 + 3 肋 + 金尖/根环，只绕 Z 旋转，椭圆螺旋 C=(4.30,40.35)、rx 2.20→0.90 / ry 4.20→1.55、扫角 −330°、带面 1.90→0.75、z 厚 1.40→0.70）；背面长发每侧 4 组窄束垂到 y=15.3；眼睛改菱形（每眼 10 块：斜置菱形虹膜/瞳孔/高光/眼睑）；角根左右分离 ±2.1。详见 [`MODEL-V2-REFINE.md`](models/togawa-sakiko/MODEL-V2-REFINE.md)。
 
 历史测试模型（deepseek-fish、sakiko-melodia）已按要求清理（sakiko-melodia 在提交 `8f3a09f` 删除；deepseek-fish 目录于 2026-11-07 删除，BUGS 记录存 `docs/archive/BUGS-deepseek-fish-testmodel.md`）。
 

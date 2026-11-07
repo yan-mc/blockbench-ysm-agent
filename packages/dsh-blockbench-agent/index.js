@@ -184,7 +184,7 @@ export function apply(ctx, config = {}) {
         return {
           protocol: 'bb-agent/1',
           transport: 'ws',
-          server: { name: 'bb-agent-runtime', version: '0.9.1', blockbench: '5.2.2' },
+          server: { name: 'bb-agent-runtime', version: '0.9.2', blockbench: '5.2.2' },
           capabilities: {
             render: { offscreen: true, transparent: true, max_size: 4096, antialias: ['off', 'msaa'] },
             texture: { layers: true, max_size: 8192 },
@@ -762,6 +762,7 @@ export function apply(ctx, config = {}) {
       + '报错会回显解析后的绝对路径，路径不对时按它修正。',
     parameters: {
       pack_dir: { type: 'string', required: true, description: 'workspace 内相对路径（不是仓库根相对，如 "my-character"）' },
+      save_current: { type: 'boolean', description: '打开前先保存当前项目（默认 true）' },
     },
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) {
@@ -838,6 +839,7 @@ export function apply(ctx, config = {}) {
       width: { type: 'number', description: '默认 128' },
       height: { type: 'number', description: '默认 128' },
       fill: { type: 'string', description: '#RRGGBB 或 #RRGGBBAA' },
+      make_active: { type: 'boolean', description: '创建后设为当前激活纹理（默认 true）' },
     },
     output: { schema: { type: 'object', additionalProperties: true }, render: (_a, v) => renderWithAutoLook(v) },
     async execute(args, exec) { try { return await callTool('bb_texture_create', 'texture.create', args, { timeoutMs: 30000, signal: exec?.signal }) } catch (error) { return errorResult(error) } },
@@ -849,6 +851,7 @@ export function apply(ctx, config = {}) {
     parameters: {
       texture: { type: 'string', description: '纹理名或 id；省略为当前激活纹理' },
       clip: { type: 'boolean', description: '越界像素裁剪（默认 true）' },
+      return_palette: { type: 'boolean', description: '返回操作后的调色板 Top 8（默认 true）' },
       note: { type: 'string' },
       ops: { type: 'array', description: '绘制 ops 数组，见 docs/03 §3.8', required: true },
     },
@@ -1670,7 +1673,7 @@ let lastRefCanon = null
   tool({
     name: 'bb_seg_probe',
     description: '探测本机能否跑 See-through 分层（可选增强），给出能力分级与安装计划。'
-      + '分级：T0 零依赖（模型直接看立绘）/ T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（24 层 + 遮挡补全）。'
+      + '分级：T0 零依赖（模型直接看立绘）/ T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（实测 23–29 个语义层；以返回的 layers.json 为准，含深度序与遮挡补全）。'
       + '检查项：NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否已装可达、是否旧架构（Pascal 不支持 NF4）。'
       + '只探测不安装；返回 plan 步骤与体积估算。非 N 卡会明确说不支持，不会假装可用。',
     parameters: {
@@ -1817,7 +1820,7 @@ let lastRefCanon = null
   tool({
     name: 'bb_seg_install',
     description: '安装 T2（See-through 分层能力）：内置下载 ComfyUI 便携版 + See-through 节点 + pip 依赖。'
-      + '默认只返回计划与当前安装状态（confirm:false）；confirm:true 才真下载（约 1.8GB + 2GB，可能十几分钟）。'
+      + '默认只返回计划与当前安装状态（confirm:false）；confirm:true 才真下载（ComfyUI 便携版约 4.6GB + pip 依赖约 1.9GB，合计约 6.5GB，可能十几分钟）。'
       + '每步幂等可续：已存在的产物会跳过。**权重不在这里下**——由节点首次跑分层时自动从 HuggingFace 拉。'
       + '装完会返回启动命令与 comfyUrl，需要把 comfyUrl 写进插件配置再用。',
     parameters: {
@@ -1868,7 +1871,7 @@ let lastRefCanon = null
           paths: r.paths ?? null,
           error: r.error ?? null,
           hint: r.ok
-            ? '用 paths.startCommand 启动 ComfyUI（保持运行），然后把 comfyUrl 写进插件配置；首次跑分层会自动下载约 3GB 权重'
+            ? '用 paths.startCommand 启动 ComfyUI（保持运行），然后把 comfyUrl 写进插件配置；首次跑分层会自动下载约 12.5GB 权重（ComfyUI 节点从 HuggingFace 拉）'
             : '看 steps 里哪一步失败；已完成的步骤会保留，修好后可重跑（幂等）',
         })
       } catch (error) { return errorResult(error) }
@@ -1877,11 +1880,12 @@ let lastRefCanon = null
 
   tool({
     name: 'bb_seg_run',
-    description: 'T2 完整分层：把立绘送进 ComfyUI 的 See-through 管线，输出 **24 层**'
-      + '（body 13 + head 11）+ 深度序 + 遮挡补全 + 分层 PSD。'
+    description: 'T2 完整分层：把立绘送进 ComfyUI 的 See-through 管线，输出 **23–29 个语义层**'
+      + '（GenerateLayers 24 → PostProcess 按 depth 拆分/聚类；实测官方立绘 29 层、头部特写 23 层，层名以返回的 layers.json 为准）+ 深度序 + 遮挡补全。'
       + '前置：ComfyUI 必须在运行且装了 See-through 节点（用 bb_seg_probe / bb_seg_install）。'
-      + '**首次运行会下载约 3GB 权重，可能等十几分钟**；之后每次约 1-3 分钟。'
-      + '返回预览图附件 + 产物路径（PSD/各层 PNG 在 ComfyUI 的 output 目录）。',
+      + '**首次运行会下载约 12.5GB 权重（ComfyUI 节点从 HuggingFace 拉），可能等十几分钟**；之后每次约 1-3 分钟。'
+      + '返回预览图附件 + 产物路径（各层 PNG + layers.json 在 ComfyUI 的 output 目录）。'
+      + '**不自动产 PSD**：服务端节点只写层 PNG/layers.json（日志提示 "Download PSD"），PSD 需前端/ag-psd 生成。',
     parameters: {
       file: { type: 'string', required: true, description: 'workspace 内相对路径的图片' },
       resolution: { type: 'number', description: `推理分辨率，默认 ${DEFAULT_RESOLUTION}（12GB 显存推荐；>=16GB 可 1024）` },
@@ -2375,7 +2379,7 @@ let lastRefCanon = null
         } catch { /* runtime busy */ }
         const payload = {
           ok: true,
-          version: '0.9.1',
+          version: '0.9.2',
           connected: !!state.connected,
           state: remote?.state ?? (state.connected ? 'idle' : 'offline'),
           revision: remote?.revision ?? state.revision,

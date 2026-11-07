@@ -3,9 +3,9 @@
 > 设计基线（历史设计意图）：见 [系统开发与设计方案.md](系统开发与设计方案.md) 与 `docs/01-06`。
 > 本文件只记录**实现状态、实测数据、已知边界与下一步**；交接第一手信息见 [HANDOVER.md](HANDOVER.md)。
 >
-> 当前版本：**0.9.1**（2026-11-07 复核）。
+> 当前版本：**0.9.2**（2026-11-07 复核）。
 
-## 0. 2026-11-07 复核（0.9.1）
+## 0. 2026-11-07 复核（0.9.2）
 
 | 项 | 结果 |
 |---|---|
@@ -13,7 +13,7 @@
 | host-smoke | **35 步全过**；schema lint 检查 **41 个暴露工具**（本地实跑 2026-11-07 18:40；产物 `workspace/_hosttest/` 已清理，复跑命令见 §4） |
 | 契约重生成 | `python spec/generate_spec.py` 重跑后与提交内容 **0 diff**（契约是**手工维护**的源，不是从 `index.js` 生成；与 `index.js` 存在 17 个工具参数漂移，以 `index.js` 实际 schema 为准） |
 | dist 组装 | `dist/bb-agent-app` 于 2026-11-07 由 `assemble.mjs` 从 vendor Blockbench 5.2.2 + 当前源码重新组装：**190 文件 / 36MB**，`templates/` 32 文件；`agent/` 4 个文件（main.js、preload.cjs、bb-agent-bridge.js、selftest.js）sha256 与源码一致 |
-| 版本 | 根 `package.json`、`packages/dsh-blockbench-agent/package.json`、`packages/bb-agent-runtime/package.json` 均为 **0.9.1**；bridge 握手与 `/bb-agent/status` 版本号均为 0.9.1 |
+| 版本 | 根 `package.json`、`packages/dsh-blockbench-agent/package.json`、`packages/bb-agent-runtime/package.json` 均为 **0.9.2**；bridge 握手与 `/bb-agent/status` 版本号均为 0.9.2 |
 | 工具规模 | `index.js` 定义 **43 个 `bb_*`**，因 `exposeGuiTools:false` 实际暴露 **41 个**（`bb_show_gui`/`bb_hide_gui` 由 `/show` `/hide` 命令替代）；5 个命令、1 个 Skill |
 | 协议 | `spec/bridge-methods.json` = **56 方法 / 7 事件 / 22 错误码** |
 | 参考语料 | `material/` 约 **329.1MB**；`ysm_decoded` **169 目录 / 1156 文件 / 233MB**；`ysm` 9 包；`maid` 874 文件 / 446 条（325 角色）；`bbmodel` 62 对 |
@@ -21,7 +21,7 @@
 
 ## 1. 当前结论
 
-**DSH 端已完整可用（v0.9.1）：插件以 link 方式安装并激活；43 个工具定义 / 41 个实际暴露、5 个命令、1 个 Skill；56 个 bridge 方法；渲染自检（isolate+zoom、多格拼图、转台、动画采样）、参考图管线、建模规格、T0/T1/T2 分层、YSM 创建/保存/导出、检查点/回滚、Client UI 状态 pill 全部就位；62/62 单测与 35 步 host-smoke 通过。**
+**DSH 端已完整可用（v0.9.2）：插件以 link 方式安装并激活；43 个工具定义 / 41 个实际暴露、5 个命令、1 个 Skill；56 个 bridge 方法；渲染自检（isolate+zoom、多格拼图、转台、动画采样）、参考图管线、建模规格、T0/T1/T2 分层、YSM 创建/保存/导出、检查点/回滚、Client UI 状态 pill 全部就位；62/62 单测与 35 步 host-smoke 通过。**
 
 - **M0 通过（Go，历史闸门）**：隐藏窗口离屏 WebGL 渲染稳定；GPU（RTX 4080 / ANGLE D3D11）与 SwiftShader 两条路径都通过；show/hide 往返后仍可渲染。报告已归档：[docs/archive/M0-report.md](docs/archive/M0-report.md)、[docs/archive/M0-report-safe.md](docs/archive/M0-report-safe.md)。
 - **BAE 可用**：`dist/bb-agent-app` 由上游 Blockbench 5.2.2 构建产物 + agent 四件套 + YSM 默认模板组装而成（2026-11-07 重新 assemble；见 §0）。
@@ -133,7 +133,7 @@
 | Client UI 状态 pill（composer dock，Host `/bb-agent/status`） | ✅（需刷新页面加载 client） |
 | Skill 注册（模型可发现、可加载） | ✅ |
 | 回归测试：单测 62 + host-smoke 35 步 + e2e + 动画语义 diff | ✅ |
-| 发布包 | ❌ 0.4.0 为历史发布；0.9.1 发布包待重打 |
+| 发布包 | ❌ 0.4.0 为历史发布；0.9.2 发布包待重打 |
 
 ## 4. 快速验证
 
@@ -174,7 +174,7 @@ python spec/generate_spec.py                                   # 契约重生成
 8. **PBR 只在支持 Iris/光影时可见**：工具会生成/保存 `_n`/`_s` 贴图，但 Blockbench 离屏渲染不展示 PBR 效果。
 9. **Client UI 验证**：状态 pill 已随 bundle 提供，Host `/bb-agent/status` 已用 HTTP 验证；当前页面需刷新后由 boot graph 加载 client half，未做浏览器自动化截图确认视觉细节。
 10. **`locale/*.json` 加载未验证**：插件 package.json 已导出 locale 文件，但 dsh 侧实际加载路径/时机未做端到端验证。
-11. **发布/分发**：0.9.1 发布包待重打；未做 electron-builder 安装器与代码签名（zip 便携分发为当前正式方式）。
+11. **发布/分发**：0.9.2 发布包待重打；未做 electron-builder 安装器与代码签名（zip 便携分发为当前正式方式）。
 12. **游戏内验证范围有限**：历史验证只覆盖单模型装载/渲染；未做多人同步、服务端校验、动画全量、长时间游玩。`game-test/` 环境已删除。
 13. **契约漂移**：`spec/` 为手工维护契约源，与 `index.js` 实际 schema 存在 17 个工具参数漂移；以 `index.js` 为准（host-smoke 校验的是真实 schema）。
 

@@ -1,6 +1,6 @@
 {
   "name": "blockbench-agent-workspace",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "description": "YSM x Blockbench headless agent plugin workspace (design docs + BAE runtime + dsh host plugin)",
   "engines": {
@@ -19,5 +19,3 @@
     "spec": "python spec/generate_spec.py"
   }
 }
-
-

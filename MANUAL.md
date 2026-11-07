@@ -400,7 +400,7 @@ bb_look({ isolate: "AllHead", zoom: 2.5,
 | `bb_seg_probe` | 探测本机分层能力（GPU/显存/磁盘/ComfyUI），给出 T0/T1/T2 分级与安装计划；不安装 |
 | `bb_seg_lite` | **T1**：SAM2.1（CPU 可跑）把立绘自动切成若干部件；首次自动下载 SAM2 约 **59MB** 到 `~/.dsh-blockbench-agent/sam2` |
 | `bb_seg_install` | **T2**：下载 ComfyUI 便携版 + See-through 节点 + pip 依赖（安装约 **7GB** 到 `~/.dsh-seethrough`） |
-| `bb_seg_run` | **T2**：跑 See-through 完整分层（原始 **24 层** = body 13 + head 11，插件按语义合并输出 **22 层**，见 docs/16），含遮挡补全 |
+| `bb_seg_run` | **T2**：跑 See-through 完整分层（实测 **23–29 个语义层**，以返回的 layers.json 为准，见 docs/16），含深度序与遮挡补全；不自动产 PSD |
 
 > T0 永远可用（模型直接看立绘），**核心建模不依赖 T1/T2**。T2 首次跑还会自动拉权重（约 12.5GB）。
 
@@ -650,7 +650,6 @@ node packages/bb-agent-runtime/scripts/package-release.mjs
 ```text
 packages/bb-agent-runtime/    # BAE 组装、bridge、测试脚本
 packages/dsh-blockbench-agent/# Host 插件 + Client pill + Skill + reference
-packages/bb-protocol/         # 协议常量/共享类型（骨架）
 models/                       # BAE 工作区根（workspaceRoot）；当前无测试模型，新验收项目 togawa-sakiko
 docs/                         # 设计/工程文档 + test-evidence + archive + 封面
 spec/                         # 工具/协议机器可读契约

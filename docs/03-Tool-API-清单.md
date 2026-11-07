@@ -4,9 +4,9 @@
 > 底层经 `02-通信协议规范.md` 的 JSON-RPC 转发给 BABP；模型**永远不直接读写** bbmodel/bedrock JSON。
 > 完整 JSON Schema 见 `spec/tool-manifest.json`；本文件是设计说明与行为契约。
 >
-> **当前规模（0.9.1）：43 个 `bb_*` 定义 / 实际暴露 41 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）。
+> **当前规模（0.9.2）：43 个 `bb_*` 定义 / 实际暴露 41 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）。
 > **权威清单：`spec/tool-manifest.json`（43 工具）与 `packages/dsh-blockbench-agent/index.js`（实际 schema）。**
-> 注意：`spec/` 为手工维护契约源，与 `index.js` 存在 17 个工具参数漂移；行为/参数以 `index.js` 为准。
+> 注意：0.9.2 起 `spec/` 已与 `index.js` 实际 schema 对齐（`spec/generate_spec.py` 为唯一契约源，两边参数一致）。
 > 本文 §2.3 是 0.1 时期设计稿的 21 个工具；0.5–0.9 新增 22 个见 §2.4。
 
 ---
@@ -96,7 +96,7 @@
 | 分层 | `bb_seg_probe` | 探测 T0/T1/T2 能力分级与安装计划（不安装） |
 | 分层 | `bb_seg_lite` | T1：SAM2.1 立绘轻量分割（首次下载约 59MB） |
 | 分层 | `bb_seg_install` | T2：安装 ComfyUI + See-through（约 7GB） |
-| 分层 | `bb_seg_run` | T2：完整分层（原始 24 层 → 22 层语义输出） |
+| 分层 | `bb_seg_run` | T2：完整分层（实测 23–29 个语义层，以 layers.json 为准） |
 | 会话 | `bb_revisions` | 列出检查点与当前 revision |
 | 会话 | `bb_project_close` | 关闭当前项目（可 force） |
 | 动画 | `bb_animation_create` | 创建动画 |
@@ -120,11 +120,9 @@
 | `mode` | `"new_ysm" \| "open_pack"` | ✓ | — | 新建默认骨架 / 打开已有 YSM 包 |
 | `name` | string | 新建必填 | — | 项目名（同时用作 pack 目录名，`^[A-Za-z0-9_-]{1,64}$`） |
 | `pack_dir` | string | 打开必填 | — | workspace 内相对路径，如 `packs/steve_armor` |
-| `gender` | `"male" \| "female"` | — | `"male"` | 选择默认骨架（影响比例与部分骨骼） |
 | `resolution` | `[number, number]` | — | `[128,128]` | 贴图尺寸，YSM 推荐 128×128 |
 | `height_scale` | number | — | `0.7` | 写入 ysm.json `properties.height_scale`，范围 0.1–2 |
 | `width_scale` | number | — | `0.7` | 同上 |
-| `template` | `"default" \| "minimal"` | — | `"default"` | default=完整默认包；minimal=仅 main+贴图，便于从零 |
 | `overwrite` | boolean | — | false | 同名已存在时是否覆盖（危险） |
 
 **返回**
@@ -197,7 +195,6 @@
 |---|---|---|---|
 | `scope` | `"summary" \| "bones" \| "bone" \| "cube" \| "textures" \| "animations" \| "uv"` | `"summary"` | 视图 |
 | `id` | string | — | scope=bone/cube 时必填 |
-| `cursor` | string | — | 分页游标（返回里有 `next_cursor`） |
 | `limit` | integer | 40 | 1–100 |
 | `include_uv` | boolean | false | cube/bone 视图是否带 UV 矩形 |
 
@@ -255,7 +252,7 @@
 
 **描述**：取单个骨骼或方块的完整字段。`bb_scene` 已包含的信息不要重复取。
 
-**参数**：`{ "id": "cu_7f3a", "include_uv": true, "include_siblings": false }`
+**参数**：`{ "id": "cu_7f3a", "include_uv": true }`
 **返回**：cube/bone 详情（同上），附 `texture_usage`（该 cube 各面落在纹理上的像素区域）。
 **错误**：`INVALID_REFERENCE`（附相近名字建议）。
 
@@ -269,8 +266,6 @@
 
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
-| `expected_revision` | integer | — | 自动 | 通常省略；恢复/并发时显式传 |
-| `atomic` | boolean | — | true | 任一 op 失败则整体回滚 |
 | `ops` | array | ✓ | — | 1–256 个操作（服务端上限 4096） |
 | `note` | string | — | — | 人类可读说明，写入 Undo 标签与日志 |
 
@@ -352,7 +347,6 @@
 
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
-| `expected_revision` | integer | — | 自动 | 并发保护 |
 | `texture` | string | — | 当前激活纹理 | 纹理名或 id |
 | `clip` | boolean | — | true | 越界像素裁剪并计数；false 时越界报错 |
 | `ops` | array | ✓ | — | 1–4096 个绘制操作 |
@@ -430,7 +424,7 @@
 
 **描述**：创建/修改 YSM 动画与关键帧。YSM 的 idle/walk/run 等动画名是约定的，新增动画应避免覆盖内置语义名。
 
-**参数**：`{ "expected_revision"?, "ops": [...] }`
+**参数**：`{ "ops": [...] }`（`expected_revision` 由 DBA 自动注入）
 
 **ops 目录**
 
@@ -475,13 +469,11 @@
 | `views` | array | `["front","right","iso_fr"]` | 见下方枚举；最多 8 个 |
 | `size` | `[w,h]` | `[768,768]` | 32–2048；超出报 `RESOURCE_LIMIT` |
 | `transparent` | boolean | true | 透明背景 |
-| `background` | color | null | 非透明背景色（与 transparent 互斥） |
 | `antialias` | `"off"\|"msaa"\|"ssaa"` | `"msaa"` | ssaa 更慢但边缘更干净 |
-| `shading` | boolean | true | 关闭后为纯色（看 UV/颜色更准） |
-| `show_gizmos` | boolean | false | 一般保持 false |
-| `pose` | `"rest"\|"current"` | `"rest"` | rest=绑定姿势；current=当前动画帧 |
 | `focus` | object | null | `{ "element":"LeftArm", "padding":0.1 }` 局部特写 |
-| `inline` | boolean | false | true 时把 ≤256KB 的图内联 base64（默认落盘 + 附件） |
+| `isolate` | string | — | 只渲染指定部件（骨骼名，多个用英文逗号分隔），其余隐藏并自动对焦 |
+| `zoom` | number | 1 | 配合 `isolate` 的额外放大倍数 |
+| `attach_size` | number | 512 | 附件缩略图边长（64–1024） |
 | `attach_images` | boolean | true | 是否把图作为多模态附件回传（最多 4 张） |
 
 **views 枚举**（相机语义，映射 Blockbench 预设）
@@ -527,7 +519,7 @@
 
 **描述**：把纹理按最近邻放大输出 PNG，检查像素画细节（色带、错误像素、接缝）。
 
-**参数**：`{ "texture":"default", "scale":8, "region":[32,16,47,31], "grid":true }`（scale 1–16，region 可选，grid 叠加网格线）
+**参数**：`{ "texture":"default", "scale":8, "region":[32,16,47,31], "attach_image":true }`（scale 1–16，region 可选，attach_image 控制是否附图）
 **返回**：文本元数据 + 1 张图片附件（≤ 512px）。
 
 ---
@@ -610,7 +602,6 @@
 | 字段 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `out_dir` | string | `exports/<ts>` | workspace 相对路径 |
-| `include_preview` | boolean | true | 生成 preview.png/thumbnail.png |
 | `validate` | boolean | true | 导出前强制校验，errors>0 则中止 |
 | `zip` | boolean | false | 同时生成 .zip |
 
@@ -716,7 +707,7 @@
 2. 所有模型修改走 bb_apply_model_patch，所有贴图绘制走 bb_texture_patch；禁止尝试读取/写入原始 JSON。
 3. 贴图是像素画：坐标必须是整数；颜色用 #RRGGBB；大面积用 rect/shade，微调用 pixel；对称部位用 copy_mirror。
 4. 每完成一批修改（≤3 次写操作）必须 bb_render_views(["front","right","iso_fr"]) 自检；看图后先列缺陷再改。
-5. 导出前必须 bb_validate(profile="ysm") 且 errors=0；导出用 bb_export_ysm。
+5. 导出前必须 bb_validate() 且 errors=0；导出用 bb_export_ysm。
 6. 不要连续两轮做同样的修改；如果同一缺陷出现两次，换策略或 bb_checkpoint 后回滚。
 7. 不确定 YSM 规范时，先 bb_scene 看默认包的骨骼/贴图结构，照抄结构而不是猜。
 ```
@@ -744,9 +735,9 @@
 
 - [ ] 每个 Tool 的 `description` 说明"做什么 + 什么时候用 + 禁止什么"，不写实现细节。
 - [ ] 每个参数有类型、范围、默认值、必填性；枚举值都列在 schema 里。
-- [ ] 每个变更 Tool 都有 `expected_revision`（可省略）与 `note`。
+- [ ] 变更 Tool 由 DBA 自动注入 `expected_revision`（模型 schema 不暴露）；写操作带 `note`。
 - [ ] 每个返回都有 `ok/revision/warnings/digest/next` 中的适用字段。
-- [ ] 列表类参数都有 `limit` 与 `cursor`；默认值保证单次 ≤ 1.5k tokens。
+- [ ] 列表类参数都有 `limit`；默认值保证单次 ≤ 1.5k tokens（`next_cursor` 为返回端预留，当前为 null）。
 - [ ] 错误码在 `spec/bridge-methods.json` 与本文档一致。
 - [ ] 破坏性操作（restore/overwrite/delete bone）要求显式确认或返回明确警告。
 - [ ] 所有 Tool 在 `booting`/`gui_visible`/`degraded` 状态下的行为已定义。

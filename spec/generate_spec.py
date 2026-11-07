@@ -116,12 +116,10 @@ TOOLS = [
             "mode": {"enum": ["new_ysm", "open_pack"], "description": "新建默认骨架 / 打开已有包"},
             "name": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
             "pack_dir": {"type": "string", "description": "workspace 内相对路径（mode=open_pack 必填）"},
-            "gender": {"enum": ["male", "female"], "default": "male"},
             "resolution": {"type": "array", "items": {"type": "integer", "minimum": 16, "maximum": 2048},
                            "minItems": 2, "maxItems": 2, "default": [128, 128]},
             "height_scale": {"type": "number", "minimum": 0.1, "maximum": 2, "default": 0.7},
             "width_scale": {"type": "number", "minimum": 0.1, "maximum": 2, "default": 0.7},
-            "template": {"enum": ["default", "minimal"], "default": "default"},
             "overwrite": {"type": "boolean", "default": False},
         }, ["mode"]),
     },
@@ -157,7 +155,6 @@ TOOLS = [
             "scope": {"enum": ["summary", "bones", "bone", "cube", "textures", "animations", "uv"],
                       "default": "summary"},
             "id": {"type": "string", "description": "scope=bone/cube 时必填"},
-            "cursor": {"type": "string"},
             "limit": LIMIT,
             "include_uv": {"type": "boolean", "default": False},
         }),
@@ -172,7 +169,6 @@ TOOLS = [
         "parameters": obj({
             "id": {"type": "string"},
             "include_uv": {"type": "boolean", "default": False},
-            "include_siblings": {"type": "boolean", "default": False},
         }, ["id"]),
     },
     {
@@ -185,8 +181,6 @@ TOOLS = [
                                               "INVALID_REFERENCE", "INVALID_OPERATION",
                                               "VALIDATION_FAILED", "RESOURCE_LIMIT"],
         "parameters": obj({
-            "expected_revision": REVISION,
-            "atomic": {"type": "boolean", "default": True},
             "note": {"type": "string", "maxLength": 200},
             "ops": {"type": "array", "minItems": 1, "maxItems": 4096, "items": schema_ref("ModelOp")},
         }, ["ops"]),
@@ -216,7 +210,6 @@ TOOLS = [
         "errors": ["PROJECT_NOT_OPEN", "REVISION_CONFLICT", "INVALID_REFERENCE",
                    "RESOURCE_LIMIT", "INVALID_PARAMS"],
         "parameters": obj({
-            "expected_revision": REVISION,
             "texture": {"type": "string", "description": "纹理名或 id；省略时为当前激活纹理"},
             "clip": {"type": "boolean", "default": True,
                      "description": "越界像素自动裁剪并计数；false 时越界报错"},
@@ -278,7 +271,6 @@ TOOLS = [
         "returns": "PatchReceipt", "errors": ["PROJECT_NOT_OPEN", "REVISION_CONFLICT",
                                               "INVALID_REFERENCE", "INVALID_OPERATION"],
         "parameters": obj({
-            "expected_revision": REVISION,
             "note": {"type": "string", "maxLength": 200},
             "ops": {"type": "array", "minItems": 1, "maxItems": 256, "items": schema_ref("AnimationOp")},
         }, ["ops"]),
@@ -302,19 +294,13 @@ TOOLS = [
         "errors": ["PROJECT_NOT_OPEN", "RENDER_FAILED", "TIMEOUT", "RESOURCE_LIMIT",
                    "ENGINE_DEGRADED", "GUI_BUSY"],
         "parameters": obj({
-            "expected_revision": REVISION,
             "views": {"type": "array", "maxItems": 8, "default": ["front", "right", "iso_fr"],
                       "items": {"enum": ["front", "back", "left", "right", "top", "bottom",
                                          "iso_fr", "iso_fl", "iso_br", "iso_bl", "closeup"]}},
             "size": {"type": "array", "items": {"type": "integer", "minimum": 32, "maximum": 2048},
                      "minItems": 2, "maxItems": 2, "default": [768, 768]},
             "transparent": {"type": "boolean", "default": True},
-            "background": {"type": ["string", "null"], "default": None},
             "antialias": {"enum": ["off", "msaa", "ssaa"], "default": "msaa"},
-            "focus": {"type": ["object", "null"], "description": "局部特写 {element, padding?}"},
-            "shading": {"type": "boolean", "default": True},
-            "show_gizmos": {"type": "boolean", "default": False},
-            "pose": {"enum": ["rest", "current"], "default": "rest"},
             "focus": {
                 "type": ["object", "null"],
                 "properties": {"element": {"type": "string"}, "padding": {"type": "number",
@@ -322,8 +308,11 @@ TOOLS = [
                                                                           "default": 0.1}},
                 "additionalProperties": False,
             },
-            "inline": {"type": "boolean", "default": False},
+            "isolate": {"type": "string", "description": "只渲染指定部件（骨骼名，多个用英文逗号分隔）；其余隐藏并自动对焦"},
+            "zoom": {"type": "number", "description": "配合 isolate 的额外放大倍数，默认 1"},
             "attach_images": {"type": "boolean", "default": True},
+            "attach_size": {"type": "integer", "minimum": 64, "maximum": 1024, "default": 512,
+                            "description": "附件缩略图边长"},
         }),
     },
     {
@@ -345,6 +334,8 @@ TOOLS = [
                                                "focus": {"type": "string"}}}},
             "camera": {"$ref": "#/$defs/Camera"},
             "focus": {"type": "string", "description": "聚焦元素名（骨骼/方块）"},
+            "isolate": {"type": "string", "description": "只渲染指定部件（骨骼名，多个用英文逗号分隔）"},
+            "zoom": {"type": "number", "description": "配合 isolate 的额外放大倍数，默认 1"},
             "cell": {"type": "integer", "minimum": 64, "maximum": 1024, "default": 320},
             "cols": {"type": "integer", "minimum": 1, "maximum": 16},
             "background": {"type": ["string", "null"], "default": "#1b1b1b"},
@@ -424,7 +415,7 @@ TOOLS = [
             "texture": {"type": "string"},
             "scale": {"type": "integer", "minimum": 1, "maximum": 16, "default": 8},
             "region": {"type": "array", "items": {"type": "integer"}, "minItems": 4, "maxItems": 4},
-            "grid": {"type": "boolean", "default": False},
+            "attach_image": {"type": "boolean", "description": "是否作为图片附件返回（默认 true）"},
         }),
     },
     {
@@ -533,7 +524,7 @@ TOOLS = [
         "name": "bb_seg_probe",
         "title_zh": "分层能力探测",
         "description": "探测本机能否跑 See-through 分层并给出能力分级与安装计划。"
-                       "T0 零依赖 / T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（24 层 + 遮挡补全）。"
+                       "T0 零依赖 / T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（实测 23–29 个语义层，以 layers.json 为准）。"
                        "检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否可达、是否旧架构。"
                        "只探测不安装；环境不支持会明确说明，不会假装可用。",
         "mutating": False, "requires_project": False, "concurrency_safe": True,
@@ -571,7 +562,7 @@ TOOLS = [
         "name": "bb_seg_install",
         "title_zh": "安装分层能力（T2）",
         "description": "安装 See-through：下载 ComfyUI 便携版 + See-through 节点 + pip 依赖。"
-                       "默认只返回计划与当前状态；confirm:true 才真下载（约 1.8GB+2GB）。"
+                       "默认只返回计划与当前状态；confirm:true 才真下载（ComfyUI 便携版约 4.6GB + pip 依赖约 1.9GB，合计约 6.5GB）。"
                        "每步幂等可续，已存在产物跳过。权重不在这里下（节点首次跑分层时自动拉）。",
         "mutating": False, "requires_project": False, "concurrency_safe": False,
         "protocol_method": None, "timeout_ms": 3600000,
@@ -585,9 +576,10 @@ TOOLS = [
     {
         "name": "bb_seg_run",
         "title_zh": "完整分层（See-through）",
-        "description": "把立绘送进 ComfyUI 的 See-through 管线，输出 24 层（body 13 + head 11）"
-                       "+ 深度序 + 遮挡补全 + 分层 PSD。前置：ComfyUI 运行中且装了 See-through 节点。"
-                       "首次运行下载约 3GB 权重，可能十几分钟。",
+        "description": "把立绘送进 ComfyUI 的 See-through 管线，输出 23–29 个语义层"
+                       "（GenerateLayers 24 → PostProcess 按 depth 拆分/聚类；实测官方立绘 29 层、头部特写 23 层，以 layers.json 为准）"
+                       "+ 深度序 + 遮挡补全。前置：ComfyUI 运行中且装了 See-through 节点。"
+                       "首次运行下载约 12.5GB 权重（HuggingFace），可能十几分钟；不自动产 PSD（需前端/ag-psd）。",
         "mutating": False, "requires_project": False, "concurrency_safe": False,
         "protocol_method": None, "timeout_ms": 3600000,
         "returns": "SegRunResult", "attachments": True,
@@ -615,10 +607,7 @@ TOOLS = [
             "warnings：B 级默认层级偏离、主动画名缺失、贴图非 128x128、UV 越界/重叠、arm 缺失、未知字段保留。",
         ],
         "parameters": obj({
-            "profile": {"enum": ["ysm", "generic"], "default": "ysm"},
             "strict": {"type": "boolean", "default": True},
-            "include": {"type": "array",
-                        "items": {"enum": ["bones", "hierarchy", "texture", "uv", "ysm_json", "animation"]}},
         }),
     },
     {
@@ -658,7 +647,6 @@ TOOLS = [
             "目标模型文件存在但非法 JSON 时 write() 会弹 native messagebox；导出前必须校验目标文件。",
         ],
         "parameters": obj({
-            "checkpoint": {"type": "boolean", "default": False},
         }),
     },
     {
@@ -675,7 +663,6 @@ TOOLS = [
         ],
         "parameters": obj({
             "out_dir": {"type": "string", "description": "workspace 相对路径；默认 exports/<ts>/"},
-            "include_preview": {"type": "boolean", "default": True},
             "validate": {"type": "boolean", "default": True},
             "zip": {"type": "boolean", "default": False},
         }),
@@ -692,7 +679,6 @@ TOOLS = [
             "calls": {"type": "array", "minItems": 1, "maxItems": 16,
                       "items": obj({"tool": {"type": "string", "pattern": "^bb_"},
                                     "args": {"type": "object"}}, ["tool", "args"])},
-            "atomic": {"type": "boolean", "default": True},
             "stop_on_error": {"type": "boolean", "default": True},
         }, ["calls"]),
     },
@@ -705,7 +691,6 @@ TOOLS = [
         "returns": "GuiState", "errors": ["PROJECT_NOT_OPEN"],
         "parameters": obj({
             "mode": {"enum": ["inspect", "edit"], "default": "inspect"},
-            "message": {"type": "string", "maxLength": 300},
         }),
     },
     {
@@ -715,9 +700,7 @@ TOOLS = [
         "mutating": True, "requires_project": True, "concurrency_safe": False,
         "protocol_method": "gui.hide", "timeout_ms": 15000,
         "returns": "GuiResyncResult", "errors": ["PROJECT_NOT_OPEN"],
-        "parameters": obj({
-            "resync": {"type": "boolean", "default": True},
-        }),
+        "parameters": obj({}),
     },
     {
         "name": "bb_revisions",
@@ -1049,7 +1032,7 @@ def build_tool_manifest() -> dict:
             "parameters 是 wire 级 JSON Schema；dsh 侧可用 defineTool 的 DSL 或原始 JSON Schema。",
             "description 为模型可见文本，修改会改变 KV 前缀，需版本化。",
             "returns 使用 $defs 中的命名 schema；attachments=true 表示结果含多模态图片块。",
-            "expected_revision 可省略；DBA 自动填入最近已知 revision。",
+            "expected_revision 不是模型参数：DBA 在 callTool 内自动注入最近已知 revision 并做前置校验。",
         ],
         "$defs": {**common_defs(), **TOOL_RETURN_DEFS},
         "tools": TOOLS,

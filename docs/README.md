@@ -1,6 +1,6 @@
 # docs · 分章索引
 
-> 当前版本：**0.9.1**（2026-11-07 复核）。实现状态以 [../ENGINEERING.md](../ENGINEERING.md) 与 [../HANDOVER.md](../HANDOVER.md) 为准。
+> 当前版本：**0.9.2**（2026-11-07 复核）。实现状态以 [../ENGINEERING.md](../ENGINEERING.md) 与 [../HANDOVER.md](../HANDOVER.md) 为准。
 > 历史归档在 [`archive/`](archive/README.md)，测试证据在 [`test-evidence/`](test-evidence/README.md)。
 
 ## 一、系统设计（现行）
