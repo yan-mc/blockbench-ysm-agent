@@ -34,7 +34,7 @@
 - **B 站向介绍视频（2:46）**：[deepseek-blockbench-agent-intro.mp4](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)（该视频为 0.4.0 时期录制，功能与本仓库不同步，仅作演示）
 - 讲功能、使用与优势，不含制作过程；素材使用早期测试模型「DeepSeek 鲸鱼娘 / 蓝色大肥鱼」（该测试模型已清理）
 - 封面与投稿文案：[media/bilibili-upload.md](media/bilibili-upload.md)、[media/bilibili-cover.png](media/bilibili-cover.png)
-- **0.9.2 更新宣传片**：见 `media/`（立绘拆分 T1/T2 + 复杂逐步调整案例，本地生成，不进仓库）
+- **0.9.2 更新宣传片（1:50，丰川祥子案例）**：`media/sakiko-0.9.2-promo.mp4`（本地生成，不提交仓库）；重点讲 **T1/T2 立绘拆分（29 语义层）** 与 **217→355→401 块复杂逐步调整**；B 站封面/投稿文案见 [media/bilibili-cover-0.9.2.png](media/bilibili-cover-0.9.2.png)、[media/bilibili-upload-0.9.2.md](media/bilibili-upload-0.9.2.md)，制件说明 [media/README-0.9.2-promo.md](media/README-0.9.2-promo.md)
 
 ## ✨ 0.9.2 更新亮点：立绘拆分 + 复杂逐步调整（案例：丰川祥子）
 
