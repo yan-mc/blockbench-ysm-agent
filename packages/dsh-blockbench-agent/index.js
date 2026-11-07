@@ -1850,8 +1850,8 @@ let lastRefCanon = null
           prompt_chars: prompt.length,
           cost_estimate_usd: cost,
           warnings: [
-            'T3 是云端生成：参考图会上传到 Google；生成图含 SynthID 水印',
-            '生成结果是「推断」不是「还原」：背面/内侧/遮挡处都是模型脑补，必须人工复核并把推定项写进 spec.gaps',
+            `T3 是云端生成（${t3.providerLabel}）：参考图会上传给该服务商；生成图可能带 SynthID 水印`,
+            '生成结果是「推断」不是「还原」：背面/内侧/遮挡处都是模型补全，必须人工复核并把推定项写进 spec.gaps',
             '不要拿生成图当官方设定或精确尺寸依据；它适合做三视图假设、部件清单与遮挡参考',
           ],
         }

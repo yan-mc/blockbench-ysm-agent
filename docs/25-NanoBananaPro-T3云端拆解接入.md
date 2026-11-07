@@ -104,6 +104,8 @@ Content-Type: application/json
 
 > **2026-11-08 实测（无有效 token）**：对本机网络 `POST https://api.apiyi.com/v1beta/models/gemini-3-pro-image:generateContent` + 假 Bearer token，返回 `HTTP 401 {"error":{"message":"Invalid token..."}}` → **端点路径与 Bearer 鉴权格式都正确**，缺的只是有效 token；拿到 token 后即可用上面的配置。
 
+- **APIYI 实际返回格式（2026-11-08 实测）**：生成图不在 `inlineData`，而是放在 text part 里的**签名 URL**（`https://mycdn-gg.oss-us-west-1.aliyuncs.com/response_images/...png?X-Amz-...`，24h 有效）。插件会自动 GET 下载并转 base64；同时按**文件头 magic** 识别真实格式（APIYI CDN 可能把 JPEG 标成 PNG）。修复前的报错是 `T3_NO_IMAGE: STOP`（有 URL 但没图）。
+
 ### 2.2 价格（官方 pricing 页，2026-11 抓取）
 
 | 项 | 价格 |
@@ -119,6 +121,7 @@ Content-Type: application/json
 ### 2.3 限制与坑
 
 1. **内容安全**：参考图含版权角色/敏感内容可能被拦截；返回 `T3_NO_IMAGE`。
+1b. **生成会补细节**：实测 `breakdown` 会给角色补出参考图未确认的"银冠/眼罩/腿链"等部件（官方图里没有或不明确）——这些是生成假设，必须逐项对照官方图剔除或写进 gaps，不能直接当设定。
 2. **一致性不是保证**：多张图之间仍会漂移，尤其左右手/左右眼、纹样、文字徽记。
 3. **背面/内侧是推断**：模型会"合理编"，必须逐张对照官方图复核，并写进 `spec.gaps`。
 4. **水印**：所有图带 SynthID；不能当官方素材直接分发。
@@ -333,6 +336,11 @@ config:
 - [ ] 错误路径：401/429/400/404 分别映射 T3_AUTH/T3_QUOTA/T3_BAD_REQUEST/T3_MODEL_NOT_FOUND。
 - [ ] 成本估算与实际张数一致；variants 成倍。
 - [ ] 人工复核后把推定项写入 spec.gaps。
+
+**2026-11-08 实测（APIYI + 5 张参考图）**：
+- `turnaround` 与 `breakdown` 各 1 张成功；分辨率 **2752×1536**；耗时 **40.1s / 42.1s**；成本估算 **$0.1415/张**（共 $0.283）。
+- 产物：`models/togawa-sakiko/artifacts/t3-sheets/run2-turnaround/`、`run2-breakdown/`（含 `t3-meta.json`）。
+- 结论：turnaround 的三视图标定、头/上身/下身/手/脚/服装单品拆分质量高；breakdown 部件标注清晰，但会补出官方图未确认的银冠/眼罩/腿链，需人工剔除。
 
 ---
 

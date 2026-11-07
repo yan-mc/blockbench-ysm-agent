@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   resolveT3Config, inspectT3Availability, buildSheetPrompt, buildT3RequestBody,
-  extractT3Result, estimateCostUsd, mapT3Error, callT3,
+  extractT3Result, extractImageUrls, sniffImageMime, estimateCostUsd, mapT3Error, callT3,
   T3_DEFAULT_MODEL, T3_MODELS, T3_PRESETS,
 } from '../lib/nanobanana.js'
 
@@ -163,6 +163,48 @@ test('extractT3Result：兼容 inlineData/inline_data，收集文字与 blockRea
   assert.deepEqual(r.texts, ['ok'])
   assert.equal(r.finishReason, 'STOP')
   assert.equal(r.blockReason, null)
+})
+
+test('extractImageUrls：从 APIYI 文本里识别签名图片 URL', () => {
+  const t = '生成的图片：https://mycdn-gg.oss-us-west-1.aliyuncs.com/response_images/97713/2026/11/08/x.png?X-Amz-Signature=abc 。'
+  const urls = extractImageUrls(t)
+  assert.equal(urls.length, 1)
+  assert.match(urls[0], /^https:\/\/mycdn-gg\.oss-us-west-1\.aliyuncs\.com\/response_images\//)
+  assert.equal(extractImageUrls('no url here').length, 0)
+})
+
+test('callT3：中转站把图放在 text URL 时自动下载成 base64', async () => {
+  const imageUrl = 'https://mycdn-gg.oss-us-west-1.aliyuncs.com/response_images/1/x.png?X-Amz-Signature=abc'
+  const calls = []
+  const fakeFetch = async (url, init) => {
+    calls.push(url)
+    if (calls.length === 1) {
+      return {
+        ok: true, status: 200,
+        text: async () => JSON.stringify({
+          candidates: [{ finishReason: 'STOP', content: { parts: [{ text: imageUrl }] } }],
+        }),
+      }
+    }
+    assert.equal(url, imageUrl)
+    return {
+      ok: true, status: 200,
+      headers: { get: () => 'image/png' },
+      arrayBuffer: async () => Uint8Array.from([137, 80, 78, 71]).buffer,
+    }
+  }
+  const cfg = resolveT3Config({ nanoBananaProvider: 'apiyi', nanoBananaApiKey: 'k' }, {})
+  const r = await callT3({ config: cfg, prompt: 'p', fetchImpl: fakeFetch })
+  assert.equal(r.images.length, 1)
+  assert.equal(r.images[0].mimeType, 'image/png')
+  assert.equal(r.images[0].data, Buffer.from([137, 80, 78, 71]).toString('base64'))
+})
+
+test('sniffImageMime：按文件头识别 png/jpeg/webp（中转站 content-type 可能不准）', () => {
+  assert.equal(sniffImageMime(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])), 'image/png')
+  assert.equal(sniffImageMime(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])), 'image/jpeg')
+  assert.equal(sniffImageMime(Buffer.from('RIFF0000WEBPVP8 ', 'ascii')), 'image/webp')
+  assert.equal(sniffImageMime(Buffer.from('not-an-image')), null)
 })
 
 test('estimateCostUsd：按官方价估算；未知模型返回 null', () => {

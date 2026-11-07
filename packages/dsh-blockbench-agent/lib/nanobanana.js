@@ -276,9 +276,32 @@ export function buildT3RequestBody({
   }
 }
 
-/** 从 generateContent 响应中提取所有图片与文字。 */
+/** 用文件头判断图片实际格式（中转站 CDN 的 content-type 可能不准）。 */
+export function sniffImageMime(buf) {
+  if (!buf || buf.length < 12) return null
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png'
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46
+      && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp'
+  return null
+}
+
+/** 从文本里提取可能的图片 URL（APIYI 等中转站会把结果以签名 URL 放在 text part）。 */
+export function extractImageUrls(text) {
+  const urls = []
+  const re = /https?:\/\/[^\s"'<>\\]+/g
+  let m
+  while ((m = re.exec(String(text || ''))) !== null) {
+    const u = m[0].replace(/[),.;]+$/, '')
+    if (/\.(png|jpe?g|webp)(\?|#|$)/i.test(u) || /response_images|\/images?\//i.test(u)) urls.push(u)
+  }
+  return [...new Set(urls)]
+}
+
+/** 从 generateContent 响应中提取所有图片（inlineData 或 text 里的 URL）与文字。 */
 export function extractT3Result(json) {
   const images = []
+  const imageUrls = []
   const texts = []
   const candidates = Array.isArray(json?.candidates) ? json.candidates : []
   for (const cand of candidates) {
@@ -290,12 +313,13 @@ export function extractT3Result(json) {
         images.push({ data: inline.data, mimeType: inline.mimeType ?? inline.mime_type ?? 'image/png' })
       } else if (typeof part?.text === 'string' && part.text.trim()) {
         texts.push(part.text)
+        imageUrls.push(...extractImageUrls(part.text))
       }
     }
   }
   const blockReason = json?.promptFeedback?.blockReason ?? null
   const finishReason = candidates[0]?.finishReason ?? null
-  return { images, texts, blockReason, finishReason, usage: json?.usageMetadata ?? null }
+  return { images, imageUrls: [...new Set(imageUrls)], texts, blockReason, finishReason, usage: json?.usageMetadata ?? null }
 }
 
 /** 官方价估算（输出图 + 粗估图片输入 token；只用于调用前提示，非账单）。 */
@@ -397,6 +421,19 @@ export async function callT3({
       throw e
     }
     const parsed = extractT3Result(json)
+    // 中转站（如 APIYI）把生成结果放在 text part 的签名 URL 里，需要下载成 base64。
+    if (!parsed.images.length && parsed.imageUrls.length) {
+      for (const u of parsed.imageUrls.slice(0, 4)) {
+        const imgRes = await fetchImpl(u, { signal: ac.signal })
+        if (!imgRes.ok) continue
+        const buf = Buffer.from(await imgRes.arrayBuffer())
+        if (!buf.length || buf.length > 25 * 1024 * 1024) continue
+        const headerMime = (imgRes.headers?.get?.('content-type') || '').split(';')[0].trim()
+        const mime = sniffImageMime(buf) || headerMime || 'image/png'
+        parsed.images.push({ data: buf.toString('base64'), mimeType: mime })
+      }
+      delete parsed.imageUrls
+    }
     if (!parsed.images.length) {
       const reason = parsed.blockReason || parsed.finishReason || (parsed.texts[0] ?? '').slice(0, 300) || '模型未返回图片'
       const e = new Error(`T3 未返回图片：${reason}`)

@@ -21,7 +21,7 @@
 
 ## 1. 当前结论
 
-**DSH 端已完整可用（v0.9.3）：插件以 link 方式安装并激活；44 个工具定义 / 42 个实际暴露、5 个命令、1 个 Skill；56 个 bridge 方法；T3 云端拆解（Nano Banana Pro）+ T2/T1 分层；渲染自检（isolate+zoom、多格拼图、转台、动画采样）、参考图管线、建模规格、T0/T1/T2 分层、YSM 创建/保存/导出、检查点/回滚、Client UI 状态 pill 全部就位；81/81 单测与 35 步 host-smoke 通过。**
+**DSH 端已完整可用（v0.9.3）：插件以 link 方式安装并激活；44 个工具定义 / 42 个实际暴露、5 个命令、1 个 Skill；56 个 bridge 方法；T3 云端拆解（Nano Banana Pro）+ T2/T1 分层；渲染自检（isolate+zoom、多格拼图、转台、动画采样）、参考图管线、建模规格、T0/T1/T2 分层、YSM 创建/保存/导出、检查点/回滚、Client UI 状态 pill 全部就位；84/84 单测与 35 步 host-smoke 通过。**
 
 - **M0 通过（Go，历史闸门）**：隐藏窗口离屏 WebGL 渲染稳定；GPU（RTX 4080 / ANGLE D3D11）与 SwiftShader 两条路径都通过；show/hide 往返后仍可渲染。报告已归档：[docs/archive/M0-report.md](docs/archive/M0-report.md)、[docs/archive/M0-report-safe.md](docs/archive/M0-report-safe.md)。
 - **BAE 可用**：`dist/bb-agent-app` 由上游 Blockbench 5.2.2 构建产物 + agent 四件套 + YSM 默认模板组装而成（2026-11-07 重新 assemble；见 §0）。
