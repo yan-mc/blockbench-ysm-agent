@@ -1953,13 +1953,13 @@
   "model": "ruanmei__20d0917bb915",
   "total": 2547,
   "dup": 1,
-  "hair": 319,
-  "hair_pc": 319.0,
+  "hair": 258,
+  "hair_pc": 258.0,
   "orn": 82,
   "glow": 0,
   "face": 108,
-  "strand_bones": 15,
-  "hair_bones": 15,
+  "strand_bones": 14,
+  "hair_bones": 14,
   "total_pc": 2547.0
  },
  {

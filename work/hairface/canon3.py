@@ -23,6 +23,8 @@ RE_FACE = re.compile(
 
 
 def own_class(n):
+    if n.strip().lower() in ("chair",) or "chair" in n.lower():
+        return None          # "chair" is furniture, not hair
     if RE_GLOW.search(n):
         return "glow"
     if RE_ORN.search(n):
