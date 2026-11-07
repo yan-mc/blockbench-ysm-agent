@@ -353,6 +353,8 @@ config:
 
 ---
 
+> **2026-11-08 实际应用**：T3 turnaround/breakdown 已用于丰川祥子「旋律的主人」v5 重建（534→1095 块）；流程与结果见 [`models/togawa-sakiko/V5-FINAL-REPORT.md`](../models/togawa-sakiko/V5-FINAL-REPORT.md)。
+
 ## 10. 参考
 
 - Gemini 图像生成文档（模型列表/参数/SynthID）：<https://ai.google.dev/gemini-api/docs/image-generation>

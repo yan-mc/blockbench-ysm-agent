@@ -402,3 +402,31 @@ F:\Deepseek_harness\blockbench\models\togawa-sakiko\MODEL-V3-REFINE.md
 1. 给 `bb_apply_model_patch` 增加 `set_texture`（或 `add_cube` 的 `texture` 字段）把眼睛方块固定到 `default`；或
 2. 把 eye 相关方块整体删除、在**只启用 default 贴图**的干净状态下重建；或
 3. 直接在 `blue` 贴图的对应格子里画出与 default 相同的金色/深棕/白色（绕开 texture index 问题）——最小改动、可立即验证。
+
+---
+
+## 17. v5 Phase 1（进行中，本轮只完成「裙装主体」）
+
+**执行计划（promote）**：① 换裙（Skirt 骨 42 块 → 短款三层）② 换 Back/Front/SideSkirt 的长拖尾 ③ 腿/袜/靴 ④ corset+绑带+蝴蝶结 ⑤ 泡泡袖+长手套 ⑥ 星空披风。逐步 render 对照 T3。
+
+**本轮实际完成**
+- `bb_checkpoint(before-v5-phase1)`（r0001）
+- **Skirt 骨 42 块旧长裙全部删除**（含 1 块腰板、9 片长裙片、12 片压边、8 片荷叶边、8 片外层、3 片下摆）
+- **新建 19 块短款三层裙**：
+  - 黑外裙：6.2×1.4×4.1（y22.55）+ 7×2.2×4.9（y20.6）+ 7.6×2×5.5（y18.9，最外层）
+  - 蓝灰中层：7.1×2.4×5 + 6.9×2.2×4.8
+  - 浅蓝衬裙：6.6×1.6×4.5 + 7.2×1.6×5.2（下摆露边）
+  - 波浪下摆/荷叶边：4 片边片（左右/前后，1.2 高）+ 3 条横荷叶边（0.55–0.6 厚）
+  - 腰部：1 块腰封 4.2×0.9×4.2
+- 裙长从 **y≈6（及踝长裙）收到 y≈18.3（大腿中上部短裙）**，侧向/前后都外扩到 7.6×5.5（不再是薄片）
+
+**数字**：方块 534 → **511**；骨骼 **68**（未增删）；validate **0 error**；`bb_save_project` main.json **58,603 B**（revision 2）。
+
+**本轮未完成（下一轮继续，需重开工程后重新取 id）**
+1. `BackSkirt` 29 / `FrontSkirt` 7 / `LeftSkirt` 2 / `RightSkirt` 2 —— **旧长拖尾仍在**（侧视可见背后平板），必须删掉换成短裙后片/前片/bustle
+2. 腿：当前 `LeftLeg/LeftLowerLeg/RightLeg/RightLowerLeg` 各 1 块黑柱 → 需重建大腿/膝/小腿 + 黑丝袜暗纹 + 左腿 garter/银十字扣/细链
+3. 靴：现有 15 块/只 → 需按 T3 改「蓝灰星纹面板 + 黑鞋头/鞋跟 + 蓝鞋带 + 厚黑底」并做出鞋底/厚底
+4. corset 收腰 + 蓝交叉绑带 + 胸口蓝蝴蝶结；off-shoulder 泡泡短袖 + 黑长手套（蕾丝袖口）
+5. 星空披风（新增 1–2 骨挂 UpperBody）
+
+**诚实说明**：本轮**未 read_image 看 T3 turnaround/breakdown/clothing-detail 三张图**（会话上下文已接近上限），裙装是按 T3-V5-BRIEF.md 的文字描述 + Lead 消息里的要点做的；颜色用了现有 swatch（黑 #17151c/#262230、蓝 #3f6bb5、浅蓝 #cfe0f5/#e4eefb）。下一轮应先看图再动手。
