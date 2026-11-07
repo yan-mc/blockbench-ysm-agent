@@ -1520,6 +1520,8 @@ def write_promo_doc(total: float, meta: dict):
                     f'{sc["chapter"]} | {sc["fn"].__name__} |')
     story = '\n'.join(rows)
     voice = '\n'.join(f'{i + 1:02d}. {sc["narration"]}' for i, sc in enumerate(SCENES))
+    full = ''.join(sc['narration'] for sc in SCENES)
+    cjk = sum(1 for ch in full if '\u4e00' <= ch <= '\u9fff')
     doc = f'''# UPDATE-PROMO · DSH × Blockbench Agent v0.9.2 更新宣传片
 
 - **成片**：`media/sakiko-0.9.2-promo.mp4`（1920×1080 / 30fps / H.264 High + AAC 192k）
@@ -1542,7 +1544,7 @@ def write_promo_doc(total: float, meta: dict):
 | 首轮 217 块 | `models/togawa-sakiko/artifacts/renders/r0021/front_768.png` | 首轮验收基线 |
 | 中间态 355 块 | `models/togawa-sakiko/artifacts/t2-repair/renders/front_768.png` | T2 逐细节修理后 |
 | 官方立绘 | `models/togawa-sakiko/refs/skin/sakiko_skin1.png` | 2176²，画面标注“官方参考” |
-| T1 掩膜 | `models/togawa-sakiko/seg/sakiko_skin1/masks/*_part00..23.png` | 24 张 2176² 二值掩膜，片中逐张叠加 |
+| T1 掩膜 | `models/togawa-sakiko/seg/sakiko_skin1/masks/*_part00..23.png` | 24 张 2176² 二值掩膜；片中只用于「24 个候选部件」计数与 §T1 面积统计，不叠色（掩膜本身多落在道具上，叠色会误导） |
 | T2 分层 | `models/togawa-sakiko/seg/sakiko_skin1-layers/layers/*.png` + `layers.json` | 29 层 PNG + 深度中位数 |
 | T2 统计 | `models/togawa-sakiko/artifacts/t2-preview/layer-metrics.json` | 每层 alpha 像素数 / 面积比 / depth_median |
 | T2 预览 | `models/togawa-sakiko/seg/sakiko_skin1-layers/seethrough_*_preview_00001_.png` | 29 层合成预览 |
@@ -1561,11 +1563,11 @@ def write_promo_doc(total: float, meta: dict):
 {story}
 
 **画面语汇**：深蓝底（#071222）+ 青 #59c2ff / 紫 #8b7cff 强调；每场 1.00→1.00+{max(s["kb"] for s in SCENES):.3f}
-的 Ken Burns 推近 + 轻微横移；场景之间 {XFADE:.2f}s 交叉淡化；底部逐句烧录中文字幕；底部细进度条。
+的 Ken Burns 推近 + 轻微横移；场景之间 {XFADE:.2f}s 划像转场（左→右，带高光边缘）；底部逐句烧录中文字幕；底部细进度条。
 
 ---
 
-## 3. 旁白全文（{sum(len(sc["narration"]) for sc in SCENES)} 字）
+## 3. 旁白全文（{len(full)} 字，含标点；纯汉字 {cjk} 字）
 
 {voice}
 
@@ -1580,14 +1582,14 @@ pip install pillow numpy edge-tts imageio-ffmpeg qrcode
 python media/build_update_promo.py --stills
 # 2) 抽帧检查成片
 python media/build_update_promo.py --check media/sakiko-0.9.2-promo.mp4
-# 3) 正式渲染（约 6–10 分钟，逐帧 PIL + ffmpeg 管道）
+# 3) 正式渲染（约 12–15 分钟，逐帧 PIL + ffmpeg 管道，3305 帧）
 python media/build_update_promo.py --full
 # 4) 只重出封面
 python media/build_update_promo.py --cover
 ```
 
 TTS 缓存在 `media/_promo_tts/vNN_rRATE.wav`；改文案后删对应文件即可重配。
-若 Edge TTS 不可达，脚本会回退到 Windows SAPI（见 `--tts sapi`），只出声不出网。
+若 Edge TTS 不可达：脚本会抛错退出，可先 `--no-tts` 出纯字幕版（时长按字数估算），或修改 `VOICE` 常量换声线。
 
 ---
 

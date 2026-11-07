@@ -6,7 +6,7 @@
 - **投稿文案**：`media/bilibili-upload-0.9.2.md`
 - **生成脚本**：`media/build_update_promo.py`
 - **配音**：Edge TTS `zh-CN-XiaoxiaoNeural`，语速 +6%
-- **生成时间**：generated
+- **生成时间**：2026-11-07 23:20 (Asia/Shanghai)
 
 > 未上传 B 站（无账号）；仓库源码 / `models/` 未做任何修改，本轮只写 `media/`。
 
@@ -20,7 +20,7 @@
 | 首轮 217 块 | `models/togawa-sakiko/artifacts/renders/r0021/front_768.png` | 首轮验收基线 |
 | 中间态 355 块 | `models/togawa-sakiko/artifacts/t2-repair/renders/front_768.png` | T2 逐细节修理后 |
 | 官方立绘 | `models/togawa-sakiko/refs/skin/sakiko_skin1.png` | 2176²，画面标注“官方参考” |
-| T1 掩膜 | `models/togawa-sakiko/seg/sakiko_skin1/masks/*_part00..23.png` | 24 张 2176² 二值掩膜，片中逐张叠加 |
+| T1 掩膜 | `models/togawa-sakiko/seg/sakiko_skin1/masks/*_part00..23.png` | 24 张 2176² 二值掩膜；片中只用于「24 个候选部件」计数与 §T1 面积统计，不叠色（掩膜本身多落在道具上，叠色会误导） |
 | T2 分层 | `models/togawa-sakiko/seg/sakiko_skin1-layers/layers/*.png` + `layers.json` | 29 层 PNG + 深度中位数 |
 | T2 统计 | `models/togawa-sakiko/artifacts/t2-preview/layer-metrics.json` | 每层 alpha 像素数 / 面积比 / depth_median |
 | T2 预览 | `models/togawa-sakiko/seg/sakiko_skin1-layers/seethrough_*_preview_00001_.png` | 29 层合成预览 |
@@ -52,11 +52,11 @@
 | 14 | 01:40 | 8.5s | 结尾 | 结尾：v0.9.2 在 GitHub | s_end |
 
 **画面语汇**：深蓝底（#071222）+ 青 #59c2ff / 紫 #8b7cff 强调；每场 1.00→1.00+0.055
-的 Ken Burns 推近 + 轻微横移；场景之间 0.34s 交叉淡化；底部逐句烧录中文字幕；底部细进度条。
+的 Ken Burns 推近 + 轻微横移；场景之间 0.34s 划像转场（左→右，带高光边缘）；底部逐句烧录中文字幕；底部细进度条。
 
 ---
 
-## 3. 旁白全文（540 字）
+## 3. 旁白全文（540 字，含标点；纯汉字 360 字）
 
 01. AI 真的能进 Blockbench 做模型吗？
 02. 不是给教程，也不是给脚本——是它自己建、自己看、自己改。
@@ -84,14 +84,14 @@ pip install pillow numpy edge-tts imageio-ffmpeg qrcode
 python media/build_update_promo.py --stills
 # 2) 抽帧检查成片
 python media/build_update_promo.py --check media/sakiko-0.9.2-promo.mp4
-# 3) 正式渲染（约 6–10 分钟，逐帧 PIL + ffmpeg 管道）
+# 3) 正式渲染（约 12–15 分钟，逐帧 PIL + ffmpeg 管道，3305 帧）
 python media/build_update_promo.py --full
 # 4) 只重出封面
 python media/build_update_promo.py --cover
 ```
 
 TTS 缓存在 `media/_promo_tts/vNN_rRATE.wav`；改文案后删对应文件即可重配。
-若 Edge TTS 不可达，脚本会回退到 Windows SAPI（见 `--tts sapi`），只出声不出网。
+若 Edge TTS 不可达：脚本会抛错退出，可先 `--no-tts` 出纯字幕版（时长按字数估算），或修改 `VOICE` 常量换声线。
 
 ---
 
@@ -109,3 +109,38 @@ TTS 缓存在 `media/_promo_tts/vNN_rRATE.wav`；改文案后删对应文件即�
 ```
 
 抽帧目视：`media/_promo_check/`（脚本 `--check` 生成 8–11 张）——逐帧确认文字未溢出、图片未变形、无黑帧。
+
+### 5.1 抽帧目视记录（成片 33.8 MB / 110.16 s）
+
+`media/_promo_check/` 共 11 张（1.5s → 96.0s），逐张检查：
+
+| 抽帧 | 场景 | 结论 |
+|---|---|---|
+| 1.5s | 开场 | 标题与模型淡入正常；本场不烧字幕（旁白即标题，避免重复） |
+| 8.0s | 自己建 / 自己看 / 自己改 | 三卡 + 底部流程条，文字未溢出卡片 |
+| 16.0s | 案例 | 立绘卡 1:1 内嵌不变形；70 / 401 / 2×512 三块对齐 |
+| 25.0s | T1 | 参考图上的扫描光带 + `24 个候选部件`，无错位 |
+| 34.0s | T1 → T2 转场 | 0.34s 划像，接缝带高光边，无重影（交叉淡化已弃用） |
+| 44.0s | 29 层清单 | 两列 29 行逐行淡入；中文名 / 英文名 / 像素数三列不重叠 |
+| 55.0s | 217 块 | 首轮渲染 + 三个问题，人物比例未拉伸 |
+| 66.0s | 355 块 | ✓ 为矢量绘制（不依赖字体，避免方框）；计数动画正常 |
+| 76.0s | 401 块 | 头部细节未裁切；计数器 355→401 中段 |
+| 86.0s | 217→355→401 | 时间轴三节点 + validate 0 error |
+| 96.0s | 工具链 | 六张卡，文字均在卡内 |
+
+黑帧：blackdetect 无 ≥0.3 s 黑段；响度：均值 -23.1 dB / 峰值 -5.4 dB（未削波）。
+
+---
+
+## 6. 已知问题与剩余项
+
+1. **旁白字数**：全文 540 字（含标点），纯汉字 360 字；略高于「420–520 字」推荐区间的上限，
+   成品 110.2s 仍在 95–115s 内。若需严格压到 500 字以内，删 §3 第 05 或第 12 句即可（各约 30 字，
+   删后需重跑 `--full`）。
+2. **转场方式**：用 0.34s 划像替代交叉淡化——两页都是满屏文字时，交叉淡化会出现 0.3s 的重影。
+3. **29 层的可读性**：原图是「暗色人物 + 大件道具 + 亮背景」的稠密插画，`front hair` 仅 2,606 px、
+   `face` 1,772 px。片中如实按像素量展示（不放大、不虚构面积），逐层特写里小层会显得块状，属正常。
+4. **T1 掩膜未上色**：24 张掩膜多数落在钢琴/沙发/基座上，直接叠色会误导成「切得很准」；
+   片中用扫描光带 + 面积柱状图（57% / 50% / 26% …）说明「道具抢走掩膜」，符合 `SEG-CHECK.md` 的判定。
+5. **未上传 B 站**：只产出可投稿文件（mp4 + 封面 + 文案），账号与上传由人工完成。
+
