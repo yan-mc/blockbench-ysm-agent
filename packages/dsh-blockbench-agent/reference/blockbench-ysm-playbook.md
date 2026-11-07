@@ -224,7 +224,7 @@ ysm.has_helmet ? 1 : 0
 | 需求 | 用哪个 | 注意 |
 |---|---|---|
 | 单部件、少角度 | `bb_look({isolate, zoom, cells})` | 最省 token；`isolate` 会包含子骨骼 |
-| 多角度/高分辨率/成品图 | `bb_render_views({views, size, antialias, isolate, zoom})` | `isolate` **不接受逗号**（分次调用）；`closeup` 单独一批 |
+| 多角度/高分辨率/成品图 | `bb_render_views({views, size, antialias, isolate, zoom})` | `isolate` 支持逗号多部件（与 `bb_look` 一致）；`closeup` 单独一批 |
 | 连续机位/固定视角接力 | `bb_camera` | `focus` 只接受元素名，不能给坐标 |
 | 穿模/对称检查 | `bb_orbit({steps:8})` | 450–800 token |
 | 动画动作检查 | `bb_anim_check` | 4–16 帧采样 |
