@@ -113,9 +113,11 @@
 **T2（See-through，完整分层）——精修/需要遮挡补全/需要头部拆分时用**
 1. `bb_seg_install({confirm:true})`：装 ComfyUI（~7GB，可后台作业）；
 2. 按返回的 `startCommand` 起 ComfyUI（8188），等 `/system_stats` 200；
-3. `bb_seg_run({file, resolution:832})`：首次下权重约 12.5GB/20 分钟，之后约 156 秒；
-4. 得到 **body 13 + head 11 层**（插件语义合并输出 22 层）+ 深度序 + 遮挡补全；
+3. `bb_seg_run({file, resolution:832})`：首次下权重约 12.5GB/约 20 分钟，之后约 1–3 分钟；
+4. 得到 **body 13 + head 11 原始 24 层 → 实际输出通常 29 个语义层**（层名以返回的 `layers.json` 为准：
+   back hair / bottomwear / handwear-l/r / headwear / face / front hair / legwear / footwear / neckwear / topwear / objects 等）+ 深度序 + 遮挡补全；
 5. **逐层与模型对照**，这就是最可靠的"每个部件像不像"依据，同时用于 spec 的 gaps 检查。
+   - 注意：`bb_seg_run` **不产 PSD**（前端按钮/ag-psd 才能生成）；`objects` 层是背景道具，不建模；裁切层图直接看形状，不要拿绝对 bbox 当模型坐标。
 
 **T1（SAM2.1 轻量分割）——默认必做的兜底**
 - `bb_seg_lite({file:"<一张全身立绘>", grid:24, max_parts:24})`：首次自动下载 **59MB** 模型 + 装 onnxruntime，CPU 约 12–39 秒/张；
@@ -503,6 +505,8 @@ bb_look({isolate:"Skirt", zoom:1.6, cells:[{view:"front"},{camera:{azimuth:40,el
 | 外部官方图直链 403/404 是常态 | 萌娘原始 storage / `bb_ref_collect({urls})` 直喂；缺口进 gaps |
 | `Set-Content -NoNewline` 写脚本 | 用 `write`/`edit` |
 | `bb_batch` 内图片块/回执 | 以最新实现为准；长批拆小 |
+| **Blockbench 欧拉序是 XYZ（R=Rx·Ry·Rz）** | 长轴方向映射解算要用正确序：`ry=asin(tx)`、`rx=atan2(−ty,tz)`；按 ZYX 推导会把角做成"齿轮辐条"（2026-11-07 实测） |
+| 骨骼 `delete` 会**级联删除子骨骼与方块** | 删角/马尾根骨会一次清掉整条链；补丁里要"先删后建"，且不要重复删已级联的 id |
 
 ---
 
