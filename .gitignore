@@ -52,3 +52,6 @@ models/*/refcorpus/
 # 语料库（含 169 个解码后的现代 YSM 模型、女仆/舰娘模型）——第三方版权，只本地用
 material/
 tools/ysmparser/
+
+# 子智能体语料分析的中间产物
+tools/curve/out_*.json
