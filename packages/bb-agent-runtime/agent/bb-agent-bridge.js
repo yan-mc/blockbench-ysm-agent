@@ -1314,7 +1314,10 @@
     return true
   }
 
+  let isolationBounds = null
+
   function modelBounds() {
+    if (isolationBounds) return isolationBounds
     if (!Cube.all.length) return [[0, 0, 0], [0, 0, 0]]
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity]
     let any = false
@@ -1343,7 +1346,7 @@
     return list
   }
 
-  async function withIsolation(refs, fn) {
+  async function withIsolation(refs, fn, paramsZoom) {
     const targets = resolvePartRefs(refs)
     const keep = new Set()
     const addTree = (node) => {
@@ -1366,10 +1369,33 @@
     }
     for (const g of Group.all) apply(g)
     for (const c of Cube.all) apply(c)
+    // 计算隔离后的包围盒，并按 zoom 收紧（zoom>1 = 更近）
+    const zoom = Math.max(0.2, Math.min(8, Number(paramsZoom) || 1))
+    const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity]
+    let any = false
+    for (const cube of Cube.all) {
+      if (!keep.has(cube)) continue
+      any = true
+      const from = vec(cube.from), to = vec(cube.to)
+      for (let i = 0; i < 3; i++) {
+        mn[i] = Math.min(mn[i], from[i], to[i])
+        mx[i] = Math.max(mx[i], to[i])
+      }
+    }
+    const prevOverride = isolationBounds
+    if (any) {
+      const ctr = [(mn[0]+mx[0])/2, (mn[1]+mx[1])/2, (mn[2]+mx[2])/2]
+      const half = [ (mx[0]-mn[0])/2/zoom, (mx[1]-mn[1])/2/zoom, (mx[2]-mn[2])/2/zoom ]
+      isolationBounds = [
+        [ctr[0]-half[0], ctr[1]-half[1], ctr[2]-half[2]],
+        [ctr[0]+half[0], ctr[1]+half[1], ctr[2]+half[2]],
+      ]
+    }
     try {
       Canvas.scene.updateMatrixWorld(true)
       return await fn()
     } finally {
+      isolationBounds = prevOverride
       for (const [node, vis, meshVis] of saved) {
         node.visibility = vis
         if (node.mesh && meshVis !== undefined) node.mesh.visible = meshVis
@@ -1960,7 +1986,7 @@
   handlers['render.views'] = async (params = {}) => {
     ensureProject()
     const isolateRefs = params.isolate ? (Array.isArray(params.isolate) ? params.isolate : [params.isolate]) : null
-    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.views']({ ...params, isolate: null }))
+    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.views']({ ...params, isolate: null }), params.zoom)
     const views = Array.isArray(params.views) && params.views.length ? params.views : ['front', 'right', 'iso_fr']
     const size = Array.isArray(params.size) ? params.size : [768, 768]
     const ssaa = params.antialias === 'ssaa' ? 2 : 1
@@ -2482,7 +2508,7 @@
   handlers['render.preview'] = async (params = {}) => {
     ensureProject()
     const isolateRefs = params.isolate ? (Array.isArray(params.isolate) ? params.isolate : [params.isolate]) : null
-    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.preview']({ ...params, isolate: null }))
+    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.preview']({ ...params, isolate: null }), params.zoom)
     const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
     const preview = offscreenPreview()
     const size = Array.isArray(params.size) ? params.size : [640, 640]
@@ -2676,7 +2702,7 @@
   handlers['render.sheet'] = async (params = {}) => {
     ensureProject()
     const isolateRefs = params.isolate ? (Array.isArray(params.isolate) ? params.isolate : [params.isolate]) : null
-    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.sheet']({ ...params, isolate: null }))
+    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.sheet']({ ...params, isolate: null }), params.zoom)
     const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
     const preview = offscreenPreview()
 

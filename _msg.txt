@@ -1,28 +1,27 @@
-﻿model: v10 -- body rescale, block-stacked eyes, part-by-part isolation review
+﻿feat: isolate zoom, corrected proportions, hair and eye corrections (v0.9.1)
 
-Three tasks from the corrected eye doctrine.
+Part review: isolate now accepts zoom (default 1, useful range 1.5-3). withIsolation
+computes the bounding box of the kept cubes and stores it, modelBounds returns that
+override while isolated, so the framing tightens to the isolated part and zoom scales it
+further. Exposed on bb_look and bb_render_views alongside isolate, so a part can be
+inspected up close from several angles in one call.
 
-Proportions: total height 51.61 to 44.62 by scaling everything below the jaw by 0.81
-(the Head subtree was translated down 6.99 while the head cube stayed 6.20 x 5.95 x 6.05).
-Bone names and hierarchy untouched, so all 51 animation entries still bind. Head-to-body
-went 6.47 to 5.59. It cannot reach the corpus 4.87 without either making head-plus-hair 16%
-taller or dropping total height to 38.9 -- a decision for the next round rather than
-something arithmetic can solve inside the current constraint.
+Proportions corrected. For three rounds I chased a head-to-body target of 4.87, which was
+a mis-measurement: it came from a head height that included hair. Measuring bone pivots
+and cube bounds across 140 models gives real medians -- total height / head height 7.31
+(p25 6.54 / p75 9.88), shoulder width / head width 1.01, hip width / head width 0.69,
+torso length / head height 1.77, arm length / head height 1.49, head 7x7x7. The corpus is
+a realistic seven-head build, not chibi. Applied to our model this exposes the actual
+fault: total/head is 7.50, close to target, while shoulder width / head width is 1.52
+against 1.01 -- the shoulders are half again too wide, which is what reads as stocky.
 
-Eyes rebuilt as solid blocks instead of painted texture, 9 per eye verified from the file:
-eyelid plate 2.00 x 1.52 x 1.00 plus a 1.2 x 0.5 lash strip rotated 4 degrees, iris
-1.00 x 1.20 plus an inner brighter circle 0.70 x 0.42 x 0.90, pupil 0.40 x 0.50, two
-ultra-thin highlights at 0.05 depth (0.5 x 0.4 and 0.2 x 0.15), and a three-block tapering
-eyebrow. Depth ordering runs -3.43 / -3.50 / -3.56 / -3.65 from lid to highlight, so the
-eye is literally built back-to-front. Every dimension lands on the corpus median. The face
-texture region was repainted as plain skin gradient with the eye drawn only as 2-4 px
-colour swatches, and 3D blush and mouth plates were added to fix the flat white face.
+Hair: measured 714 strands of four or more cubes. Within a single strand the coefficient
+of variation of thickness is a median 0.11 (p25 0.00) and 68% fall below 0.3, with a median
+of 10 cubes per strand. So strands are uniform-thickness chains, not tapered wedges; the
+curve comes from many slightly rotated cubes in series, which is also what keeps the top of
+the head from reading as a hard corner. The taper that 61% of models do show is only the
+last one or two cubes.
 
-Part review via isolate: head, arms, skirt and legs each rendered alone. The head pass is
-what exposed the old eye as a 0.05-thick plate, which is why the rebuild happened at all.
-
-394 cubes, 162 bones, validate 0 errors.
-
-Open: head-to-body still 5.59, hair volume now dominates the silhouette and hides the
-arms, and the plugin closeup view does not actually zoom (focus.padding moves the target
-but not the scale) so eye review had to go through isolate instead.
+Eyes: the lid plate measures 2.00 wide by 1.52 tall, i.e. 1.32:1 and clearly wider than
+tall. Anime eyes are flat, and every horizontal dimension should exceed its vertical
+counterpart.
