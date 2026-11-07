@@ -1,27 +1,35 @@
-﻿feat: isolate zoom, corrected proportions, hair and eye corrections (v0.9.1)
+﻿model: v11 -- shoulder width fixed, eyes flattened, hair rebuilt as uniform strips
 
-Part review: isolate now accepts zoom (default 1, useful range 1.5-3). withIsolation
-computes the bounding box of the kept cubes and stores it, modelBounds returns that
-override while isolated, so the framing tightens to the isolated part and zoom scales it
-further. Exposed on bb_look and bb_render_views alongside isolate, so a part can be
-inspected up close from several angles in one call.
+Proportions now land on the corpus medians, verified from the file:
+- shoulder width / head width 1.52 to 1.01 (corpus 1.01)
+- hip width / head width 0.61 to 0.69 (corpus 0.69)
+- total height / head height 7.50 to 7.36 (corpus 7.31)
+- head enlarged 3% to 6.39 x 6.13 x 6.05 against the corpus 7 x 7 x 7
 
-Proportions corrected. For three rounds I chased a head-to-body target of 4.87, which was
-a mis-measurement: it came from a head height that included hair. Measuring bone pivots
-and cube bounds across 140 models gives real medians -- total height / head height 7.31
-(p25 6.54 / p75 9.88), shoulder width / head width 1.01, hip width / head width 0.69,
-torso length / head height 1.77, arm length / head height 1.49, head 7x7x7. The corpus is
-a realistic seven-head build, not chibi. Applied to our model this exposes the actual
-fault: total/head is 7.50, close to target, while shoulder width / head width is 1.52
-against 1.01 -- the shoulders are half again too wide, which is what reads as stocky.
+Shoulder width was the actual cause of the stocky look, not head-to-body. Arms and their
+cubes moved inward 1.47, legs outward 0.24, and the head subtree scaled 1.03 about its
+pivot. Bone names and hierarchy untouched, 162 bones, 304 animations intact.
 
-Hair: measured 714 strands of four or more cubes. Within a single strand the coefficient
-of variation of thickness is a median 0.11 (p25 0.00) and 68% fall below 0.3, with a median
-of 10 cubes per strand. So strands are uniform-thickness chains, not tapered wedges; the
-curve comes from many slightly rotated cubes in series, which is also what keeps the top of
-the head from reading as a hard corner. The taper that 61% of models do show is only the
-last one or two cubes.
+Eyes went flat. Every part is now wider than tall: lid plate 2.00 x 1.36, iris 1.16 x 0.86
+(was 1.00 x 1.20, taller than wide), inner gold 0.74 x 0.34, pupil 0.46 x 0.30 (was
+0.40 x 0.50), highlights 0.50 x 0.30 and 0.20 x 0.13, lash strip 1.24 x 0.42. Eye centres
+moved apart from +/-0.98 to +/-1.45 so 0.42 of eye white shows on each side. Structure is
+still the solid-colour block stack, no return to painted texture.
 
-Eyes: the lid plate measures 2.00 wide by 1.52 tall, i.e. 1.32:1 and clearly wider than
-tall. Anime eyes are flat, and every horizontal dimension should exceed its vertical
-counterpart.
+Hair rebuilt from single long boards into uniform-thickness chains: each former board
+split into 1.35-tall segments, each segment rotated 2.5-5 degrees about z and 2 about x,
+24+28+45 cubes across three back-hair chains, 6-12 cubes per twin-tail node, side hair
+moved out 0.25 so it clears the cheek. Thickness stays constant (back 1.03-1.09, side
+0.52-0.68) rather than tapering. Total 404 to 587 cubes.
+
+Part review with isolate at zoom 2-2.5 across three angles each is what surfaced the
+faults fixed here: iris and pupil were taller than wide, eye spacing was too narrow with
+no eye white, side hair touched the cheek, back hair was one solid board, and a white
+neck strip under the chin.
+
+Still open: the back of the hair still reads as a wall because the chains are equal length
+and side by side with no stagger; side hair is brick-dense at 58 and 55 cubes when the
+corpus suggests 8-12 per strand; the neck strip remains; horns are still thin black spikes
+rather than the thick curved ram horns the design calls for; and the 1.01 shoulder width
+was achieved by pulling the arms inward, so they are now hidden behind the hair instead of
+being visible at the sides.
