@@ -7,7 +7,9 @@
  *   T1 SAM2           → 本地轻量部件分割（只给可见区域）
  *
  * 约束（写进代码与文档，避免"把生成当还原"）：
- *   - 需要 Google Gemini API key（付费层；Pro Image 无免费层）。
+ *   - 需要付费 API key；支持官方 Gemini API，也支持兼容 Gemini 格式的中转站
+ *     （如 APIYI：baseUrl https://api.apiyi.com/v1beta，Bearer 鉴权）。
+ *   - Pro Image 无免费层；中转站价格以服务商为准，本模块只按 Google 官方价估算。
  *   - 生成结果含 SynthID 水印；上传参考图视为把素材发给 Google，注意版权/隐私。
  *   - 输出是**推断**：背面、内侧、被遮挡部件都是模型脑补，必须人工复核并记入 spec.gaps。
  *   - 不替代本地流水线：没有 key / 调用失败时降级 T2。
@@ -49,10 +51,45 @@ export const T3_ASPECTS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:1
 export const T3_IMAGE_SIZES = ['1K', '2K', '4K']
 export const T3_MODES = ['turnaround', 'breakdown', 'custom']
 
+/**
+ * 服务商预设：官方 Gemini / APIYI 中转站 / 自定义。
+ * APIYI 文档（https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit）
+ * 使用 `Authorization: Bearer <token>` + 与官方一致的 generateContent body
+ * （camelCase inlineData/mimeType）；baseUrl 为 https://api.apiyi.com/v1beta。
+ */
+export const T3_PRESETS = {
+  official: {
+    label: 'Google Gemini 官方',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    auth: 'query',
+    bodyStyle: 'camel',
+    responseModalities: ['IMAGE'],
+    model: 'gemini-3-pro-image',
+  },
+  apiyi: {
+    label: 'APIYI 中转站',
+    baseUrl: 'https://api.apiyi.com/v1beta',
+    auth: 'bearer',
+    bodyStyle: 'camel',
+    responseModalities: ['IMAGE'],
+    model: 'gemini-3-pro-image',
+  },
+  custom: {
+    label: '自定义中转站',
+    baseUrl: '',
+    auth: 'bearer',
+    bodyStyle: 'camel',
+    responseModalities: ['IMAGE'],
+    model: 'gemini-3-pro-image',
+  },
+}
+
 /** 把配置 + 环境变量归一成 T3 运行配置。 */
 export function resolveT3Config(config = {}, env = process.env) {
   const nb = config?.nanoBanana && typeof config.nanoBanana === 'object' ? config.nanoBanana : {}
   const pick = (...vals) => vals.find((v) => typeof v === 'string' && v.trim()) ?? ''
+  const provider = pick(nb.provider, config?.nanoBananaProvider, 'official').toLowerCase()
+  const preset = T3_PRESETS[provider] ?? T3_PRESETS.official
   const apiKey = pick(nb.apiKey, config?.nanoBananaApiKey, env?.GEMINI_API_KEY, env?.GOOGLE_API_KEY, env?.NANO_BANANA_API_KEY)
   const apiKeySource = nb.apiKey ? 'nanoBanana.apiKey'
     : config?.nanoBananaApiKey ? 'nanoBananaApiKey'
@@ -60,8 +97,13 @@ export function resolveT3Config(config = {}, env = process.env) {
         : env?.GOOGLE_API_KEY ? 'env:GOOGLE_API_KEY'
           : env?.NANO_BANANA_API_KEY ? 'env:NANO_BANANA_API_KEY'
             : ''
-  const model = pick(nb.model, config?.nanoBananaModel, T3_DEFAULT_MODEL)
-  const baseUrl = pick(nb.baseUrl, config?.nanoBananaBaseUrl, T3_DEFAULT_BASE_URL).replace(/\/+$/, '')
+  const model = pick(nb.model, config?.nanoBananaModel, preset.model, T3_DEFAULT_MODEL)
+  const baseUrl = pick(nb.baseUrl, config?.nanoBananaBaseUrl, preset.baseUrl, T3_DEFAULT_BASE_URL).replace(/\/+$/, '')
+  const auth = pick(nb.auth, config?.nanoBananaAuth, preset.auth, 'query').toLowerCase() === 'bearer' ? 'bearer' : 'query'
+  const bodyStyle = pick(nb.bodyStyle, config?.nanoBananaBodyStyle, preset.bodyStyle, 'camel').toLowerCase() === 'snake' ? 'snake' : 'camel'
+  const rm = Array.isArray(nb.responseModalities) ? nb.responseModalities
+    : Array.isArray(config?.nanoBananaResponseModalities) ? config.nanoBananaResponseModalities
+      : (preset.responseModalities ?? ['IMAGE'])
   const imageSize = pick(nb.imageSize, config?.nanoBananaImageSize, T3_DEFAULT_IMAGE_SIZE).toUpperCase()
   const aspectRatio = pick(nb.aspectRatio, config?.nanoBananaAspectRatio, T3_DEFAULT_ASPECT)
   const maxReferences = clampInt(nb.maxReferences ?? config?.nanoBananaMaxReferences, 1, 14, 6)
@@ -70,8 +112,13 @@ export function resolveT3Config(config = {}, env = process.env) {
     configured: Boolean(apiKey),
     apiKey,
     apiKeySource,
+    provider,
+    providerLabel: preset.label,
     model,
     baseUrl,
+    auth,
+    bodyStyle,
+    responseModalities: rm.length ? rm : ['IMAGE'],
     imageSize: T3_IMAGE_SIZES.includes(imageSize) ? imageSize : T3_DEFAULT_IMAGE_SIZE,
     aspectRatio: T3_ASPECTS.includes(aspectRatio) ? aspectRatio : T3_DEFAULT_ASPECT,
     maxReferences,
@@ -90,13 +137,18 @@ function clampInt(v, min, max, fallback) {
 export function inspectT3Availability(config = {}, env = process.env) {
   const c = resolveT3Config(config, env)
   const reasons = []
-  if (!c.configured) reasons.push('未配置 Gemini API key（nanoBanana.apiKey / nanoBananaApiKey / 环境变量 GEMINI_API_KEY）')
+  if (!c.configured) reasons.push('未配置 API key（nanoBanana.apiKey / nanoBananaApiKey / 环境变量 GEMINI_API_KEY）')
   return {
     ok: c.configured,
     label: 'T3 云端拆解（Nano Banana Pro）',
-    desc: '多参考图 → 严格三视图 / 全景式深度拆解板；生成式推断，需付费 API',
+    desc: '多参考图 → 严格三视图 + 部件分解图 / 全展开拆解板；生成式推断，需付费 API',
+    provider: c.provider,
+    provider_label: c.providerLabel,
     model: c.model,
     model_label: c.modelInfo?.label ?? c.model,
+    base_url: c.baseUrl,
+    auth: c.auth,
+    body_style: c.bodyStyle,
     api_key_source: c.apiKeySource || null,
     image_size: c.imageSize,
     aspect_ratio: c.aspectRatio,
@@ -105,50 +157,62 @@ export function inspectT3Availability(config = {}, env = process.env) {
     reasons,
     fallback: c.configured ? null : 't2',
     note: c.configured
-      ? '会调用 Google Gemini API；参考图会上传，生成图含 SynthID 水印；结果必须人工复核'
+      ? `会调用 ${c.providerLabel}（${c.baseUrl}）；参考图会上传给服务商；生成图结果必须人工复核`
       : '没有 key 时降级用 T2（bb_seg_run，本地 See-through）',
   }
 }
 
 const TURNAROUND_PROMPT = [
-  '你是资深游戏角色概念设计师，正在为 3D 建模制作严格三视图。',
-  '以用户提供的参考图（同一角色的官方立绘 / 设定图，可能有多张多角度）作为**唯一身份依据**，生成一张横向三视图：',
-  '- 从左到右：严格正面、严格 90° 正侧面、严格背面，三个完整全身视图；',
+  '你是资深游戏角色概念设计师，正在为 3D 建模制作角色设定图。',
+  '以用户提供的参考图（同一角色的官方立绘/设定图，可能有多张多角度）作为**唯一身份依据**，',
+  '生成一张排版清晰、等比例、可量尺寸的**正交三视图 + 部件分解图**。',
+  '',
+  '一、三视图（必须清晰、完整）',
+  '- 横向并排：严格正面、严格 90° 正侧面、严格背面，三个完整全身视图；',
   '- 三视图等高等比例，头顶与脚底分别对齐同一条水平基线；',
-  '- 中性站立姿势（A-pose 或双臂自然下垂），不要保留参考图里的坐姿、动作、舞蹈姿势；',
+  '- 中性站立姿势（A-pose 或双臂自然下垂），不保留参考图的坐姿/动作/舞蹈姿势；',
   '- 纯白或极浅灰背景；无场景、无道具、无特效、无水印、无多余装饰文字；',
-  '- 严格保持脸型、五官、瞳色、发型、角 / 兽耳、服装结构、层次、配色、纹样与配饰；不得新增参考图里没有的元素；',
-  '- 参考图缺少背面 / 侧面信息时，按可见结构与设计语言做合理推断，三个视图之间必须自洽；',
-  '- 只输出一张图，不要输出文字说明。',
+  '- 严格保持脸型、五官、瞳色、发型、角/兽耳、服装结构、层次、配色、纹样与配饰；',
+  '',
+  '二、单独部位图（必须逐项画出，不要只画全身）',
+  '- 头部：正面、侧面、背面特写，清晰画出五官、发型、角/耳、发饰；',
+  '- 上半身：正面、侧面（躯干 + 手臂 + 上衣结构）；',
+  '- 下半身：正面、侧面（腰胯 + 腿 + 鞋/靴）；',
+  '- 手部：正/背/侧面（被袖子遮挡时画出袖口连接结构）；',
+  '- 脚部/鞋：正面、侧面、鞋底；',
+  '- 服装拆解：把每件衣服和配饰拆成独立单品平铺展示（外套、上衣、裙/裤、腰带/绑带、袖套、手套、鞋、发饰、胸针、角环等），一件一张，保持原配色与纹样；',
+  '- 对应关系：可用细线/编号把拆解单品连到三视图上的对应位置（编号少而清晰）。',
+  '',
+  '三、约束',
+  '- 只出现参考图里的这一个角色；不添加参考图没有的配饰、花纹、道具、内着或其他物品；',
+  '- 不画参考图原有的背景、家具、乐器、特效；',
+  '- 参考图缺少背面/侧面信息时，按可见结构做合理推断，三视图与拆解件之间必须自洽；',
+  '- 只输出一张图，不要输出大段文字说明。',
 ].join('\n')
 
 const BREAKDOWN_PROMPT = [
-  '你是一位顶尖的游戏与动漫概念美术设计大师，擅长制作详尽的角色设定图，并具备"像素级拆解"能力：',
-  '能透视角色的穿着层级、捕捉微表情变化，把与角色相关的物品具象化还原。',
+  '你是资深游戏角色概念设计师，正在制作**角色部件拆解设定图**（用于 3D 建模）。',
+  '以用户提供的同一角色参考图（可多张多角度）作为唯一设计依据，生成一张"全展开部件设定板"。',
   '',
-  '任务：根据用户提供的同一角色参考图（可能有多张多角度），生成一张"全景式角色深度概念分解图"。',
-  '',
-  '1. 构图布局：中心位放角色全身立绘（以参考图为准，保持身份特征与服装），作为视觉锚点；',
-  '环绕位在四周空白处有序排列拆解元素；用手绘箭头或引导线把拆解物连到中心人物对应部位。',
-  '2. 拆解内容：',
-  '- 三视图：正面、90° 侧面、背面三个完整全身视图，等高等比例；',
-  '- 服装分层：把服装拆成单品展示；多层穿搭要展示脱下外套后的内层状态；',
-  '- 表情集：角落画 3–4 个头部特写，展示不同情绪；',
-  '- 材质特写：选 1–2 个关键部位放大（布料/皮革/金属/蕾丝等质感）；',
-  '- 核心道具与配饰：完整展示，被手挡住或过小的配件单独放大；',
-  '- 随身物品：符合角色职业、爱好、性格的日常物件（包袋内容物、小物等），不要低俗内容。',
-  '3. 风格与注释：高质量 2D 插画 / 概念设计草图风格，线条干净；米黄、羊皮纸或浅灰设计稿背景；',
-  '每个拆解元素旁可加简短手写注释（材质/结构），文字用中文。',
-  '',
-  '一致性要求：所有视图、拆解单品和中心人物必须是同一个角色、同一套设计；不得改变发色/瞳色/角/服装结构；',
-  '参考图里没有明确画出的背面与内侧结构，按设计语言做合理推断，并在画面里保持自洽。',
-  '只输出一张图。',
+  '1. 中心位：角色全身中性站姿（正面），可在旁边加正/侧/背三视图小图；',
+  '2. 拆解部件：把角色拆成独立部件，按区域整齐排开，互不遮挡、平铺摆放：',
+  '- 头部：正/侧/背特写（五官、发型、角/兽耳、发饰分别画出）；',
+  '- 躯干：正面/背面（上衣、胸饰、腰带逐件分开）；',
+  '- 双臂与手：左右分开，画清袖口与手套连接；',
+  '- 双腿与脚：左右分开，画清裤/袜/鞋的结构与鞋底；',
+  '- 每件服装单品：外套、上衣、裙/裤、袖套、腰带/绑带、鞋/靴逐件平铺；',
+  '- 每件配饰/道具：发饰、胸针、角环、挂件等逐个放大展示。',
+  '3. 标注：用细编号或短标签说明部件名称/连接关系；保持原设计、配色、纹样、材质；',
+  '4. 约束：只拆参考图中**确实存在**的部件；不添加参考图没有的服装、道具、内着、花纹或生活物品；',
+  '被遮挡的结构可按可见设计语言补全，但必须与原设计一致；',
+  '纯白或浅灰背景，只输出一张排版清晰的设计图，不要大段文字。',
 ].join('\n')
 
 const COMMON_GUARD = [
   '重要约束：',
-  '- 只能出现参考图里的这一个角色，不要添加其他人物、 logo、签名或与角色无关的文字；',
-  '- 不要画参考图原图里的背景、家具、乐器、特效等场景元素（拆解板的"道具"区除外）；',
+  '- 只能出现参考图里的这一个角色，不要添加其他人物、logo、签名或与角色无关的文字；',
+  '- 不要画参考图原图里的背景、家具、乐器、特效等场景元素；',
+  '- 不要虚构参考图里不存在的服装、配饰、道具、内着或生活物品；',
   '- 如果参考图是复杂动作，先把角色还原成中性站姿再拆解。',
 ].join('\n')
 
@@ -184,16 +248,24 @@ export function buildSheetPrompt({ mode = 'turnaround', character = '', prompt =
  * @param {string} [p.aspectRatio]
  * @param {string} [p.imageSize]
  */
-export function buildT3RequestBody({ prompt, images = [], aspectRatio = T3_DEFAULT_ASPECT, imageSize = T3_DEFAULT_IMAGE_SIZE } = {}) {
+export function buildT3RequestBody({
+  prompt, images = [], aspectRatio = T3_DEFAULT_ASPECT, imageSize = T3_DEFAULT_IMAGE_SIZE,
+  bodyStyle = 'camel', responseModalities = ['IMAGE'],
+} = {}) {
   const parts = [{ text: String(prompt || '') }]
   for (const img of images) {
     if (!img?.data) continue
-    parts.push({ inline_data: { mime_type: img.mimeType || 'image/png', data: img.data } })
+    const mime = img.mimeType || 'image/png'
+    parts.push(bodyStyle === 'snake'
+      ? { inline_data: { mime_type: mime, data: img.data } }
+      : { inlineData: { mimeType: mime, data: img.data } })
   }
+  const rm = Array.isArray(responseModalities) && responseModalities.length ? responseModalities : ['IMAGE']
   return {
-    contents: [{ role: 'user', parts }],
+    // 不写 role：官方与 APIYI 文档示例均为 {"contents":[{"parts":[...]}]}，兼容性最好
+    contents: [{ parts }],
     generationConfig: {
-      responseModalities: ['TEXT', 'IMAGE'],
+      responseModalities: rm,
       imageConfig: {
         aspectRatio: T3_ASPECTS.includes(aspectRatio) ? aspectRatio : T3_DEFAULT_ASPECT,
         imageSize: T3_IMAGE_SIZES.includes(imageSize) ? imageSize : T3_DEFAULT_IMAGE_SIZE,
@@ -287,13 +359,18 @@ export async function callT3({
     e.code = 'T3_NO_FETCH'
     throw e
   }
-  const url = `${c.baseUrl}/models/${encodeURIComponent(c.model)}:generateContent?key=${encodeURIComponent(c.apiKey)}`
+  const endpoint = `${c.baseUrl}/models/${encodeURIComponent(c.model)}:generateContent`
+  const url = c.auth === 'bearer' ? endpoint : `${endpoint}?key=${encodeURIComponent(c.apiKey)}`
   const body = buildT3RequestBody({
     prompt,
     images,
     aspectRatio: aspectRatio ?? c.aspectRatio,
     imageSize: imageSize ?? c.imageSize,
+    bodyStyle: c.bodyStyle,
+    responseModalities: c.responseModalities,
   })
+  const headers = { 'content-type': 'application/json' }
+  if (c.auth === 'bearer') headers.authorization = `Bearer ${c.apiKey}`
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(new Error('T3 timeout')), timeoutMs ?? c.timeoutMs)
   const onAbort = () => ac.abort(signal.reason ?? new Error('aborted'))
@@ -305,7 +382,7 @@ export async function callT3({
   try {
     const res = await fetchImpl(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: ac.signal,
     })

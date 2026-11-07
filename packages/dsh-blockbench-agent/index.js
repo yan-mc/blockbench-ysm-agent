@@ -112,12 +112,20 @@ const DEFAULTS = {
   comfyOutputDir: '',
 
   // ---- T3 云端拆解（Nano Banana Pro / Gemini 3 Pro Image，docs/25）----
+  /** 服务商预设：official（Google 官方）| apiyi（APIYI 中转站）| custom。 */
+  nanoBananaProvider: 'official',
   /** Gemini API key（也可用环境变量 GEMINI_API_KEY / GOOGLE_API_KEY）。Pro Image 需付费项目。 */
   nanoBananaApiKey: '',
   /** 模型 id；默认 gemini-3-pro-image（Nano Banana Pro）。 */
   nanoBananaModel: 'gemini-3-pro-image',
-  /** 可选代理/区域端点；默认官方 v1beta。 */
-  nanoBananaBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+  /** 可选端点；留空取 provider 预设（官方 googleapis / APIYI api.apiyi.com）。 */
+  nanoBananaBaseUrl: '',
+  /** 鉴权方式：auto（按预设）/ query（?key=）/ bearer（Authorization: Bearer）。 */
+  nanoBananaAuth: 'auto',
+  /** 请求体风格：auto/camel（inlineData/mimeType，官方与 APIYI 文档）/ snake（inline_data）。 */
+  nanoBananaBodyStyle: 'auto',
+  /** 输出模态；默认 ["IMAGE"]（APIYI 文档示例），需要文字说明可改 ["TEXT","IMAGE"]。 */
+  nanoBananaResponseModalities: ['IMAGE'],
   /** 默认输出尺寸 1K/2K/4K。 */
   nanoBananaImageSize: '2K',
   /** 默认宽高比。 */
@@ -1735,8 +1743,8 @@ let lastRefCanon = null
   tool({
     name: 'bb_seg_t3',
     description: 'T3 云端拆解（Nano Banana Pro / Gemini 3 Pro Image）：把同一角色的 1–14 张多角度参考图交给 Google 图像模型，'
-      + '生成**严格三视图**（mode:"turnaround"，建模用）或**全景式深度拆解板**（mode:"breakdown"：三视图 + 服装分层 + 表情 + 材质 + 道具 + 箭头注释）。'
-      + '分级优先级 **T3 > T2 > T1**：需要付费 Gemini API key（配置 nanoBanana.apiKey / nanoBananaApiKey，或环境变量 GEMINI_API_KEY / GOOGLE_API_KEY）；'
+      + '生成**严格三视图 + 部件分解图**（mode:"turnaround"，建模用，含头部/上半身/下半身/手/脚/服装单品）或**全展开部件拆解板**（mode:"breakdown"：把每件服装和配饰平铺拆开，只拆参考图里存在的部件）。'
+      + '分级优先级 **T3 > T2 > T1**：需要付费 API key；支持官方 Gemini 与兼容中转站（如 APIYI：provider:"apiyi"，baseUrl https://api.apiyi.com/v1beta，Bearer 鉴权）。'
       + '没有 key 时返回 T3_NOT_CONFIGURED，请降级用 bb_seg_run（T2 本地 See-through）。'
       + '**云端生成是推断不是还原**：背面/内侧/被遮挡部件都是模型脑补，必须逐张人工复核并把推定项写进 spec.gaps；参考图会上传到 Google，生成图含 SynthID 水印。'
       + '官方价约 1K/2K $0.134/张、4K $0.24/张（variants 成倍计费）；`dry_run:true` 不需要 key，可先看提示词与成本。'
@@ -1745,7 +1753,7 @@ let lastRefCanon = null
       references: { type: 'array', items: { type: 'string' }, description: 'workspace 内相对路径的参考图数组（同角色多角度；1–14 张，建议 4–6）' },
       reference_dir: { type: 'string', description: 'workspace 内目录，自动取前 max_references 张图片（与 references 二选一）' },
       max_references: { type: 'number', description: '最多用几张参考图，默认取配置（6；上限 14）' },
-      mode: { type: 'string', enum: T3_MODES, description: 'turnaround=严格三视图（默认，建模用）；breakdown=全景拆解板；custom=用 prompt' },
+      mode: { type: 'string', enum: T3_MODES, description: 'turnaround=三视图+逐部位/服装拆解（默认，建模用）；breakdown=全展开部件拆解板；custom=用 prompt' },
       prompt: { type: 'string', description: '追加说明；custom 模式必填' },
       character: { type: 'string', description: '角色名（提示词身份锚定，可选）' },
       aspect_ratio: { type: 'string', enum: T3_ASPECTS, description: '默认 16:9（横向三视图/拆解板）' },

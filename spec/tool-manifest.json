@@ -2009,7 +2009,7 @@
     {
       "name": "bb_seg_t3",
       "title_zh": "T3 云端拆解（Nano Banana Pro）",
-      "description": "把同一角色的 1–14 张多角度参考图交给 Google Nano Banana Pro（Gemini 3 Pro Image），生成严格三视图（turnaround）或全景式深度拆解板（breakdown：三视图+服装分层+表情+材质+道具）。优先级 T3 > T2 > T1：需要付费 Gemini API key（nanoBanana.apiKey / GEMINI_API_KEY）；无 key 返回 T3_NOT_CONFIGURED，降级 bb_seg_run(T2)。云端生成是推断不是还原：背面/内侧/遮挡处为模型脑补，必须人工复核并写进 spec.gaps；参考图会上传到 Google，生成图含 SynthID 水印；官方价约 1K/2K $0.134/张、4K $0.24/张。dry_run:true 不需要 key，可只看提示词与成本不调用 API。",
+      "description": "把同一角色的 1–14 张多角度参考图交给 Nano Banana Pro（Gemini 3 Pro Image），生成严格三视图 + 逐个部位图（头部/上半身/下半身/手/脚）+ 服装单品拆解（turnaround），或全展开部件拆解板（breakdown，只拆参考图里存在的部件）。优先级 T3 > T2 > T1：需要付费 API key；支持官方 Gemini，也支持兼容中转站（provider:'apiyi' → https://api.apiyi.com/v1beta + Bearer；或 custom + baseUrl/auth/bodyStyle）。无 key 返回 T3_NOT_CONFIGURED，降级 bb_seg_run(T2)。云端生成是推断不是还原：背面/内侧/遮挡处为模型补全，必须人工复核并写进 spec.gaps；参考图会上传到服务商，生成图含 SynthID 水印；官方价约 1K/2K $0.134/张、4K $0.24/张（中转站价格以其账单为准）。dry_run:true 不需要 key，可只看提示词与成本不调用 API。",
       "mutating": false,
       "requires_project": false,
       "concurrency_safe": false,

@@ -55,7 +55,7 @@ baseUrl 默认 https://generativelanguage.googleapis.com/v1beta
     "role": "user",
     "parts": [
       { "text": "<提示词>" },
-      { "inline_data": { "mime_type": "image/png", "data": "<base64>" } }
+      { "inlineData": { "mimeType": "image/png", "data": "<base64>" } }
     ]
   }],
   "generationConfig": {
@@ -67,9 +67,40 @@ baseUrl 默认 https://generativelanguage.googleapis.com/v1beta
 
 - `imageSize`：`1K` / `2K` / `4K`（Pro 支持）。
 - `aspectRatio`：`1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9`。
-- 参考图：`inline_data` 多张（建议 4–6 张；第三方服务说明 Pro 系列最多约 14 张，实际以 API 报错为准；本工具默认上限 6、参数上限 14）。
-- 响应：`candidates[].content.parts[]` 中 `inlineData/inline_data` 为 base64 图片，`text` 为说明；无图时看 `promptFeedback.blockReason` / `finishReason`。
-- 兼容性：REST 用 snake_case（`inline_data`/`mime_type`），`generationConfig` 内部为 camelCase；实现里两种都解析。
+- 参考图：`inlineData` 多张（建议 4–6 张；第三方服务说明 Pro 系列最多约 14 张，实际以 API 报错为准；本工具默认上限 6、参数上限 14）。
+- 响应：`candidates[].content.parts[]` 中 `inlineData`（或 `inline_data`）为 base64 图片，`text` 为说明；无图时看 `promptFeedback.blockReason` / `finishReason`。
+- 请求体风格：默认 **camelCase**（`inlineData`/`mimeType`，与 Google 官方与 APIYI 文档一致）；兼容 `bodyStyle:"snake"`（`inline_data`/`mime_type`）。
+- 输出模态：默认 `responseModalities:["IMAGE"]`（APIYI 文档示例）；需要文字说明时可配 `nanoBananaResponseModalities:["TEXT","IMAGE"]`。
+
+### 2.1.1 APIYI 中转站兼容性（2026-11 核对）
+
+APIYI 的 Nano Banana 图片编辑文档（<https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit>）给的是**与官方 Gemini 一致的 generateContent 接口**，只是换成中转站域名 + Bearer 鉴权：
+
+```
+POST https://api.apiyi.com/v1beta/models/gemini-3-pro-image:generateContent
+Authorization: Bearer <APIYI token>
+Content-Type: application/json
+
+{
+  "contents": [{ "parts": [
+    { "text": "<提示词>" },
+    { "inlineData": { "mimeType": "image/png", "data": "<base64>" } },
+    { "inlineData": { "mimeType": "image/png", "data": "<base64>" } }
+  ]}],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": { "aspectRatio": "16:9", "imageSize": "2K" }
+  }
+}
+```
+
+结论：**格式兼容**，不需要改请求体结构；只需要：
+- `nanoBananaProvider: 'apiyi'`（自动 baseUrl=`https://api.apiyi.com/v1beta`、`auth: bearer`、`bodyStyle: camel`）；
+- `nanoBananaApiKey` 填 APIYI 的 token（或环境变量 `GEMINI_API_KEY`）；
+- 模型名用 `gemini-3-pro-image`（APIYI 文档就是这个 id；如中转站另有别名，按报错调整）。
+- 多参考图：文档示例就是多个 `inlineData`，支持；图片大小/限额以中转站为准。
+- **价格/额度以 APIYI 账单为准**（本插件的 `cost_estimate_usd` 是按 Google 官方价估算，不是中转站账单）。
+- 迁移到其他中转站：用 `nanoBananaProvider:'custom'` + `nanoBananaBaseUrl` + `nanoBananaAuth`（query/bearer）+ `nanoBananaBodyStyle` 覆盖即可。
 
 ### 2.2 价格（官方 pricing 页，2026-11 抓取）
 
@@ -130,18 +161,43 @@ T0  零依赖：模型直接看立绘
 
 ### 3.3 配置
 
-`cordis.patch.yml` 里可选（或用户 profile）：
+**官方 Gemini**（`cordis.patch.yml` 或用户 profile）：
 
 ```yaml
 config:
+  nanoBananaProvider: 'official'   # Google 官方（默认）
   # 也可用环境变量 GEMINI_API_KEY / GOOGLE_API_KEY
   nanoBananaApiKey: 'AIza...'
   nanoBananaModel: 'gemini-3-pro-image'
-  nanoBananaBaseUrl: 'https://generativelanguage.googleapis.com/v1beta'
   nanoBananaImageSize: '2K'
   nanoBananaAspectRatio: '16:9'
   nanoBananaMaxReferences: 6
   nanoBananaTimeoutMs: 180000
+```
+
+**APIYI 中转站**（中国大陆/香港不直连官方时用）：
+
+```yaml
+config:
+  nanoBananaProvider: 'apiyi'
+  nanoBananaApiKey: 'APIYI 的 token'
+  # provider=apiyi 自动：baseUrl=https://api.apiyi.com/v1beta, auth=bearer, bodyStyle=camel
+  nanoBananaModel: 'gemini-3-pro-image'
+  nanoBananaImageSize: '2K'
+  nanoBananaAspectRatio: '16:9'
+  nanoBananaMaxReferences: 6
+```
+
+**其他中转站**：
+
+```yaml
+config:
+  nanoBananaProvider: 'custom'
+  nanoBananaApiKey: '...'
+  nanoBananaBaseUrl: 'https://relay.example.com/v1beta'
+  nanoBananaAuth: 'bearer'        # 或 'query'
+  nanoBananaBodyStyle: 'camel'    # 或 'snake'
+  nanoBananaModel: 'gemini-3-pro-image'
 ```
 
 不提交 key；文档只写占位符。
@@ -152,35 +208,60 @@ config:
 
 ### 4.1 `turnaround`（默认，建模主用）
 
+要求模型输出"**正交三视图 + 逐部位单独图 + 服装单品拆解**"，而不是只画三张全身：
+
 ```
-你是资深游戏角色概念设计师，正在为 3D 建模制作严格三视图。
-以用户提供的参考图（同一角色的官方立绘/设定图，可能有多张多角度）作为唯一身份依据，生成一张横向三视图：
-- 从左到右：严格正面、严格 90° 正侧面、严格背面，三个完整全身视图；
+你是资深游戏角色概念设计师，正在为 3D 建模制作角色设定图。
+以用户提供的参考图（同一角色的官方立绘/设定图，可能有多张多角度）作为唯一身份依据，
+生成一张排版清晰、等比例、可量尺寸的**正交三视图 + 部件分解图**。
+
+一、三视图（必须清晰、完整）
+- 横向并排：严格正面、严格 90° 正侧面、严格背面，三个完整全身视图；
 - 三视图等高等比例，头顶与脚底分别对齐同一条水平基线；
-- 中性站立姿势（A-pose 或双臂自然下垂），不要保留参考图里的坐姿/动作/舞蹈姿势；
+- 中性站立姿势（A-pose 或双臂自然下垂），不保留参考图的坐姿/动作/舞蹈姿势；
 - 纯白或极浅灰背景；无场景、无道具、无特效、无水印、无多余装饰文字；
-- 严格保持脸型、五官、瞳色、发型、角/兽耳、服装结构、层次、配色、纹样与配饰；不得新增参考图里没有的元素；
-- 参考图缺少背面/侧面信息时，按可见结构与设计语言做合理推断，三个视图之间必须自洽；
-- 只输出一张图。
+- 严格保持脸型、五官、瞳色、发型、角/兽耳、服装结构、层次、配色、纹样与配饰；
+
+二、单独部位图（必须逐项画出，不要只画全身）
+- 头部：正面、侧面、背面特写，清晰画出五官、发型、角/耳、发饰；
+- 上半身：正面、侧面（躯干 + 手臂 + 上衣结构）；
+- 下半身：正面、侧面（腰胯 + 腿 + 鞋/靴）；
+- 手部：正/背/侧面（被袖子遮挡时画出袖口连接结构）；
+- 脚部/鞋：正面、侧面、鞋底；
+- 服装拆解：把每件衣服和配饰拆成独立单品平铺展示（外套、上衣、裙/裤、腰带/绑带、袖套、手套、鞋、发饰、胸针、角环等），一件一张，保持原配色与纹样；
+- 对应关系：可用细线/编号把拆解单品连到三视图上的对应位置（编号少而清晰）。
+
+三、约束
+- 只出现参考图里的这一个角色；不添加参考图没有的配饰、花纹、道具、内着或其他物品；
+- 不画参考图原有的背景、家具、乐器、特效；
+- 参考图缺少背面/侧面信息时，按可见结构做合理推断，三视图与拆解件之间必须自洽；
+- 只输出一张图，不要输出大段文字说明。
 ```
 
-### 4.2 `breakdown`（全景拆解板，来自社区爆款提示词的工程化版本）
+### 4.2 `breakdown`（全展开部件拆解板）
 
-用户找到的原始爆款（Nano Banana Pro "像素级拆解"）见：<https://github.com/mqyqingfeng/Blog/issues/385>。核心是"**全景式角色深度概念分解图**"：
+用户找到的原始爆款（Nano Banana Pro "像素级拆解"）见：<https://github.com/mqyqingfeng/Blog/issues/385>。
+原始提示词里的"生活切片/私密物品/脑补二级元素"属于过度编造，**已从我们的模板删掉**。现在的 `breakdown` 只做**设计拆解**：
 
-- 中心：角色全身立绘（身份锚点）；
-- 环绕：**服装分层（单品/内层）**、3–4 个表情、材质特写、核心道具、随身物品/生活切片；
-- 用手绘箭头/引导线连到对应部位；
-- 米黄/羊皮纸/浅灰设计稿背景 + 手写注释。
+```
+你是资深游戏角色概念设计师，正在制作角色部件拆解设定图（用于 3D 建模）。
+以用户提供的同一角色参考图（可多张多角度）作为唯一设计依据，生成一张"全展开部件设定板"。
 
-我们的改造（写进 `lib/nanobanana.js`）：
+1. 中心位：角色全身中性站姿（正面），可加正/侧/背三视图小图；
+2. 拆解部件：把角色拆成独立部件，按区域整齐排开，互不遮挡、平铺摆放：
+- 头部：正/侧/背特写（五官、发型、角/兽耳、发饰分别画出）；
+- 躯干：正面/背面（上衣、胸饰、腰带逐件分开）；
+- 双臂与手：左右分开，画清袖口与手套连接；
+- 双腿与脚：左右分开，画清裤/袜/鞋的结构与鞋底；
+- 每件服装单品：外套、上衣、裙/裤、袖套、腰带/绑带、鞋/靴逐件平铺；
+- 每件配饰/道具：发饰、胸针、角环、挂件等逐个放大展示；
+3. 标注：用细编号或短标签说明部件名称/连接关系；保持原设计、配色、纹样、材质；
+4. 约束：只拆参考图中确实存在的部件；不添加参考图没有的服装、道具、内着、花纹或生活物品；
+被遮挡的结构可按可见设计语言补全，但必须与原设计一致；
+纯白或浅灰背景，只输出一张排版清晰的设计图，不要大段文字。
+```
 
-- 保留"中心立绘 + 服装分层 + 表情 + 材质 + 道具 + 箭头"；
-- 增加**三视图**区（正面/90°侧面/背面）；
-- 去掉低俗/隐私类内容要求，强调"只出现参考图角色、不要背景场景、不要改设计"；
-- 加一致性要求 + "只输出一张图"。
-
-> 注意：拆解板是**生成式设定稿**，不是严格三视图；适合做部件清单/穿法假设/遮挡参考，不适合量尺寸。
+> 注意：拆解板是**生成式设定稿**，不是严格三视图；适合做部件清单/连接结构/遮挡参考，不适合量尺寸。
 
 ### 4.3 `custom`
 
@@ -193,7 +274,11 @@ config:
 ```
 官方立绘/同人多角度
    │
-   ├─ T3 bb_seg_t3(mode:"turnaround")  → 干净三视图候选（人工复核）
+   ├─ bb_ref_search / bb_ref_collect → 带编号对照表
+   │     └─ **先把对照表给用户看，让用户按编号挑选"角度正确"的几张**（正面/侧面/背面/细节）
+   │        再把选中的文件路径传入 bb_seg_t3.references（或 reference_dir）
+   │
+   ├─ T3 bb_seg_t3(mode:"turnaround")  → 干净三视图 + 部位/服装拆解（人工复核）
    ├─ T3 bb_seg_t3(mode:"breakdown")   → 部件/服装分层/遮挡假设（人工标注可信度）
    │
    ├─ 可选：把 T3 生成的三视图交给 T2 bb_seg_run → 23–29 层语义分层
@@ -228,8 +313,8 @@ config:
 
 ## 7. 隐私 / 版权 / 合规
 
-- **会上传参考图到 Google**：不要把未授权/敏感素材传上去；项目里的第三方参考图仅本地研究（我们已 gitignore `artifacts/refstudy/`）。
-- **生成图带 SynthID**：不能当官方素材；如果要对外发布，注明"AI 生成参考"。
+- **会上传参考图到所选服务商**（Google 官方，或 APIYI 等中转站）：不要把未授权/敏感素材传上去；项目里的第三方参考图仅本地研究（我们已 gitignore `artifacts/refstudy/`）。
+- **生成图通常带 SynthID 水印**（Google 模型侧；中转站是否保留以实际返回为准）：不能当官方素材；如果要对外发布，注明"AI 生成参考"。
 - **不要把 API key 写进仓库**：只用 `cordis.patch.yml` 注释占位/环境变量。
 - **内容政策**：角色/服装描述避免低俗；拆解板只做设计用途。
 
@@ -238,6 +323,7 @@ config:
 ## 8. 验收清单
 
 - [ ] 未配置 key：`bb_seg_probe` 显示 `tiers.t3.ok=false`、`recommendedTier` 落 `t2`；`bb_seg_t3` 返回 `T3_NOT_CONFIGURED`（不崩溃、不扣费）。
+- [ ] APIYI：`nanoBananaProvider:"apiyi"` + token 后 `bb_seg_probe` 显示 provider=apiyi、auth=bearer；真实调用 URL 为 `https://api.apiyi.com/v1beta/models/gemini-3-pro-image:generateContent`。
 - [ ] `dry_run:true` **在没 key 时也能**返回提示词/成本（不发请求、不花钱）；配 key 后仍可用。
 - [ ] 配 key：`turnaround` 生成 2K 三视图，落盘 + meta.json + 附件预览。
 - [ ] `breakdown` 生成拆解板（中心角色 + 服装分层 + 表情 + 道具 + 箭头）。
@@ -262,6 +348,7 @@ config:
 - Gemini 图像生成文档（模型列表/参数/SynthID）：<https://ai.google.dev/gemini-api/docs/image-generation>
 - Gemini 图像理解（多图上传/内联/文件 API）：<https://ai.google.dev/gemini-api/docs/image-understanding>
 - Gemini API 价格：<https://ai.google.dev/gemini-api/docs/pricing>
+- APIYI Nano Banana 图片编辑（Gemini 兼容格式 + Bearer）：<https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit>
 - 社区爆款"像素级拆解"提示词：<https://github.com/mqyqingfeng/Blog/issues/385>
 - See-through（T2）：<https://arxiv.org/abs/2602.03749>
 - ai-chan-sheets（单立绘 → 多素材设定板流程）：<https://github.com/lmy414/ai-chan-sheets>

@@ -1,16 +1,21 @@
-// T3（Nano Banana Pro）纯逻辑单测：不发真实请求、不需要 API key。
+// T3（Nano Banana Pro / APIYI 中转站）纯逻辑单测：不发真实请求、不需要 API key。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   resolveT3Config, inspectT3Availability, buildSheetPrompt, buildT3RequestBody,
   extractT3Result, estimateCostUsd, mapT3Error, callT3,
-  T3_DEFAULT_MODEL, T3_MODELS,
+  T3_DEFAULT_MODEL, T3_MODELS, T3_PRESETS,
 } from '../lib/nanobanana.js'
 
-test('resolveT3Config：无 key 时 configured=false，默认 Pro 模型', () => {
+test('resolveT3Config：无 key -> configured=false，默认官方/query/camel/IMAGE', () => {
   const c = resolveT3Config({}, {})
   assert.equal(c.configured, false)
   assert.equal(c.model, T3_DEFAULT_MODEL)
+  assert.equal(c.provider, 'official')
+  assert.equal(c.baseUrl, 'https://generativelanguage.googleapis.com/v1beta')
+  assert.equal(c.auth, 'query')
+  assert.equal(c.bodyStyle, 'camel')
+  assert.deepEqual(c.responseModalities, ['IMAGE'])
   assert.equal(c.apiKeySource, '')
   assert.equal(c.imageSize, '2K')
   assert.equal(c.aspectRatio, '16:9')
@@ -23,7 +28,17 @@ test('resolveT3Config：环境变量 GEMINI_API_KEY 可启用，且标注来源'
   assert.equal(c.apiKeySource, 'env:GEMINI_API_KEY')
 })
 
-test('resolveT3Config：config 优先于 env；模型/尺寸/比例/上限被规整', () => {
+test('resolveT3Config：APIYI 预设（bearer + api.apiyi.com + gemini-3-pro-image）', () => {
+  const c = resolveT3Config({ nanoBananaProvider: 'apiyi', nanoBananaApiKey: 'k' }, {})
+  assert.equal(c.provider, 'apiyi')
+  assert.equal(c.baseUrl, 'https://api.apiyi.com/v1beta')
+  assert.equal(c.auth, 'bearer')
+  assert.equal(c.bodyStyle, 'camel')
+  assert.equal(c.model, 'gemini-3-pro-image')
+  assert.equal(T3_PRESETS.apiyi.baseUrl, 'https://api.apiyi.com/v1beta')
+})
+
+test('resolveT3Config：config 优先于 env；尺寸/比例/上限被规整', () => {
   const c = resolveT3Config({
     nanoBananaApiKey: 'cfg-key',
     nanoBananaModel: 'gemini-nano-banana-2.1',
@@ -40,43 +55,60 @@ test('resolveT3Config：config 优先于 env；模型/尺寸/比例/上限被规
   assert.equal(c.timeoutMs, 10000)
 })
 
-test('resolveT3Config：非法尺寸/比例回落到默认', () => {
-  const c = resolveT3Config({ nanoBananaApiKey: 'k', nanoBananaImageSize: '8K', nanoBananaAspectRatio: '7:3' }, {})
+test('resolveT3Config：可覆盖 auth/bodyStyle；非法尺寸/比例回落', () => {
+  const c = resolveT3Config({
+    nanoBananaProvider: 'custom',
+    nanoBananaApiKey: 'k',
+    nanoBananaBaseUrl: 'https://relay.example.com/v1beta/',
+    nanoBananaAuth: 'query',
+    nanoBananaBodyStyle: 'snake',
+    nanoBananaImageSize: '8K',
+    nanoBananaAspectRatio: '7:3',
+  }, {})
+  assert.equal(c.baseUrl, 'https://relay.example.com/v1beta')
+  assert.equal(c.auth, 'query')
+  assert.equal(c.bodyStyle, 'snake')
   assert.equal(c.imageSize, '2K')
   assert.equal(c.aspectRatio, '16:9')
 })
 
-test('inspectT3Availability：无 key 给出 reason 与 fallback=t2；有 key 时 ok', () => {
+test('inspectT3Availability：无 key 给出 reason 与 fallback=t2；有 key 时带 provider/baseUrl', () => {
   const no = inspectT3Availability({}, {})
   assert.equal(no.ok, false)
   assert.equal(no.fallback, 't2')
   assert.match(no.reasons[0], /GEMINI_API_KEY|apiKey/)
 
-  const yes = inspectT3Availability({ nanoBananaApiKey: 'k' }, {})
+  const yes = inspectT3Availability({ nanoBananaProvider: 'apiyi', nanoBananaApiKey: 'k' }, {})
   assert.equal(yes.ok, true)
   assert.equal(yes.fallback, null)
+  assert.equal(yes.provider, 'apiyi')
+  assert.equal(yes.provider_label, 'APIYI 中转站')
+  assert.equal(yes.auth, 'bearer')
   assert.equal(yes.price_per_image_usd, 0.134)
 })
 
-test('buildSheetPrompt：三种模式的关键词与身份锚定', () => {
+test('buildSheetPrompt：turnaround 要三视图 + 头/上身/下身/手/脚/服装拆解', () => {
   const turn = buildSheetPrompt({ mode: 'turnaround', character: '丰川祥子' })
-  assert.match(turn, /三视图/)
-  assert.match(turn, /正面/)
-  assert.match(turn, /背面/)
+  for (const kw of ['三视图', '正面', '侧面', '背面', '头部', '上半身', '下半身', '手部', '脚部', '服装拆解']) {
+    assert.ok(turn.includes(kw), `turnaround 缺关键词: ${kw}`)
+  }
   assert.match(turn, /丰川祥子/)
-  assert.match(turn, /参考图/)
-
-  const br = buildSheetPrompt({ mode: 'breakdown' })
-  assert.match(br, /全景式/)
-  assert.match(br, /服装分层/)
-  assert.match(br, /表情/)
-
-  assert.throws(() => buildSheetPrompt({ mode: 'custom' }), (e) => e.code === 'INVALID_PARAMS')
-  const custom = buildSheetPrompt({ mode: 'custom', prompt: '只画正面' })
-  assert.match(custom, /只画正面/)
+  assert.match(turn, /不添加参考图没有/)
 })
 
-test('buildT3RequestBody：图片作为 inline_data，输出 modalities/imageConfig 正确', () => {
+test('buildSheetPrompt：breakdown 只拆存在的部件，去掉编造/私密提示', () => {
+  const br = buildSheetPrompt({ mode: 'breakdown' })
+  assert.match(br, /拆解/)
+  assert.match(br, /平铺/)
+  assert.match(br, /不要虚构/)
+  for (const bad of ['私密', '生活切片', '表情集', '脑补']) {
+    assert.ok(!br.includes(bad), `breakdown 不应包含: ${bad}`)
+  }
+  assert.throws(() => buildSheetPrompt({ mode: 'custom' }), (e) => e.code === 'INVALID_PARAMS')
+  assert.match(buildSheetPrompt({ mode: 'custom', prompt: '只画正面' }), /只画正面/)
+})
+
+test('buildT3RequestBody：默认 camelCase inlineData + IMAGE modality', () => {
   const body = buildT3RequestBody({
     prompt: 'hello',
     images: [{ mimeType: 'image/png', data: 'AAA' }, { mimeType: 'image/jpeg', data: 'BBB' }],
@@ -86,10 +118,19 @@ test('buildT3RequestBody：图片作为 inline_data，输出 modalities/imageCon
   const parts = body.contents[0].parts
   assert.equal(parts.length, 3)
   assert.equal(parts[0].text, 'hello')
-  assert.equal(parts[1].inline_data.mime_type, 'image/png')
-  assert.equal(parts[1].inline_data.data, 'AAA')
-  assert.deepEqual(body.generationConfig.responseModalities, ['TEXT', 'IMAGE'])
+  assert.equal(parts[1].inlineData.mimeType, 'image/png')
+  assert.equal(parts[1].inlineData.data, 'AAA')
+  assert.deepEqual(body.generationConfig.responseModalities, ['IMAGE'])
   assert.deepEqual(body.generationConfig.imageConfig, { aspectRatio: '16:9', imageSize: '2K' })
+})
+
+test('buildT3RequestBody：snake 风格 + 自定义 responseModalities', () => {
+  const body = buildT3RequestBody({
+    prompt: 'x', images: [{ mimeType: 'image/webp', data: 'CC' }],
+    bodyStyle: 'snake', responseModalities: ['TEXT', 'IMAGE'],
+  })
+  assert.equal(body.contents[0].parts[1].inline_data.mime_type, 'image/webp')
+  assert.deepEqual(body.generationConfig.responseModalities, ['TEXT', 'IMAGE'])
 })
 
 test('extractT3Result：兼容 inlineData/inline_data，收集文字与 blockReason', () => {
@@ -131,12 +172,13 @@ test('mapT3Error：鉴权/配额/参数/模型/未知分别映射', () => {
   assert.ok(!String(e.message).includes('key='))
 })
 
-test('callT3：mock fetch 成功路径解析图片并带出 usage', async () => {
+test('callT3：官方 query 鉴权，mock fetch 解析图片', async () => {
   const calls = []
   const fakeFetch = async (url, init) => {
     calls.push({ url, init })
     const body = JSON.parse(init.body)
     assert.equal(body.contents[0].parts.length, 2)
+    assert.equal(body.contents[0].parts[1].inlineData.data, 'AAA')
     return {
       ok: true, status: 200,
       text: async () => JSON.stringify({
@@ -149,9 +191,20 @@ test('callT3：mock fetch 成功路径解析图片并带出 usage', async () => 
   const r = await callT3({ config: cfg, prompt: 'p', images: [{ mimeType: 'image/png', data: 'AAA' }], fetchImpl: fakeFetch })
   assert.equal(r.images.length, 1)
   assert.equal(r.images[0].data, 'QUJD')
-  assert.equal(calls.length, 1)
-  assert.match(calls[0].url, /gemini-3-pro-image:generateContent/)
-  assert.match(calls[0].url, /key=k/)
+  assert.match(calls[0].url, /gemini-3-pro-image:generateContent\?key=k/)
+  assert.equal(calls[0].init.headers.authorization, undefined)
+})
+
+test('callT3：APIYI bearer 鉴权，URL 不带 key', async () => {
+  const calls = []
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, init })
+    return { ok: true, status: 200, text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: 'QQ==' } }] } }] }) }
+  }
+  const cfg = resolveT3Config({ nanoBananaProvider: 'apiyi', nanoBananaApiKey: 'relay-key' }, {})
+  await callT3({ config: cfg, prompt: 'p', fetchImpl: fakeFetch })
+  assert.equal(calls[0].url, 'https://api.apiyi.com/v1beta/models/gemini-3-pro-image:generateContent')
+  assert.equal(calls[0].init.headers.authorization, 'Bearer relay-key')
 })
 
 test('callT3：401 抛 T3_AUTH；无图片抛 T3_NO_IMAGE；未配置抛 T3_NOT_CONFIGURED', async () => {

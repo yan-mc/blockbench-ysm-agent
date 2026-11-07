@@ -38,9 +38,10 @@
 
 ## ✨ 0.9.3 新增：T3 云端拆解（Nano Banana Pro）
 
-> 分级优先级 **T3 > T2 > T1**。T3 = Google **Nano Banana Pro（Gemini 3 Pro Image）**：把同一角色的 1–14 张多角度参考图交给云端模型，生成**严格三视图**或**全景式深度拆解板**（三视图 + 服装分层 + 表情 + 材质 + 道具 + 箭头注释）。
+> 分级优先级 **T3 > T2 > T1**。T3 = Google **Nano Banana Pro（Gemini 3 Pro Image）**：把同一角色的 1–14 张多角度参考图交给云端模型，生成**严格三视图 + 逐部位图（头/上身/下身/手/脚）+ 服装单品拆解**，或**全展开部件拆解板**（只拆参考图里存在的部件，不再要求"脑补生活物品"）。
 >
-> - **需要外接付费 API**（`gemini-3-pro-image`，约 $0.134/张 1K/2K、$0.24/张 4K）；配置 `nanoBanana.apiKey` 或环境变量 `GEMINI_API_KEY`。**没有 key 时自动降级现有 T2（See-through）**，不消耗额度。
+> - **需要外接付费 API**；支持官方 Gemini 与兼容中转站（如 **APIYI**：`provider:"apiyi"`，baseUrl `https://api.apiyi.com/v1beta` + Bearer 鉴权；请求体与官方一致）。官方价约 $0.134/张 1K/2K、$0.24/张 4K；中转站以账单为准。**没有 key 时自动降级现有 T2（See-through）**，不消耗额度。
+> - **参考图先给用户筛**：`bb_ref_search`/`bb_ref_collect` 出带编号对照表 → 让用户按编号挑"角度正确"的几张 → 再喂 `bb_seg_t3`。
 > - **定位**：T3 解决"官方立绘带动作/背景/打光、T1/T2 拆不干净"和"缺背面/内侧"的痛点；生成结果是**假设**不是还原，必须人工复核并把推定项写进 `spec.gaps`。T3 →（可选）T2 分层 → spec/建模。
 > - 工具：新增 **`bb_seg_t3`**；`bb_seg_probe` 增加 T3 配置探测与 `recommendedTier`。详见 [docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md)。
 >
@@ -73,7 +74,7 @@
 
 | 项 | 结果 |
 |---|---|
-| 单元测试 | **76/76 通过**（7 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 12 / spec 17 / tool-schema 5 / viewsheet 8 / nanobanana 12） |
+| 单元测试 | **80/80 通过**（7 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 12 / spec 17 / tool-schema 5 / viewsheet 8 / nanobanana 16） |
 | host-smoke | **35 步全过**，schema lint 检查 **42 个工具**（本地实跑，2026-11-08） |
 | 契约 | `spec/tool-manifest.json` **44 工具**、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**，且 0.9.3 已对齐 `spec` ↔ `index.js` 的 **44/44** 参数 |
 | 上游 | `vendor/blockbench` = **Blockbench 5.2.2**；`vendor/YSM-Utils-Plugins` = 2.6.0（MIT）；vendor 总体积约 **1.54GB** |

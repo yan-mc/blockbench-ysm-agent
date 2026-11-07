@@ -101,6 +101,8 @@
 
 缺背面是常态：**继续做，按对称推断，最后明确告诉用户**（进 spec.gaps）。
 
+**对照表必须给用户看一遍再继续**（尤其是要喂 T3/T2 之前）：让用户按编号挑出"角度正确、可信"的几张（正面/侧面/背面/细节），再把选中文件喂给分层工具；不要把整批候选原样喂进去，也不要自己替用户决定。
+
 ### 2.4 立绘拆分（**强制步骤**：T3 有 key 优先，T2/T1 兜底）
 
 拆分给两样东西：**部件清单**（做逐部件检查的 checklist）+ **2D 面积/占位数字**（校准比例）。
@@ -124,12 +126,14 @@
 `recommendedTier` 已按 **T3 > T2 > T1 > T0** 排序：T3 没配置 key 时自动落到 T2；T3 只检查配置，不发请求、不耗额度。
 
 **T3（Nano Banana Pro，云端）——复杂立绘/缺背面时用（需要付费 API key）**
-1. 先 `bb_seg_t3({mode:"turnaround", references:[正面,侧面,...], dry_run:true})`：看提示词与成本，不花钱；
-2. 去掉 dry_run 真跑：`mode:"turnaround"` 出**严格正/侧/背三视图**（建模主用）；`mode:"breakdown"` 出**全景拆解板**（服装分层/表情/材质/道具/箭头，做部件清单与遮挡假设）；
-3. 参考图建议 4–6 张同角色多角度；`image_size:"2K"` 性价比最好，4K 只给需要放大看纹理的拆解板；
-4. **所有生成结果都是推断**：逐张复核身份/左右镜像/配色/纹样/背面自洽性；推定项写进 `spec.gaps`；**不得当官方设定或精确尺寸依据**；
-5. 生成图可交给 `bb_seg_run`（T2）继续分层：T3 出假设，T2 出可见证据；
-6. 无 key / 限流 / 内容拦截 → 返回 `T3_NOT_CONFIGURED`/`T3_QUOTA`/`T3_NO_IMAGE`，**降级 T2** 并在报告写原因。
+1. **先筛选参考图**：`bb_ref_search` → `bb_ref_collect` 得到带编号对照表；**必须把对照表给用户看**，让用户按编号挑选"角度正确/可信"的几张（正面/侧面/背面/细节各取所需），再把选中路径传给 `bb_seg_t3.references`（或放进一个目录用 `reference_dir`）；不要自己替用户决定。
+2. 先 `bb_seg_t3({mode:"turnaround", references:[...], dry_run:true})`：看提示词与成本，不花钱（dry_run 不需要 key）；
+3. 去掉 dry_run 真跑：`mode:"turnaround"` 出**严格正/侧/背三视图 + 头部/上半身/下半身/手/脚单独图 + 服装单品拆解**（建模主用）；`mode:"breakdown"` 出**全展开部件拆解板**（把每件服装/配饰平铺分开，只拆参考图里存在的部件）；`mode:"custom"` 定向修改；
+4. 参考图建议 4–6 张同角色多角度；`image_size:"2K"` 性价比最好，4K 只给需要放大看纹理的拆解板；
+5. **所有生成结果都是推断**：逐张复核身份/左右镜像/配色/纹样/背面自洽性；推定项写进 `spec.gaps`；**不得当官方设定或精确尺寸依据**；
+6. 生成图可交给 `bb_seg_run`（T2）继续分层：T3 出假设，T2 出可见证据；
+7. 服务商：官方 Gemini 用 `nanoBananaProvider:"official"`；**中国大陆/香港不直连官方时用 APIYI**：`nanoBananaProvider:"apiyi"` + `nanoBananaApiKey`（自动 baseUrl `https://api.apiyi.com/v1beta` + Bearer 鉴权，请求体与官方一致）；其他中转站用 `custom` + `baseUrl/auth/bodyStyle`；价格以服务商账单为准；
+8. 无 key / 限流 / 内容拦截 → 返回 `T3_NOT_CONFIGURED`/`T3_QUOTA`/`T3_NO_IMAGE`，**降级 T2** 并在报告写原因。
 
 **T2（See-through，完整分层）——精修/需要遮挡补全/需要头部拆分时用**
 1. `bb_seg_install({confirm:true})`：装 ComfyUI（~7GB，可后台作业）；
