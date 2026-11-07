@@ -48,3 +48,7 @@ models/*/sakiko-fresh-acceptance/
 
 # 参考模型语料（来自用户本机 MC 安装，第三方版权，只本地用）
 models/*/refcorpus/
+
+# 语料库（含 169 个解码后的现代 YSM 模型、女仆/舰娘模型）——第三方版权，只本地用
+material/
+tools/ysmparser/
