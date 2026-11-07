@@ -1,35 +1,28 @@
-﻿model: v11 -- shoulder width fixed, eyes flattened, hair rebuilt as uniform strips
+﻿model: v12 -- hair colour fixed, hair staggered and thinned; horns and arms still hidden
 
-Proportions now land on the corpus medians, verified from the file:
-- shoulder width / head width 1.52 to 1.01 (corpus 1.01)
-- hip width / head width 0.61 to 0.69 (corpus 0.69)
-- total height / head height 7.50 to 7.36 (corpus 7.31)
-- head enlarged 3% to 6.39 x 6.13 x 6.05 against the corpus 7 x 7 x 7
+Six fixes requested; four landed, two did not.
 
-Shoulder width was the actual cause of the stocky look, not head-to-body. Arms and their
-cubes moved inward 1.47, legs outward 0.24, and the head subtree scaled 1.03 about its
-pivot. Bone names and hierarchy untouched, 162 bones, 304 animations intact.
+Hair colour was the real complaint and it is fixed. The old build gave every long board its
+own gradient UV, so each segment ran light-to-dark independently and the hair shimmered in
+stripes. Now every cube has exactly one flat colour chosen by its vertical position in the
+strand, so the gradient runs once across the whole head of hair. Palette sampled from the
+official collab artwork (ref_015) rather than guessed: root #7a8ab0, upper #8697be, middle
+#9ea7d4, lower #9aa4d6, tips #a8b0dc, plus #cfd6f2 highlight and #6f7ea6 inner shadow,
+seven steps painted as flat blocks in both 1024 textures with all hair UVs pointing at them.
 
-Eyes went flat. Every part is now wider than tall: lid plate 2.00 x 1.36, iris 1.16 x 0.86
-(was 1.00 x 1.20, taller than wide), inner gold 0.74 x 0.34, pupil 0.46 x 0.30 (was
-0.40 x 0.50), highlights 0.50 x 0.30 and 0.20 x 0.13, lash strip 1.24 x 0.42. Eye centres
-moved apart from +/-0.98 to +/-1.45 so 0.42 of eye white shows on each side. Structure is
-still the solid-colour block stack, no return to painted texture.
+Back hair went from three equal-length chains to four groups of length 15.0 / 19.0 / 17.0 /
+13.5 with 12 / 10 / 11 / 12 segments, offset 0.1-3.4 in x and 0.05-0.25 in z, so the back
+now shows staggered strand ends instead of a wall. Side hair halved from 58 and 55 cubes to
+3 strands of 10 segments each per side, lengths 20.5 / 18.5 / 22.0, uniform 0.58-0.66
+thickness, pulled back 0.85 off the cheek. Neck strip shortened from 3.0 to 1.1 and switched
+to skin tone. Total 587 to 466 cubes.
 
-Hair rebuilt from single long boards into uniform-thickness chains: each former board
-split into 1.35-tall segments, each segment rotated 2.5-5 degrees about z and 2 about x,
-24+28+45 cubes across three back-hair chains, 6-12 cubes per twin-tail node, side hair
-moved out 0.25 so it clears the cheek. Thickness stays constant (back 1.03-1.09, side
-0.52-0.68) rather than tapering. Total 404 to 587 cubes.
+Failed: the horns were rebuilt as nine segments tapering 2.5 to 1.0 along a 260-degree curl
+but the hair mass completely buries them, so only two nubs show above the crown. The arms
+moved from +/-3.23 to +/-3.5 while the torso narrowed 0.86, yet the side hair still covers
+the upper arm in front view.
 
-Part review with isolate at zoom 2-2.5 across three angles each is what surfaced the
-faults fixed here: iris and pupil were taller than wide, eye spacing was too narrow with
-no eye white, side hair touched the cheek, back hair was one solid board, and a white
-neck strip under the chin.
-
-Still open: the back of the hair still reads as a wall because the chains are equal length
-and side by side with no stagger; side hair is brick-dense at 58 and 55 cubes when the
-corpus suggests 8-12 per strand; the neck strip remains; horns are still thin black spikes
-rather than the thick curved ram horns the design calls for; and the 1.01 shoulder width
-was achieved by pulling the arms inward, so they are now hidden behind the hair instead of
-being visible at the sides.
+Comparing against the official artwork afterwards found the remaining drift: the reference
+hair is far more voluminous and fluffy than ours, the horns are large dark-blue curled horns
+occupying about half the head height, the eyes are larger and brighter, the chest bow and
+brooch are bigger, and the skirt has more lace layering plus a long train.
