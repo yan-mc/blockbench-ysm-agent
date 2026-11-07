@@ -1357,14 +1357,23 @@
       while (p && p !== 'root') { keep.add(p); p = p.parent }
     }
     const saved = []
-    const toggle = (node) => { saved.push([node, node.visibility]); node.visibility = keep.has(node) }
-    for (const g of Group.all) toggle(g)
-    for (const c of Cube.all) toggle(c)
+    const apply = (node) => {
+      const vis = keep.has(node)
+      saved.push([node, node.visibility, node.mesh ? node.mesh.visible : undefined])
+      node.visibility = vis
+      // Blockbench 的 visibility 标记不会自动同步到 three.js mesh，必须直接写 mesh.visible
+      if (node.mesh) node.mesh.visible = vis
+    }
+    for (const g of Group.all) apply(g)
+    for (const c of Cube.all) apply(c)
     try {
       Canvas.scene.updateMatrixWorld(true)
       return await fn()
     } finally {
-      for (const [node, vis] of saved) node.visibility = vis
+      for (const [node, vis, meshVis] of saved) {
+        node.visibility = vis
+        if (node.mesh && meshVis !== undefined) node.mesh.visible = meshVis
+      }
       Canvas.scene.updateMatrixWorld(true)
     }
   }
