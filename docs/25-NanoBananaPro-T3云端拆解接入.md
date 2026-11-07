@@ -102,6 +102,8 @@ Content-Type: application/json
 - **价格/额度以 APIYI 账单为准**（本插件的 `cost_estimate_usd` 是按 Google 官方价估算，不是中转站账单）。
 - 迁移到其他中转站：用 `nanoBananaProvider:'custom'` + `nanoBananaBaseUrl` + `nanoBananaAuth`（query/bearer）+ `nanoBananaBodyStyle` 覆盖即可。
 
+> **2026-11-08 实测（无有效 token）**：对本机网络 `POST https://api.apiyi.com/v1beta/models/gemini-3-pro-image:generateContent` + 假 Bearer token，返回 `HTTP 401 {"error":{"message":"Invalid token..."}}` → **端点路径与 Bearer 鉴权格式都正确**，缺的只是有效 token；拿到 token 后即可用上面的配置。
+
 ### 2.2 价格（官方 pricing 页，2026-11 抓取）
 
 | 项 | 价格 |
