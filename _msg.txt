@@ -1,30 +1,28 @@
-﻿model: art polish round (v9) -- head shape and eyes fixed
+﻿feat(skill): correct the eye doctrine -- solid blocks stacked by depth, not painted texture
 
-Three polish passes on v8, verified independently afterwards: 162 bones / 374 cubes
-(+8 from v8), validate 0 errors, 51 animation entries intact.
+The previous entry claimed eye geometry barely matters and expression lives in the
+texture. That was wrong, and the corpus says so plainly.
 
-Head shape: the head cube went from 6.2 x 9.1 (1.47:1, a tall slab) to 6.2 x 5.95 x 6.05
-(1.04:1, essentially cubic). The skull box was compressed 7.55 to 5.95, the jaw 1.67 to
-0.79 and raised to 36.78, and the jaw-to-cheek setback was pulled in from 0.27 to 0.06 so
-the step across the middle of the face is gone.
+Measured across 157 models with eye geometry: the median colour standard deviation of an
+eye block's texture region is 0.00 (p75 also 0), and 82% of eye blocks sit below 2. In
+other words the texture holds flat swatches, not a painted eye. Composition over the whole
+corpus: eyebrow 849 blocks, misc eye parts 824, eye base 358, pupil 322, highlight 270,
+eyelid plate 238.
 
-Eyes: the dead-fish look was a painting fault, as the corpus survey suggested. Rebuilt as
-exactly two blocks per eye (lid 1.42 x 1.62 plus iris 1.24 x 1.28, no micro-sculpture) and
-repainted against the six rules -- thick lash line angled up at the outer corner, iris
-clipped at the top by the lid, pupil high, highlight upper-left, lower lid reduced to a
-bright line, eye white only at the sides. The before/after sheet shows the difference
-clearly.
+Median dimensions per part: eyelid plate / eye white 2.00 x 1.52 x 1.00, iris 0.9-1.2 x
+1.0-1.3, pupil 0.40 x 0.50 x 1.00, eye base 1.20 x 0.50, highlight 0.50 x 0.40 x 0.05
+(ultra thin), eyebrow 1.15 x 0.50.
 
-Other fixes: the flat three-layer crown became a five-layer rounded dome and the band that
-read as a headband was removed; the dress darkest value moved from #09080d to #1a1a20 with
-four value steps (1a1a20 / 2a2a34 / 383843 / 454b62); the blue-violet petticoat gained 16%
-brightness and saturation so silver trim now reads against it; thighs widened 3.0 to 3.34;
-horns scaled up 15%.
+The reason is animation: eyes must blink, rotate and emote. A painted texture cannot be
+animated, blocks can be moved, rotated and hidden independently -- and high-resolution
+textures are expensive in YSM, so the texture budget should not be spent on the eye.
 
-Known gap the worker flagged and I confirm: the head-to-body ratio is now about 6.5 versus
-the corpus 4.87. That is an arithmetic conflict -- keeping a 4.87 ratio with a 43.5-unit
-body requires a 9.2-unit-tall head, i.e. the tall slab again. Hitting 4.87 needs the body
-rescaled about 23%, which is a rebuild rather than a polish, so this round chose the
-visible head-shape defect. Also still open: hair is flat in profile with two mystery light
-patches (one inherited v8 UV, one suspected z-fighting on the back hair), skirt layers
-still read as stiff cardboard, and the face is pale and flat at game scale.
+Section 3.1.4 rewritten around the correct build order, back to front: eyelid plate, iris,
+pupil, one or two ultra-thin highlights offset to the upper left, an eye-base strip over
+the upper rim that produces the lash shadow, then a three-block tapering eyebrow. Depth
+separation plus occlusion is what makes the eye look set into its socket. Blink animation
+works by moving the iris and highlight group while the lid plate stays as a mask.
+
+Also records the two anti-patterns explicitly: painting a full eye on a high-res texture
+and using one flat plate, and micro-sculpting 0.2-thick pupils. And it requires eye checks
+to use isolate at normal viewing scale rather than only at 8x zoom.
