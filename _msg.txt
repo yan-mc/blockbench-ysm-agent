@@ -1,21 +1,30 @@
-﻿fix+docs: isolation actually hides geometry; eye doctrine; part-level inspection
+﻿model: art polish round (v9) -- head shape and eyes fixed
 
-The isolate feature framed correctly but still rendered the hidden parts: setting
-Group.visibility / Cube.visibility in Blockbench does not propagate to the three.js mesh,
-so the renderer kept drawing everything. withIsolation now writes mesh.visible directly
-and restores it in the finally block. Verified on the live model: isolating AllHead now
-returns just the head and hair, auto-framed, and nothing else.
+Three polish passes on v8, verified independently afterwards: 162 bones / 374 cubes
+(+8 from v8), validate 0 errors, 51 animation entries intact.
 
-Skill additions:
-- 3.1.4 eye doctrine from the 157-model eye survey. Single-eye geometry is a median of 17
-  cubes but p25 of 8, and the best examples use one or two flat plates (nagato: one
-  3x3.4 block plus a highlight block; alice: a single 2x2 lid plate; ump45: a 2x2 lid plus
-  a narrower 1.4x2 iris plate). The largest block has a median width-to-height ratio of
-  1.02, i.e. square -- round is painted, not built. Three causes of dead-fish eyes are all
-  painting faults: a perfectly round centred iris, no upper lash line or too faint a one,
-  and perfect symmetry with a centred highlight. Six painting rules follow: thick 1-2
-  texel upper lash angled 15-25 degrees up at the outer corner, iris clipped 20-30% by the
-  lid and slightly taller than wide, pupil high, one or two highlights off to the upper
-  left, lower lid just a bright line, eye white only at the bottom and sides.
-- 3.1.5 part-level inspection: do not render the whole model for every check, use
-  isolate with one bone or a comma-separated list, which hides the rest and auto-frames.
+Head shape: the head cube went from 6.2 x 9.1 (1.47:1, a tall slab) to 6.2 x 5.95 x 6.05
+(1.04:1, essentially cubic). The skull box was compressed 7.55 to 5.95, the jaw 1.67 to
+0.79 and raised to 36.78, and the jaw-to-cheek setback was pulled in from 0.27 to 0.06 so
+the step across the middle of the face is gone.
+
+Eyes: the dead-fish look was a painting fault, as the corpus survey suggested. Rebuilt as
+exactly two blocks per eye (lid 1.42 x 1.62 plus iris 1.24 x 1.28, no micro-sculpture) and
+repainted against the six rules -- thick lash line angled up at the outer corner, iris
+clipped at the top by the lid, pupil high, highlight upper-left, lower lid reduced to a
+bright line, eye white only at the sides. The before/after sheet shows the difference
+clearly.
+
+Other fixes: the flat three-layer crown became a five-layer rounded dome and the band that
+read as a headband was removed; the dress darkest value moved from #09080d to #1a1a20 with
+four value steps (1a1a20 / 2a2a34 / 383843 / 454b62); the blue-violet petticoat gained 16%
+brightness and saturation so silver trim now reads against it; thighs widened 3.0 to 3.34;
+horns scaled up 15%.
+
+Known gap the worker flagged and I confirm: the head-to-body ratio is now about 6.5 versus
+the corpus 4.87. That is an arithmetic conflict -- keeping a 4.87 ratio with a 43.5-unit
+body requires a 9.2-unit-tall head, i.e. the tall slab again. Hitting 4.87 needs the body
+rescaled about 23%, which is a rebuild rather than a polish, so this round chose the
+visible head-shape defect. Also still open: hair is flat in profile with two mystery light
+patches (one inherited v8 UV, one suspected z-fighting on the back hair), skirt layers
+still read as stiff cardboard, and the face is pale and flat at game scale.

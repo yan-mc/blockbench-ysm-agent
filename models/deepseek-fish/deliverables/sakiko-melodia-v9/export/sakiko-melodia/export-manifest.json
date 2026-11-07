@@ -1,0 +1,172 @@
+{
+  "exported_at": "2026-11-07T09:17:20.820Z",
+  "source_revision": 9,
+  "pack_name": "sakiko-melodia",
+  "files": [
+    {
+      "path": "animations/arm.animation.json",
+      "bytes": 172791,
+      "sha256": "842feaa47347bb7fa9a53f31bf76dcf74aff618e7b52cc1637380333812a87cb"
+    },
+    {
+      "path": "animations/arrow.animation.json",
+      "bytes": 744,
+      "sha256": "01902bc329af43baf925d67eb6861c5f4e2dd5355258c96819533ed7d94239ba"
+    },
+    {
+      "path": "animations/boat.animation.json",
+      "bytes": 1113,
+      "sha256": "f40524137ed91be2a0e7ff6b12b73e4aa46574053e6d9f1e2e3df6da0fedb6fd"
+    },
+    {
+      "path": "animations/carryon.animation.json",
+      "bytes": 3078,
+      "sha256": "fe28bda145b9a8f8acfd3aa1d85b267a55e5c6538f595161dbd2161bbebd8bda"
+    },
+    {
+      "path": "animations/extra.animation.json",
+      "bytes": 124605,
+      "sha256": "febebf03a70fca55ac3138c7e97fd24a0c83cdf54b27c3d3a091e8a6bb2ad1cb"
+    },
+    {
+      "path": "animations/fp.arm.animation.json",
+      "bytes": 441,
+      "sha256": "6030836fffd11cc9883b495cc01e314c377db9f428bd0d76578f3431898a3b9a"
+    },
+    {
+      "path": "animations/main.animation.json",
+      "bytes": 309924,
+      "sha256": "8e4336fc8e7241a29eecf28deb702ebc1fa9adf61e38373108c48330c66f4260"
+    },
+    {
+      "path": "animations/parcool.animation.json",
+      "bytes": 186710,
+      "sha256": "5407ef2708e8849b9ffbeaac4dd81cbb6943a3cef53d6cd6e13f22c2426f1d98"
+    },
+    {
+      "path": "animations/slashblade.animation.json",
+      "bytes": 1652964,
+      "sha256": "af05ec10f7e23dd7148f6a72bdba8abd0e4899dd9e7bf6d65cc42e4feba118fb"
+    },
+    {
+      "path": "animations/swem.animation.json",
+      "bytes": 42814,
+      "sha256": "b0018f5a7e88c21f78b75ff18c98966428ac691c46f716950d2a8f2a0815abb3"
+    },
+    {
+      "path": "animations/tac.animation.json",
+      "bytes": 321898,
+      "sha256": "4594de398c4d34311d540caa2c1b314f631307fd68d810dfc84a8ac1552b3e88"
+    },
+    {
+      "path": "animations/tlm.animation.json",
+      "bytes": 66511,
+      "sha256": "353dc14cd77017092bc969500977609c5585fe71db258cf57ae703d9cdb00641"
+    },
+    {
+      "path": "avatar/null.png",
+      "bytes": 1336,
+      "sha256": "3ded42151694f96d982098f244bf992a0d6ba6631b22d8f3e76207faf7e6d0f3"
+    },
+    {
+      "path": "controller/main.animation_controllers.json",
+      "bytes": 870,
+      "sha256": "2954b522ea6af6ad36ddd33e45005ce816aea75cd35259be402c75440ecac72c"
+    },
+    {
+      "path": "export-manifest.json",
+      "bytes": 5065,
+      "sha256": "6b7b705dbc349441729d013267ac39070a57188e9431d7277fea3c9020d1b563"
+    },
+    {
+      "path": "lang/en_us.json",
+      "bytes": 878,
+      "sha256": "ec3441ecfe429f1512e3afff247622dca16dc2d64ca678a52860657b8785845f"
+    },
+    {
+      "path": "lang/zh_cn.json",
+      "bytes": 897,
+      "sha256": "0d72ffefd89dc4950e752ad7659bb1484cac39eb7f657259776b2ae7696777c1"
+    },
+    {
+      "path": "models/arm.json",
+      "bytes": 1850,
+      "sha256": "76e749a57f464453da2c3f9ef5f700656ea1d70b1880a5a55100d9579093212c"
+    },
+    {
+      "path": "models/arrow.json",
+      "bytes": 14608,
+      "sha256": "4f04aa3cb1327346ae1f63b4f960571c990dc7fd2e0ad93965c9b130d1eff324"
+    },
+    {
+      "path": "models/boat.json",
+      "bytes": 35930,
+      "sha256": "9e4d7cf3d6c22753a52c54aef3c32b5976b03fac93e73cc6b100ad51c67f572f"
+    },
+    {
+      "path": "models/fishing_bobber.json",
+      "bytes": 2191,
+      "sha256": "9fac3cb452683c2f8164b7a118babfabb5bcc3362715e7d7352d1ff29b0cd2f1"
+    },
+    {
+      "path": "models/main.json",
+      "bytes": 199053,
+      "sha256": "468d3f2bf0e5219d2f84ee1b3b27ece8fbc6c64a0dfa00b6cc52697d6c8bf9bf"
+    },
+    {
+      "path": "models/minecart.json",
+      "bytes": 10604,
+      "sha256": "4ee627e87958ec1235206cca85d06d3b3c473a7b2ae896a8c4fe9b95cb2fd736"
+    },
+    {
+      "path": "NOTES-四层计划.md",
+      "bytes": 5569,
+      "sha256": "ab8923f2d199781c5e4a968436d3d07fbad11771cf5ba2b7e1598b4e4024d9df"
+    },
+    {
+      "path": "textures/arrow.png",
+      "bytes": 1213,
+      "sha256": "0ecda6c1557cf3571289a3212c93e125d8b075cc37ac62f14dad852d83a576ec"
+    },
+    {
+      "path": "textures/blue.png",
+      "bytes": 124906,
+      "sha256": "213d3af1ac599fc9dc342cdd5ce0ec90184878feb817f6a46e23462bfdb36b0a"
+    },
+    {
+      "path": "textures/boat.png",
+      "bytes": 3468,
+      "sha256": "ae83a6dff32901c63f01acf7256cbe8c36595685c3a8a6737b15d5c0ad417e14"
+    },
+    {
+      "path": "textures/default.png",
+      "bytes": 254890,
+      "sha256": "807dcd5af85a39a50fb59258d0ce7645969b8be5500d59f7c52ef5b056797db8"
+    },
+    {
+      "path": "textures/fishing_bobber.png",
+      "bytes": 202,
+      "sha256": "14e65b95c519f47578b63a915744b96359d87dc9bc2822dd9ba203a228c53191"
+    },
+    {
+      "path": "textures/gui/background.png",
+      "bytes": 953,
+      "sha256": "d13cc65035f3979c81f16763d49d8bb56e86a9d1921b2d3909def3c05b0c8d13"
+    },
+    {
+      "path": "textures/gui/foreground.png",
+      "bytes": 320,
+      "sha256": "43d7c8b33fe33fd381e5e43791fb7e28749cae52b87f35b1c5fc19557a1e4c10"
+    },
+    {
+      "path": "textures/minecart.png",
+      "bytes": 1566,
+      "sha256": "277e32e4980b846be5dee52180a625d84b79cd01476a761005c2d0fe76be465f"
+    },
+    {
+      "path": "ysm.json",
+      "bytes": 3265,
+      "sha256": "753d6fae3e961a8a4f24938db5e66b26ec7b56c4b995898cb43fa2fd2bdd7766"
+    }
+  ]
+}
