@@ -1,28 +1,28 @@
-﻿feat(skill): correct the eye doctrine -- solid blocks stacked by depth, not painted texture
+﻿model: v10 -- body rescale, block-stacked eyes, part-by-part isolation review
 
-The previous entry claimed eye geometry barely matters and expression lives in the
-texture. That was wrong, and the corpus says so plainly.
+Three tasks from the corrected eye doctrine.
 
-Measured across 157 models with eye geometry: the median colour standard deviation of an
-eye block's texture region is 0.00 (p75 also 0), and 82% of eye blocks sit below 2. In
-other words the texture holds flat swatches, not a painted eye. Composition over the whole
-corpus: eyebrow 849 blocks, misc eye parts 824, eye base 358, pupil 322, highlight 270,
-eyelid plate 238.
+Proportions: total height 51.61 to 44.62 by scaling everything below the jaw by 0.81
+(the Head subtree was translated down 6.99 while the head cube stayed 6.20 x 5.95 x 6.05).
+Bone names and hierarchy untouched, so all 51 animation entries still bind. Head-to-body
+went 6.47 to 5.59. It cannot reach the corpus 4.87 without either making head-plus-hair 16%
+taller or dropping total height to 38.9 -- a decision for the next round rather than
+something arithmetic can solve inside the current constraint.
 
-Median dimensions per part: eyelid plate / eye white 2.00 x 1.52 x 1.00, iris 0.9-1.2 x
-1.0-1.3, pupil 0.40 x 0.50 x 1.00, eye base 1.20 x 0.50, highlight 0.50 x 0.40 x 0.05
-(ultra thin), eyebrow 1.15 x 0.50.
+Eyes rebuilt as solid blocks instead of painted texture, 9 per eye verified from the file:
+eyelid plate 2.00 x 1.52 x 1.00 plus a 1.2 x 0.5 lash strip rotated 4 degrees, iris
+1.00 x 1.20 plus an inner brighter circle 0.70 x 0.42 x 0.90, pupil 0.40 x 0.50, two
+ultra-thin highlights at 0.05 depth (0.5 x 0.4 and 0.2 x 0.15), and a three-block tapering
+eyebrow. Depth ordering runs -3.43 / -3.50 / -3.56 / -3.65 from lid to highlight, so the
+eye is literally built back-to-front. Every dimension lands on the corpus median. The face
+texture region was repainted as plain skin gradient with the eye drawn only as 2-4 px
+colour swatches, and 3D blush and mouth plates were added to fix the flat white face.
 
-The reason is animation: eyes must blink, rotate and emote. A painted texture cannot be
-animated, blocks can be moved, rotated and hidden independently -- and high-resolution
-textures are expensive in YSM, so the texture budget should not be spent on the eye.
+Part review via isolate: head, arms, skirt and legs each rendered alone. The head pass is
+what exposed the old eye as a 0.05-thick plate, which is why the rebuild happened at all.
 
-Section 3.1.4 rewritten around the correct build order, back to front: eyelid plate, iris,
-pupil, one or two ultra-thin highlights offset to the upper left, an eye-base strip over
-the upper rim that produces the lash shadow, then a three-block tapering eyebrow. Depth
-separation plus occlusion is what makes the eye look set into its socket. Blink animation
-works by moving the iris and highlight group while the lid plate stays as a mask.
+394 cubes, 162 bones, validate 0 errors.
 
-Also records the two anti-patterns explicitly: painting a full eye on a high-res texture
-and using one flat plate, and micro-sculpting 0.2-thick pupils. And it requires eye checks
-to use isolate at normal viewing scale rather than only at 8x zoom.
+Open: head-to-body still 5.59, hair volume now dominates the silhouette and hides the
+arms, and the plugin closeup view does not actually zoom (focus.padding moves the target
+but not the scale) so eye review had to go through isolate instead.
