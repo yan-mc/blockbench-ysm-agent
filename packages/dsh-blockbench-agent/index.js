@@ -1118,14 +1118,17 @@ export function apply(ctx, config = {}) {
     async execute(args, exec) {
       try {
         let result
+        const callArgs = { ...args }
+        const iso = normalizeIsolate(callArgs.isolate)
+        if (iso) callArgs.isolate = iso
         try {
-          result = await raceAbort(call('render.views', args, 120000), exec?.signal)
+          result = await raceAbort(call('render.views', callArgs, 120000), exec?.signal)
         } catch (error) {
           const code = error?.rpc?.data?.code ?? error?.code
           if (['ENGINE_DEGRADED', 'RENDER_FAILED', 'TIMEOUT'].includes(code) && !state.safeMode && cfg.executable && cfg.appPath) {
             const restarted = await restartInSafeMode()
             if (!restarted) return errorResult(error)
-            result = await raceAbort(call('render.views', args, 120000), exec?.signal)
+            result = await raceAbort(call('render.views', callArgs, 120000), exec?.signal)
             result.safe_mode_fallback = true
           } else {
             return errorResult(error)
