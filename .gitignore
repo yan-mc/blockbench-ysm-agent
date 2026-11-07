@@ -3,12 +3,15 @@ workspace/
 dist/
 node_modules/
 *.log
+# 测试证据日志是有意保留的（覆盖上面的 *.log）
+!docs/test-evidence/*.log
+
+# python 缓存（如 tools/__pycache__）
+__pycache__/
+*.pyc
 
 # archived test / reference material (kept on disk, never distributed)
 _archive/
-
-# 本地素材库（教程 PDF / 共享模型 / 参考图；含版权内容，不进仓库）
-材料/
 
 # upstream clones (keep out of VCS; re-clone per research docs)
 vendor/
