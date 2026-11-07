@@ -55,3 +55,6 @@ tools/ysmparser/
 
 # 子智能体语料分析的中间产物
 tools/curve/out_*.json
+
+# 子智能体的分析中间产物
+work/
