@@ -99,8 +99,10 @@ export function resolveT3Config(config = {}, env = process.env) {
             : ''
   const model = pick(nb.model, config?.nanoBananaModel, preset.model, T3_DEFAULT_MODEL)
   const baseUrl = pick(nb.baseUrl, config?.nanoBananaBaseUrl, preset.baseUrl, T3_DEFAULT_BASE_URL).replace(/\/+$/, '')
-  const auth = pick(nb.auth, config?.nanoBananaAuth, preset.auth, 'query').toLowerCase() === 'bearer' ? 'bearer' : 'query'
-  const bodyStyle = pick(nb.bodyStyle, config?.nanoBananaBodyStyle, preset.bodyStyle, 'camel').toLowerCase() === 'snake' ? 'snake' : 'camel'
+  const authRaw = pick(nb.auth, config?.nanoBananaAuth, '').toLowerCase()
+  const auth = authRaw === 'bearer' ? 'bearer' : authRaw === 'query' ? 'query' : preset.auth
+  const bodyRaw = pick(nb.bodyStyle, config?.nanoBananaBodyStyle, '').toLowerCase()
+  const bodyStyle = bodyRaw === 'snake' ? 'snake' : bodyRaw === 'camel' ? 'camel' : preset.bodyStyle
   const rm = Array.isArray(nb.responseModalities) ? nb.responseModalities
     : Array.isArray(config?.nanoBananaResponseModalities) ? config.nanoBananaResponseModalities
       : (preset.responseModalities ?? ['IMAGE'])

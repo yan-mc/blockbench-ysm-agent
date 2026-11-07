@@ -119,7 +119,7 @@ dsh Host 插件  ── WebSocket / HTTP+SSE ──►  BAE（隐藏 Electron + 
 BAE 需要一个 Electron 可执行文件。推荐直接使用仓库 vendor 里 Blockbench 自带的 Electron：
 
 ```text
-F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe
+<仓库目录>/vendor/blockbench/node_modules/electron/dist/electron.exe
 ```
 
 （即上游 Blockbench `v5.2.2` 的 Electron 43；用你本机 Blockbench 安装目录下的同类路径也可以。）
@@ -129,7 +129,7 @@ F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\elec
 `dist/bb-agent-app` 是组装产物，不入库。首次搭建或改了 `vendor`/`packages` 后：
 
 ```powershell
-cd F:\Deepseek_harness\blockbench
+cd <仓库目录>
 node packages/bb-agent-runtime/scripts/assemble.mjs
 ```
 
@@ -147,12 +147,12 @@ node packages/bb-agent-runtime/scripts/assemble.mjs
     - id: blockbench-agent
       name: '@local/dsh-blockbench-agent'
       config:
-        workspaceRoot: 'F:\Deepseek_harness\blockbench\models'   # 模型根目录
+        workspaceRoot: '<仓库目录>/models'                        # 模型根目录（按本机填）
         project: 'togawa-sakiko'                                  # 当前模型目录名（新验收项目）
         autoStart: true
-        executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
-        appPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app'
-        pluginPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app\agent\bb-agent-bridge.js'
+        executable: '<仓库目录>/vendor/blockbench/node_modules/electron/dist/electron.exe'
+        appPath: '<仓库目录>/dist/bb-agent-app'
+        pluginPath: '<仓库目录>/dist/bb-agent-app/agent/bb-agent-bridge.js'
         exposeGuiTools: false
         bridgeTransport: auto
 ```
@@ -165,7 +165,7 @@ node packages/bb-agent-runtime/scripts/assemble.mjs
 首次安装：
 
 ```text
-plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh-blockbench-agent
+plugin_manager install_bundle target=<仓库目录>/packages/dsh-blockbench-agent
 ```
 
 更新插件（改过 `index.js`/`lib/`/`skills/`/`reference/` 后）：
@@ -174,7 +174,7 @@ plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh
 plugin_manager remove_bundle target=@local/dsh-blockbench-agent
 （停止 BAE / 清理残留 electron 进程，确认 dist 未被占用）
 node packages/bb-agent-runtime/scripts/assemble.mjs          # 若改过 agent/bridge
-plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh-blockbench-agent
+plugin_manager install_bundle target=<仓库目录>/packages/dsh-blockbench-agent
 ```
 
 安装后插件行应显示 `active`。**改 schemas 后必须跑 host-smoke**：schema 非法会导致所有工具和 skill 一起从 DSH 消失。
@@ -587,7 +587,7 @@ bb_export_ysm({ out_dir: "release", zip: true })
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `workspaceRoot` | `F:\Deepseek_harness\blockbench\models` | 模型根目录 |
+| `workspaceRoot` | `<仓库目录>/models` | 模型根目录（按本机填，勿提交个人路径） |
 | `project` | `togawa-sakiko` | 当前项目目录名（工作区 = `<workspaceRoot>/<project>`） |
 | `executable` | `vendor\blockbench\node_modules\electron\dist\electron.exe` | BAE 的 electron.exe |
 | `appPath` | `dist\bb-agent-app` | BAE 应用目录 |

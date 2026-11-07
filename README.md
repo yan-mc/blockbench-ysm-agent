@@ -74,7 +74,7 @@
 
 | 项 | 结果 |
 |---|---|
-| 单元测试 | **80/80 通过**（7 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 12 / spec 17 / tool-schema 5 / viewsheet 8 / nanobanana 16） |
+| 单元测试 | **81/81 通过**（7 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 12 / spec 17 / tool-schema 5 / viewsheet 8 / nanobanana 17） |
 | host-smoke | **35 步全过**，schema lint 检查 **42 个工具**（本地实跑，2026-11-08） |
 | 契约 | `spec/tool-manifest.json` **44 工具**、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**，且 0.9.3 已对齐 `spec` ↔ `index.js` 的 **44/44** 参数 |
 | 上游 | `vendor/blockbench` = **Blockbench 5.2.2**；`vendor/YSM-Utils-Plugins` = 2.6.0（MIT）；vendor 总体积约 **1.54GB** |
@@ -235,7 +235,7 @@ flowchart LR
 ## 7. 目录（当前真实布局）
 
 ```
-F:\Deepseek_harness\blockbench\
+<仓库根目录>\
 ├─ README.md                      # 门面：封面 / 工程状态 / 历史设计基线
 ├─ MANUAL.md                      # 完整使用手册（v0.9.3）
 ├─ HANDOVER.md                    # 交接班档案（第一手）

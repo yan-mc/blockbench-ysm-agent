@@ -1,15 +1,23 @@
 # 插入 Host 插件行；config 可被用户 profile 的 cordis.patch.yml 覆盖。
-# 本地开发默认使用 F:\Deepseek_harness\blockbench\dist\bb-agent-app（由 scripts/assemble.mjs 生成）。
+#
+# ⚠️ 这里**不要写死个人机器路径**（否则别人安装会失败）。安装后按本机位置填写：
+#   workspaceRoot: '<仓库目录>/models'          # 必填：模型根目录
+#   project:       'togawa-sakiko'              # 当前模型目录名
+#   executable:    '<仓库目录>/vendor/blockbench/node_modules/electron/dist/electron.exe'
+#   appPath:       '<仓库目录>/dist/bb-agent-app'
+#   pluginPath:    '<仓库目录>/dist/bb-agent-app/agent/bb-agent-bridge.js'
+# 只填 workspaceRoot、不填 executable/appPath 时，插件会等待外部启动的 BAE 连接。
+# 完整示例见 SETUP.md §6.1 / MANUAL.md §4.3。
 - insert:
     - id: blockbench-agent
       name: '@local/dsh-blockbench-agent'
       config:
-        workspaceRoot: 'F:\Deepseek_harness\blockbench\models'
+        workspaceRoot: ''
         project: 'togawa-sakiko'
         autoStart: true
-        executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
-        appPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app'
-        pluginPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app\agent\bb-agent-bridge.js'
+        executable: ''
+        appPath: ''
+        pluginPath: ''
         connectTimeoutMs: 30000
         defaultTimeoutMs: 120000
         maxImagesPerCall: 4
@@ -30,4 +38,3 @@
         # nanoBananaImageSize: '2K'
         # nanoBananaAspectRatio: '16:9'
         # nanoBananaMaxReferences: 6
-

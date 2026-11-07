@@ -16,8 +16,8 @@
 ## 1. clone 仓库
 
 ```powershell
-git clone https://github.com/yan-mc/blockbench-ysm-agent.git F:\Deepseek_harness\blockbench
-cd F:\Deepseek_harness\blockbench
+git clone https://github.com/yan-mc/blockbench-ysm-agent.git <仓库目录>
+cd <仓库目录>
 ```
 
 仓库**不包含** `vendor/`、`dist/`、`material/`、`release/`、`workspace/`（均在 `.gitignore` 中）。
@@ -86,12 +86,12 @@ python spec/generate_spec.py                                # 契约重生成，
     - id: blockbench-agent
       name: '@local/dsh-blockbench-agent'
       config:
-        workspaceRoot: 'F:\Deepseek_harness\blockbench\models'   # 模型根目录
+        workspaceRoot: '<仓库目录>/models'                        # 模型根目录（按本机填）
         project: 'togawa-sakiko'                                  # 当前模型目录名
         autoStart: true
-        executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
-        appPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app'
-        pluginPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app\agent\bb-agent-bridge.js'
+        executable: '<仓库目录>/vendor/blockbench/node_modules/electron/dist/electron.exe'
+        appPath: '<仓库目录>/dist/bb-agent-app'
+        pluginPath: '<仓库目录>/dist/bb-agent-app/agent/bb-agent-bridge.js'
         exposeGuiTools: false
         bridgeTransport: auto
 ```
@@ -103,14 +103,14 @@ python spec/generate_spec.py                                # 契约重生成，
 在 DSH 中执行：
 
 ```text
-plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh-blockbench-agent
+plugin_manager install_bundle target=<仓库目录>/packages/dsh-blockbench-agent
 ```
 
 已安装过时先移除再装：
 
 ```text
 plugin_manager remove_bundle target=@local/dsh-blockbench-agent
-plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh-blockbench-agent
+plugin_manager install_bundle target=<仓库目录>/packages/dsh-blockbench-agent
 ```
 
 安装后插件行应显示 active。若改过 `dist` 需重启 BAE：`plugin_manager remove_bundle` → `install_bundle`，或先 `/bb-status` 停 BAE。

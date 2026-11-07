@@ -49,7 +49,8 @@ export const name = 'blockbench-agent'
 export const inject = ['tools', 'commands']
 
 const DEFAULTS = {
-  workspaceRoot: 'F:\\Deepseek_harness\\blockbench\\workspace',
+  // 可移植默认值：不写死机器路径。真实项目请用 cordis/profile 配置覆盖为 <仓库>/models。
+  workspaceRoot: path.join(os.homedir(), '.dsh-blockbench-agent', 'workspace'),
   project: 'default',
   executable: '',            // BAE 的 electron.exe
   appPath: '',               // BAE 应用目录（含 index.html / agent/）

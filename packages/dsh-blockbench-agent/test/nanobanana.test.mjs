@@ -38,6 +38,17 @@ test('resolveT3Config：APIYI 预设（bearer + api.apiyi.com + gemini-3-pro-ima
   assert.equal(T3_PRESETS.apiyi.baseUrl, 'https://api.apiyi.com/v1beta')
 })
 
+test('resolveT3Config：默认 auto 不能覆盖 provider 预设（APIYI 仍 bearer）', () => {
+  const c = resolveT3Config({
+    nanoBananaProvider: 'apiyi',
+    nanoBananaApiKey: 'k',
+    nanoBananaAuth: 'auto',
+    nanoBananaBodyStyle: 'auto',
+  }, {})
+  assert.equal(c.auth, 'bearer')
+  assert.equal(c.bodyStyle, 'camel')
+})
+
 test('resolveT3Config：config 优先于 env；尺寸/比例/上限被规整', () => {
   const c = resolveT3Config({
     nanoBananaApiKey: 'cfg-key',
