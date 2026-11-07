@@ -1,0 +1,507 @@
+{
+  "spec": "ysm-model-spec/1",
+  "character": {
+    "name": "丰川祥子 / Togawa Sakiko（Oblivionis）",
+    "source": "明日方舟 × BanG Dream! Ave Mujica 联动 6★领主近卫；皮肤「旋律的主人 / Master of Melodia」"
+  },
+  "references": {
+    "dir": "refs/skin",
+    "images": [
+      {
+        "index": 0,
+        "angle": "three_quarter",
+        "kind": "fullbody",
+        "note": "官方皮肤「旋律的主人」立绘 2176²（sakiko_skin1.png）：坐姿3/4正面，主参考（发色/瞳色/双角/黑银服装/黑丝/短靴）"
+      },
+      {
+        "index": 1,
+        "angle": "front",
+        "kind": "screenshot",
+        "note": "头部+双大角裁切 crop_head.png（来自#0）：角形弯曲方向、发饰、领口"
+      },
+      {
+        "index": 2,
+        "angle": "front",
+        "kind": "screenshot",
+        "note": "面部放大 crop_face.png（来自#0）：琥珀金瞳、刘海分束、低双马尾黑蝴蝶结"
+      },
+      {
+        "index": 3,
+        "angle": "three_quarter",
+        "kind": "screenshot",
+        "note": "上身服装 crop_horn_hair.png（来自#0）：黑高领/鼓袖/浅蓝灰荷叶边胸饰/蓝宝石胸针/黑蕾丝手套"
+      },
+      {
+        "index": 4,
+        "angle": "side",
+        "kind": "screenshot",
+        "note": "裙/腿/靴裁切 crop_body.png+crop_legs.png（来自#0）：多层黑裙/白蓝衬裙边/黑丝/黑银系带高跟短靴"
+      },
+      {
+        "index": 5,
+        "angle": "front",
+        "kind": "fullbody",
+        "note": "E2 立绘 sakiko_e2.png（非本皮肤，仅站姿比例参考）"
+      },
+      {
+        "index": 6,
+        "angle": "front",
+        "kind": "fullbody",
+        "note": "E0 校服立绘 sakiko_e0.png（非本皮肤，仅7头身比例参考）"
+      }
+    ]
+  },
+  "palette": [
+    {
+      "name": "hair_light",
+      "hex": "#cfd8ee",
+      "usage": "头发亮部"
+    },
+    {
+      "name": "hair_mid",
+      "hex": "#b3c2e2",
+      "usage": "头发中间调"
+    },
+    {
+      "name": "hair_shadow",
+      "hex": "#8fa0c8",
+      "usage": "头发暗部"
+    },
+    {
+      "name": "hair_deep",
+      "hex": "#6f7fa8",
+      "usage": "头发深暗/内层"
+    },
+    {
+      "name": "skin",
+      "hex": "#f6e7e7",
+      "usage": "皮肤"
+    },
+    {
+      "name": "skin_shadow",
+      "hex": "#e4c9d1",
+      "usage": "皮肤阴影"
+    },
+    {
+      "name": "dress_black",
+      "hex": "#24212a",
+      "usage": "演出服黑主体"
+    },
+    {
+      "name": "dress_dark",
+      "hex": "#17151c",
+      "usage": "演出服最深"
+    },
+    {
+      "name": "dress_fold",
+      "hex": "#332f3a",
+      "usage": "黑布褶/亮边"
+    },
+    {
+      "name": "frill_white",
+      "hex": "#eef2fa",
+      "usage": "荷叶边/衬裙亮部"
+    },
+    {
+      "name": "frill_shadow",
+      "hex": "#c9d4e6",
+      "usage": "荷叶边阴影"
+    },
+    {
+      "name": "silver",
+      "hex": "#dfe4ee",
+      "usage": "银饰边/扣"
+    },
+    {
+      "name": "silver_dark",
+      "hex": "#a9b3c6",
+      "usage": "银饰暗部"
+    },
+    {
+      "name": "horn_light",
+      "hex": "#5c5c68",
+      "usage": "角脊棱亮部"
+    },
+    {
+      "name": "horn_mid",
+      "hex": "#3f3f4a",
+      "usage": "角主体"
+    },
+    {
+      "name": "horn_dark",
+      "hex": "#2a2a32",
+      "usage": "角暗部/根部"
+    },
+    {
+      "name": "eye_amber",
+      "hex": "#e2b04a",
+      "usage": "琥珀金虹膜"
+    },
+    {
+      "name": "eye_amber_dark",
+      "hex": "#8f6a1e",
+      "usage": "虹膜暗圈"
+    },
+    {
+      "name": "pupil_dark",
+      "hex": "#2a1d0c",
+      "usage": "瞳孔/睫毛"
+    },
+    {
+      "name": "white",
+      "hex": "#ffffff",
+      "usage": "高光/眼白"
+    },
+    {
+      "name": "gem_blue",
+      "hex": "#69b4e6",
+      "usage": "蓝宝石发饰/胸针"
+    },
+    {
+      "name": "gem_blue_dark",
+      "hex": "#3d7fb8",
+      "usage": "蓝宝石暗部"
+    },
+    {
+      "name": "tight_black",
+      "hex": "#211e27",
+      "usage": "黑丝袜"
+    },
+    {
+      "name": "boot_black",
+      "hex": "#1b1920",
+      "usage": "短靴黑皮"
+    },
+    {
+      "name": "boot_panel",
+      "hex": "#8ba0bb",
+      "usage": "靴筒蓝灰面板"
+    },
+    {
+      "name": "lace_silver",
+      "hex": "#cfd6e2",
+      "usage": "靴带/蕾丝银线"
+    }
+  ],
+  "parts": [
+    {
+      "id": "torso",
+      "bone": "UpperBody",
+      "cubes": 24,
+      "shape": "黑银演出服上身：高领、肩披鼓袖、胸口浅蓝灰荷叶边、银链胸针、束腰",
+      "colors": [
+        "dress_black",
+        "dress_dark",
+        "frill_white",
+        "frill_shadow",
+        "silver",
+        "gem_blue"
+      ],
+      "refs": [
+        0,
+        1,
+        3
+      ],
+      "region": null
+    },
+    {
+      "id": "chest",
+      "bone": "Breast",
+      "cubes": 4,
+      "shape": "胸部起伏（被服装覆盖）",
+      "colors": [
+        "dress_black",
+        "dress_fold"
+      ],
+      "refs": [
+        3
+      ],
+      "region": null
+    },
+    {
+      "id": "collar",
+      "bone": "Collar",
+      "cubes": 5,
+      "shape": "黑色高领+蕾丝边",
+      "colors": [
+        "dress_black",
+        "silver"
+      ],
+      "refs": [
+        1,
+        3
+      ],
+      "region": null
+    },
+    {
+      "id": "head",
+      "bone": "Head",
+      "cubes": 14,
+      "shape": "7宽头骨+下颌收窄+耳朵+颊侧斜块",
+      "colors": [
+        "skin",
+        "skin_shadow",
+        "hair_shadow"
+      ],
+      "refs": [
+        1,
+        2
+      ],
+      "region": null
+    },
+    {
+      "id": "eyes",
+      "bone": "Eyelid",
+      "cubes": 14,
+      "shape": "纯色方块叠层眼：眼睑板/眼白/虹膜/瞳孔/高光/眉毛",
+      "colors": [
+        "skin",
+        "white",
+        "eye_amber",
+        "eye_amber_dark",
+        "pupil_dark"
+      ],
+      "refs": [
+        2
+      ],
+      "region": null
+    },
+    {
+      "id": "hair_main",
+      "bone": "Hair",
+      "cubes": 26,
+      "shape": "头顶+后发体积，银蓝灰长卷发",
+      "colors": [
+        "hair_light",
+        "hair_mid",
+        "hair_shadow",
+        "hair_deep"
+      ],
+      "refs": [
+        0,
+        1
+      ],
+      "region": null
+    },
+    {
+      "id": "hair_bangs",
+      "bone": "front_h1",
+      "cubes": 14,
+      "shape": "刘海8-12撮压眉、侧发贴颊",
+      "colors": [
+        "hair_light",
+        "hair_mid",
+        "hair_shadow"
+      ],
+      "refs": [
+        2
+      ],
+      "region": null
+    },
+    {
+      "id": "hair_side",
+      "bone": "corner_h1",
+      "cubes": 12,
+      "shape": "鬓发+侧发内收吃掉脸方角",
+      "colors": [
+        "hair_mid",
+        "hair_shadow"
+      ],
+      "refs": [
+        0,
+        1
+      ],
+      "region": null
+    },
+    {
+      "id": "hair_long",
+      "bone": "hl_m",
+      "cubes": 20,
+      "shape": "后长发4-6束多段（等粗长条+每块微转）",
+      "colors": [
+        "hair_light",
+        "hair_mid",
+        "hair_shadow",
+        "hair_deep"
+      ],
+      "refs": [
+        0
+      ],
+      "region": null
+    },
+    {
+      "id": "hair_long_side",
+      "bone": "hl_side",
+      "cubes": 10,
+      "shape": "两侧长发束/低双马尾（前列肩前）",
+      "colors": [
+        "hair_mid",
+        "hair_shadow"
+      ],
+      "refs": [
+        0,
+        2
+      ],
+      "region": null
+    },
+    {
+      "id": "ribbon",
+      "bone": "Ribbon",
+      "cubes": 8,
+      "shape": "黑蝴蝶结发饰+低双马尾系带",
+      "colors": [
+        "dress_black",
+        "silver",
+        "gem_blue"
+      ],
+      "refs": [
+        1,
+        2
+      ],
+      "region": null
+    },
+    {
+      "id": "horns",
+      "bone": "Horn_R_01",
+      "cubes": 20,
+      "shape": "双大角：每侧3段弯曲（向上→外张→前勾下弯），深炭灰带脊棱",
+      "colors": [
+        "horn_light",
+        "horn_mid",
+        "horn_dark"
+      ],
+      "refs": [
+        0,
+        1
+      ],
+      "region": null
+    },
+    {
+      "id": "skirt",
+      "bone": "Skirt",
+      "cubes": 12,
+      "shape": "黑色多层荷叶短裙+白蓝衬裙边",
+      "colors": [
+        "dress_black",
+        "dress_fold",
+        "frill_white",
+        "frill_shadow"
+      ],
+      "refs": [
+        0,
+        4
+      ],
+      "region": null
+    },
+    {
+      "id": "skirt_front",
+      "bone": "FrontSkirt",
+      "cubes": 16,
+      "shape": "前后左右裙片+背后大黑蝴蝶结+长拖尾",
+      "colors": [
+        "dress_black",
+        "dress_dark",
+        "silver"
+      ],
+      "refs": [
+        0,
+        4
+      ],
+      "region": null
+    },
+    {
+      "id": "arms",
+      "bone": "LeftArm",
+      "cubes": 12,
+      "shape": "黑色鼓袖+肩披蕾丝层",
+      "colors": [
+        "dress_black",
+        "frill_white",
+        "silver"
+      ],
+      "refs": [
+        3
+      ],
+      "region": null
+    },
+    {
+      "id": "forearms",
+      "bone": "LeftForeArm",
+      "cubes": 6,
+      "shape": "黑蕾丝长手套+袖口",
+      "colors": [
+        "dress_black",
+        "dress_fold",
+        "silver"
+      ],
+      "refs": [
+        3
+      ],
+      "region": null
+    },
+    {
+      "id": "legs",
+      "bone": "LeftLeg",
+      "cubes": 6,
+      "shape": "黑丝袜（星光纹理降级到贴图）",
+      "colors": [
+        "tight_black"
+      ],
+      "refs": [
+        4
+      ],
+      "region": null
+    },
+    {
+      "id": "boots",
+      "bone": "LeftFoot",
+      "cubes": 8,
+      "shape": "黑银系带高跟短靴、蓝灰靴筒面板",
+      "colors": [
+        "boot_black",
+        "boot_panel",
+        "lace_silver",
+        "silver"
+      ],
+      "refs": [
+        4
+      ],
+      "region": null
+    },
+    {
+      "id": "accessory",
+      "bone": "AllHead",
+      "cubes": 9,
+      "shape": "蓝水晶发饰、金饰、蓝宝石胸针、浅蓝腰结",
+      "colors": [
+        "gem_blue",
+        "gem_blue_dark",
+        "silver",
+        "frill_white"
+      ],
+      "refs": [
+        0,
+        1,
+        3
+      ],
+      "region": null
+    }
+  ],
+  "budget": {
+    "cubesTotal": 240,
+    "cubesMin": 50,
+    "cubesMax": 600,
+    "headShare": 0.332,
+    "headShareMin": 0.28,
+    "headShareMax": 0.48,
+    "textureSize": 512
+  },
+  "gaps": [
+    "缺背面参考：官方皮肤立绘为坐姿3/4正面，无背面/正侧图；背面发型、裙摆与拖尾按对称+长发推断",
+    "缺直立侧面参考：角在侧视的弯曲平面、身体厚度按3/4视角推断",
+    "坐姿遮挡下半身：腿长/靴高按站姿 E2/E0 与 YSM 模板比例推断",
+    "皮肤立绘中的古典钢琴/留声机/螺旋阶梯/高塔为背景元素，明确不建模",
+    "角的具体脊棱数量、瞳孔细节、布料蕾丝纹样在方块尺度下做简化/贴图降级"
+  ],
+  "notes": "锁定 skin1=「旋律的主人」黑银演出服（E0=校服、E2=红黑舞台服均非目标皮肤）。骨架沿用 YSM 模板并新增角骨链；保留模板 303 个动画以避免动画层返工。"
+}
