@@ -12,7 +12,8 @@
 |---|---|
 | `togawa-sakiko/` | 明日方舟 × BanG Dream! Ave Mujica 联动干员 **丰川祥子（Togawa Sakiko）**，皮肤「旋律的主人 / Master of Melodia」，卡普里尼双大角 |
 | 实测 | 70 bones / **217 cubes** / 2×512² 贴图 / 304 animations（模板 303 + 自定义 `sakiko_showcase`）；`bb_validate` ok=true、**0 error**（3 warning：512 贴图 ×2、可选 ViewLocator 缺省） |
-| 产物 | `pack/`（YSM 工作副本）、`exports/<ts>/pack.zip`（32 文件 / 486KB）、`artifacts/renders/r0021/*_768.png`（front/back/left/iso）、`specs/丰川祥子_*.json/.md`、`checkpoints/r0019.bbmodel` |
+| 产物 | `pack/`（YSM 工作副本）、`exports/<ts>/pack.zip`（32 文件 / 486KB）、`artifacts/renders/r0021/*_768.png`（front/back/left/iso）、`specs/丰川祥子_*.json/.md`、`checkpoints/r0019.bbmodel`、`SEG-CHECK.md`（立绘拆分+逐部件复检） |
+| **复检结论** | 2026-11-07 T1 立绘拆分 + 8 组 isolate 复检：**major 5 / minor 4 / pass 0**。top 问题：角仅约参考 1/3、双马尾仅 4 块薄板、靴无形体、裙层/衬裙边/拖尾缺失、腹前灰框无对应物。详见 [`togawa-sakiko/SEG-CHECK.md`](togawa-sakiko/SEG-CHECK.md)；下一步 P1 角→P2 头发→P3 靴→P4 裙/拖尾→P5 胸衣 |
 | 已知降级 | 角为 10 段折线（无罗纹）、裙/蕾丝/褶皱简化、头发卷曲不足、眼睛偏圆、背面为对称推断（无背面参考）、arm.json 与 blue.png 仍是模板 |
 | 历史 `deepseek-fish/` | 已按要求删除；BUGS 记录保留到 [`../docs/archive/BUGS-deepseek-fish-testmodel.md`](../docs/archive/BUGS-deepseek-fish-testmodel.md) |
 | 历史 `sakiko-melodia/` | 已在更早提交 `8f3a09f` 删除 |

@@ -253,24 +253,29 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 ## 七、技能文档（AI 建模时读这个）
 
-`packages/dsh-blockbench-agent/skills/blockbench-ysm-artist.md`
+`packages/dsh-blockbench-agent/skills/blockbench-ysm-artist.md`（**v2，2026-11-07 重构，约 400 行**）
 
-**核心方法：从总到分四层**（§2.2）
+> v2 把此前 31 次补丁式修改合并成一份自洽手册，消除了旧 skill / playbook / corpus-rules 之间的
+> 头身比（7.31 vs 4.87）、发片厚度、贴图尺寸、工具行为等矛盾。配套三份文档：
+> `reference/blockbench-ysm-playbook.md`（操作/格式）、`reference/ysm-corpus-rules.md`（数字出处）、
+> `assets/delegation-brief.md`（任务书/回报格式）。
 
-```
-第1层 风格档位   —— 定体素尺度，全模型贯彻
-第2层 剪影比例   —— 轮廓/头身比/体积
-第3层 部件形态   —— 长什么样、曲面往哪走
-第4层 方块实现   —— 最后才决定用几块
-```
+**章节结构**：
 
-**关键章节**：
-- §2.3 实测参考值（比例表）
-- §3.1 脸与五官（含 3.1.4 眼睛纯色叠层、3.1.5 isolate 局部检查）
-- §3.2 头发（等粗条带链）
-- §3.4 服装（5 种裙拓扑，圆环已淘汰）
-- §5 验收清单（**整体优先**）
-- §10 常见错误（含 Blockbench Z 轴旋向与右手定则相反）
+| 节 | 内容 |
+|---|---|
+| §0 | 强制委派 + 十条流水线（canon → 深搜 → **立绘拆分** → spec → 开项目 → 档位/剪影/比例 → 建模 → 贴图 → **逐部件检查** → 出厂） |
+| §1 | 14 条铁律（含"禁止模板换色""先算后做""美术亲自看图"） |
+| §2 | 参考阶段：官方基准 → deep 搜索 → 对照表逐格判读 → **T1/T2 立绘拆分（分档强制）** → spec → 开项目（清示例模型/rest rotation） |
+| §3 | 从总到分四层法 + **头身比双口径**（7.31 方块 / 4.87 视觉）与肩宽/胯宽/头宽 |
+| §4 | 部件配方：脸/眼（纯色方块叠层）/发（等粗条带+发色分档）/角（需超出头发）/身体/服装/配饰 |
+| §5 | 贴图与配色（尺寸/texel/纯色分档/UV 三写法） |
+| §6 | **逐部件检查（强制）**：8 组 isolate 清单 + 整体验收 + 反模板检查 |
+| §7 | 动画 |
+| §8 | 保存/导出/回滚 |
+| §9 | YSM 约束、骨架树/命名、arm、动画槽位、MoLang |
+| §10 | 工具坑（致命静默类 + 效率类） |
+| 附录 | 41 暴露工具速查、常见美术错误 |
 
 ---
 
@@ -305,15 +310,16 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 ## 十、推荐工作流（接手的第一个任务）
 
 ```
-1. skill 加载 blockbench-ysm-artist，完整读一遍
+1. skill 加载 blockbench-ysm-artist，完整读一遍（并读 playbook / corpus-rules）
 2. bb_ref_canon({character})          拿官方基准
 3. bb_ref_search({depth:"deep"})      大面积搜图（902 候选/2s）
 4. bb_ref_collect()                   下载 → 去重 → 编号对照表，**真的看**
-5. bb_spec_save({spec})               固化规格 → 拿到构建计划
-6. bb_session_start({mode:"new_ysm", resolution:[512,512]})
-7. 按四层方法建模
-8. 每个部件 bb_look({isolate, zoom}) 局部检查
-9. bb_validate → bb_save_project → bb_export_ysm
+5. bb_seg_probe → bb_seg_lite         立绘拆分（标准档必做；精修档再加 T2）
+6. bb_spec_save({spec})               固化规格 → 拿到构建计划
+7. bb_session_start({mode:"new_ysm", resolution:[512,512]}); 清空示例模型/处理 rest rotation
+8. 按四层方法建模
+9. 每个部件 bb_look({isolate, zoom}) 局部检查（8 组清单）
+10. bb_validate → bb_save_project → bb_export_ysm → 成品 4 视角图
 ```
 
 **当前测试模型：`togawa-sakiko`（首轮验收已完成，2026-11-07，带已知降级项）。**
@@ -332,6 +338,8 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | 预算 | 写操作 ~20、显式渲染 ~10、restore 0（session 上限 60/40/2） |
 
 已知降级：角为 10 段折线（脊棱仅明暗近似，无罗纹）、裙/蕾丝/褶皱大幅简化、头发卷曲与发流不足、眼睛偏圆、**无背面/侧面参考**（背面为对称推断，已记 `spec.gaps`）、`arm.json` 与 `blue.png` 仍是模板。
+
+**2026-11-07 立绘拆分（T1）+ 逐部件复检结论**：T1 可用（自动下载 SAM2 59MB），但对这张"暗色人物 + 暗色大件道具 + 亮背景"的稠密官方立绘**拆分质量低**（72 部件里人物的裙/手套/腿/靴/胸饰 0 个切出，掩膜被钢琴/沙发/基座占据）；逐部件检查仍完成 8 组，判定 **major 5 / minor 4 / pass 0**。top 问题：①双角仅约参考 1/3、无回卷棱纹 ②双马尾每条仅 4 块薄板、后发阶梯块 ③靴与黑丝糊死 ④裙层/白衬裙边缺失、拖尾仅 3 块 ⑤腹前浅灰方框无对应参考物。详见 [`models/togawa-sakiko/SEG-CHECK.md`](models/togawa-sakiko/SEG-CHECK.md)；下一步按 P1 角→P2 头发→P3 靴→P4 裙/拖尾→P5 胸衣修。
 
 历史测试模型（deepseek-fish、sakiko-melodia）已按要求清理（sakiko-melodia 在提交 `8f3a09f` 删除；deepseek-fish 目录于 2026-11-07 删除，BUGS 记录存 `docs/archive/BUGS-deepseek-fish-testmodel.md`）。
 

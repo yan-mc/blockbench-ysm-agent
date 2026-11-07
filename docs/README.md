@@ -45,6 +45,7 @@
 | [21a-衣服与裙子结构](21a-衣服与裙子结构.md) | 5 种裙拓扑、布料预算、上衣/袖/披风/配饰（52KB） |
 | [21b-身体曲线塑造](21b-身体曲线塑造.md) | 胸/腰/腿/肩/手的分位数与做法，梨形比例（33KB） |
 | [21c-头发与面部](21c-头发与面部.md) | 发片厚度 1.00、发束组织、刘海、眼睛四层、脸型修形（54KB） |
+| [22-建模实战复盘与经验（2026-11-07）](22-建模实战复盘与经验（2026-11-07）.md) | 47 turns 会话复盘、13 轮建模得失、立绘拆分复检、skill/brief 调整记录 |
 
 ## 五、归档（`archive/`，不随现状维护）
 
@@ -61,7 +62,7 @@
 
 ## 六、测试证据
 
-- [test-evidence/README.md](test-evidence/README.md)：0.9.1 复核证据说明（`test-all-0.9.1.log` / `hosttest-result-0.9.1.json` 由 Lead 写入；62/62 单测、host-smoke 35 步/41 工具）。
+- [test-evidence/README.md](test-evidence/README.md)：0.9.1 全量回归证据（`test-all-0.9.1.log` 6/6 PASSED、`hosttest-result-0.9.1.json` 35 步/41 工具、`e2e-result-0.9.1.json`、`animation-diff-0.9.1.json`、`M0-2026-11-07.md`）。
 - 0.4.0 旧证据已移到 `archive/test-evidence-0.4.0/`。
 
 ## 机器可读契约
