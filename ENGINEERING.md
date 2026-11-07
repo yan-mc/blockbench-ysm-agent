@@ -3,31 +3,31 @@
 > 设计基线（历史设计意图）：见 [系统开发与设计方案.md](系统开发与设计方案.md) 与 `docs/01-06`。
 > 本文件只记录**实现状态、实测数据、已知边界与下一步**；交接第一手信息见 [HANDOVER.md](HANDOVER.md)。
 >
-> 当前版本：**0.9.2**（2026-11-07 复核）。
+> 当前版本：**0.9.3**（2026-11-08 复核，新增 T3 云端拆解）。
 
-## 0. 2026-11-07 复核（0.9.2）
+## 0. 2026-11-08 复核（0.9.3）
 
 | 项 | 结果 |
 |---|---|
 | 单元测试 | **62/62 通过**（6 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 10 / spec 17 / tool-schema 5 / viewsheet 8） |
-| host-smoke | **35 步全过**；schema lint 检查 **41 个暴露工具**（本地实跑 2026-11-07 18:40；产物 `workspace/_hosttest/` 已清理，复跑命令见 §4） |
+| host-smoke | **35 步全过**；schema lint 检查 **42 个暴露工具**（本地实跑 2026-11-08；产物 `workspace/_hosttest/` 已清理，复跑命令见 §4） |
 | 契约重生成 | `python spec/generate_spec.py` 重跑后与提交内容 **0 diff**（契约是**手工维护**的源，不是从 `index.js` 生成；与 `index.js` 存在 17 个工具参数漂移，以 `index.js` 实际 schema 为准） |
 | dist 组装 | `dist/bb-agent-app` 于 2026-11-07 由 `assemble.mjs` 从 vendor Blockbench 5.2.2 + 当前源码重新组装：**190 文件 / 36MB**，`templates/` 32 文件；`agent/` 4 个文件（main.js、preload.cjs、bb-agent-bridge.js、selftest.js）sha256 与源码一致 |
-| 版本 | 根 `package.json`、`packages/dsh-blockbench-agent/package.json`、`packages/bb-agent-runtime/package.json` 均为 **0.9.2**；bridge 握手与 `/bb-agent/status` 版本号均为 0.9.2 |
-| 工具规模 | `index.js` 定义 **43 个 `bb_*`**，因 `exposeGuiTools:false` 实际暴露 **41 个**（`bb_show_gui`/`bb_hide_gui` 由 `/show` `/hide` 命令替代）；5 个命令、1 个 Skill |
+| 版本 | 根 `package.json`、`packages/dsh-blockbench-agent/package.json`、`packages/bb-agent-runtime/package.json` 均为 **0.9.3**；bridge 握手与 `/bb-agent/status` 版本号均为 0.9.3 |
+| 工具规模 | `index.js` 定义 **44 个 `bb_*`**，因 `exposeGuiTools:false` 实际暴露 **42 个**（`bb_show_gui`/`bb_hide_gui` 由 `/show` `/hide` 命令替代）；5 个命令、1 个 Skill |
 | 协议 | `spec/bridge-methods.json` = **56 方法 / 7 事件 / 22 错误码** |
 | 参考语料 | `material/` 约 **329.1MB**；`ysm_decoded` **169 目录 / 1156 文件 / 233MB**；`ysm` 9 包；`maid` 874 文件 / 446 条（325 角色）；`bbmodel` 62 对 |
 | 上游 | `vendor/blockbench` = **Blockbench 5.2.2**（不是 3.7.5）；`vendor/YSM-Utils-Plugins` = 2.6.0 MIT；vendor 总体积约 **1.54GB** |
 
 ## 1. 当前结论
 
-**DSH 端已完整可用（v0.9.2）：插件以 link 方式安装并激活；43 个工具定义 / 41 个实际暴露、5 个命令、1 个 Skill；56 个 bridge 方法；渲染自检（isolate+zoom、多格拼图、转台、动画采样）、参考图管线、建模规格、T0/T1/T2 分层、YSM 创建/保存/导出、检查点/回滚、Client UI 状态 pill 全部就位；62/62 单测与 35 步 host-smoke 通过。**
+**DSH 端已完整可用（v0.9.3）：插件以 link 方式安装并激活；44 个工具定义 / 42 个实际暴露、5 个命令、1 个 Skill；56 个 bridge 方法；T3 云端拆解（Nano Banana Pro）+ T2/T1 分层；渲染自检（isolate+zoom、多格拼图、转台、动画采样）、参考图管线、建模规格、T0/T1/T2 分层、YSM 创建/保存/导出、检查点/回滚、Client UI 状态 pill 全部就位；76/76 单测与 35 步 host-smoke 通过。**
 
 - **M0 通过（Go，历史闸门）**：隐藏窗口离屏 WebGL 渲染稳定；GPU（RTX 4080 / ANGLE D3D11）与 SwiftShader 两条路径都通过；show/hide 往返后仍可渲染。报告已归档：[docs/archive/M0-report.md](docs/archive/M0-report.md)、[docs/archive/M0-report-safe.md](docs/archive/M0-report-safe.md)。
 - **BAE 可用**：`dist/bb-agent-app` 由上游 Blockbench 5.2.2 构建产物 + agent 四件套 + YSM 默认模板组装而成（2026-11-07 重新 assemble；见 §0）。
 - **协议可用**：WebSocket JSON-RPC 2.0 与 HTTP+SSE 双传输（dsh 为 server、BBAR 为 client），首包 token 鉴权、双向请求、事件、超时、断线重连均实现；变更加 `expected_revision` 前置校验。
 - **YSM 可用**：默认包创建/打开（main+arm、2 贴图、303 动画、8 控制器）、显式保存（16 个文件）、导出（32 个文件 + manifest）、YSM 校验、贴图/动画/检查点/回滚。
-- **dsh 插件已安装并激活**：entry `include:blockbench-agent`（`@local/dsh-blockbench-agent`），`autoStart:true`；**41 个暴露工具**（43 定义，GUI 2 个由命令接管）、**5 个命令**、**1 个 Skill**（`blockbench-ysm-artist`）、进程崩溃自动重启、GUI 抢占冻结、512px 附件缩略图。
+- **dsh 插件已安装并激活**：entry `include:blockbench-agent`（`@local/dsh-blockbench-agent`），`autoStart:true`；**42 个暴露工具**（44 定义，GUI 2 个由命令接管）、**5 个命令**、**1 个 Skill**（`blockbench-ysm-artist`）、进程崩溃自动重启、GUI 抢占冻结、512px 附件缩略图。
 - **真实闭环已验证（历史）**：AI 通过工具创建 YSM 项目 → 加方块 → 精确 UV → 像素涂色 → 无头渲染 → 看图确认金色王冠 → 保存 → 导出。
 - **渲染自检（0.5–0.9）**：`bb_look`（多格拼图 + `isolate` 局部审查 + `zoom`）、`bb_camera`、`bb_orbit`、`bb_anim_check`、图史压缩与附件预算；`focus.padding` 缺陷已修，局部审查推荐 `isolate`+`zoom`。
 - **参考语料**：`material/refmodels/ysm_decoded` 已由 Lead 修正为 **169 条**（`inventory_ysm.json`）；`inventory_parts.json` 仍为 161 条历史派生统计。
@@ -52,7 +52,7 @@
 | 测试 | 命令 | 结果 |
 |---|---|---|
 | 单元测试 6 个文件 | `node --test packages/dsh-blockbench-agent/test/*.test.mjs` | ✅ **62/62** |
-| dsh Host 插件全工具（mock ctx + 真实 spawn BAE + 图片附件 + 命令） | `node packages/dsh-blockbench-agent/test/host-smoke.mjs` | ✅ **35 步全过**，schema lint 41 工具 |
+| dsh Host 插件全工具（mock ctx + 真实 spawn BAE + 图片附件 + 命令） | `node packages/dsh-blockbench-agent/test/host-smoke.mjs` | ✅ **35 步全过**，schema lint 42 工具 |
 | 契约重生成 | `python spec/generate_spec.py` | ✅ 0 diff（与提交内容一致） |
 | 全量回归（assemble → M0 → e2e WS → e2e HTTP+SSE → hosttest → 动画语义 diff） | `npm run test` | 0.4.0 时期 6/6 PASSED（历史）；0.9.1 全量回归由 Lead 复跑，证据落 `docs/test-evidence/` |
 
@@ -97,12 +97,12 @@
 | Bridge plugin | `packages/bb-agent-runtime/agent/bb-agent-bridge.js` | WS client/dispatch、revision/预算/GUI 门控、项目/模型/贴图/动画/渲染/校验/检查点/保存/导出/GUI、YRL、附件缩略图；**56 方法**实现 |
 | 自检脚本 | `packages/bb-agent-runtime/agent/selftest.js` | 加载真实 YSM 默认模型，5 机位 + show/hide + WebGL 信息 |
 | 组装/测试脚本 | `packages/bb-agent-runtime/scripts/{assemble,m0,e2e,e2e-look,test-all,verify-animation-diff,package-release}.mjs` | 组装 BAE、M0 报告、协议 e2e、视口 e2e、全量回归、动画 diff、发布包 |
-| dsh Host 插件 | `packages/dsh-blockbench-agent/index.js` | **43 个 `bb_*` 定义（41 暴露）**、5 个命令、Skill 注册、进程监管/自动重启、revision 自动注入、超时/取消、图片附件缩略图、GPU safe-mode 降级 |
+| dsh Host 插件 | `packages/dsh-blockbench-agent/index.js` | **44 个 `bb_*` 定义（42 暴露）**、5 个命令、Skill 注册、进程监管/自动重启、revision 自动注入、超时/取消、图片附件缩略图、GPU safe-mode 降级 |
 | 工具实现库 | `packages/dsh-blockbench-agent/lib/*.js` | `ws-server`、`refcanon`/`refsearch`/`refcollect`、`spec`、`segprobe`/`seglite`/`seginstall`/`segcomfy`、`viewsheet`、`imageprune`、`toolschema` |
 | Skill / reference | `packages/dsh-blockbench-agent/skills/`、`reference/` | 建模工作流与语料规则（AI 读） |
 | 测试 | `packages/dsh-blockbench-agent/test/` | 6 个 `*.test.mjs`（62 项）+ `host-smoke.mjs` + e2e 辅助脚本 |
 | 协议传输 | `packages/dsh-blockbench-agent/lib/ws-server.js` | 零依赖 RFC6455 + JSON-RPC + HTTP/SSE（`/rpc`、`/events`）、token、超时、双向请求 |
-| 契约 | `spec/tool-manifest.json`、`spec/bridge-methods.json`、`spec/generate_spec.py` | **43 工具 / 56 bridge 方法**的机器可读契约（手工维护源，重跑应 0 diff） |
+| 契约 | `spec/tool-manifest.json`、`spec/bridge-methods.json`、`spec/generate_spec.py` | **44 工具 / 56 bridge 方法**的机器可读契约（手工维护源，重跑应 0 diff） |
 | 参考语料 | `material/refmodels/`、`tools/ysmparser/`、`tools/extract_corpus.py` | 本地语料（gitignored）与解密/抽取工具 |
 
 ### DSH 端完成度清单
@@ -133,7 +133,7 @@
 | Client UI 状态 pill（composer dock，Host `/bb-agent/status`） | ✅（需刷新页面加载 client） |
 | Skill 注册（模型可发现、可加载） | ✅ |
 | 回归测试：单测 62 + host-smoke 35 步 + e2e + 动画语义 diff | ✅ |
-| 发布包 | ❌ 0.4.0 为历史发布；0.9.2 发布包待重打 |
+| 发布包 | ❌ 0.4.0 为历史发布；0.9.3 发布包待重打 |
 
 ## 4. 快速验证
 
@@ -142,7 +142,7 @@
 $node = 'D:\deepseekharness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe'
 cd F:\Deepseek_harness\blockbench
 & $node --test packages/dsh-blockbench-agent/test/*.test.mjs   # 62/62
-& $node packages/dsh-blockbench-agent/test/host-smoke.mjs      # 35 步，41 工具 schema lint
+& $node packages/dsh-blockbench-agent/test/host-smoke.mjs      # 35 步，42 工具 schema lint
 & $node packages/bb-agent-runtime/scripts/assemble.mjs         # 重新组装 dist/bb-agent-app
 & $node packages/bb-agent-runtime/scripts/e2e.mjs              # 协议 + YSM 全链路
 & $node packages/bb-agent-runtime/scripts/e2e-look.mjs         # 视口反馈 e2e
@@ -174,7 +174,7 @@ python spec/generate_spec.py                                   # 契约重生成
 8. **PBR 只在支持 Iris/光影时可见**：工具会生成/保存 `_n`/`_s` 贴图，但 Blockbench 离屏渲染不展示 PBR 效果。
 9. **Client UI 验证**：状态 pill 已随 bundle 提供，Host `/bb-agent/status` 已用 HTTP 验证；当前页面需刷新后由 boot graph 加载 client half，未做浏览器自动化截图确认视觉细节。
 10. **`locale/*.json` 加载未验证**：插件 package.json 已导出 locale 文件，但 dsh 侧实际加载路径/时机未做端到端验证。
-11. **发布/分发**：0.9.2 发布包待重打；未做 electron-builder 安装器与代码签名（zip 便携分发为当前正式方式）。
+11. **发布/分发**：0.9.3 发布包待重打；未做 electron-builder 安装器与代码签名（zip 便携分发为当前正式方式）。
 12. **游戏内验证范围有限**：历史验证只覆盖单模型装载/渲染；未做多人同步、服务端校验、动画全量、长时间游玩。`game-test/` 环境已删除。
 13. **契约漂移**：`spec/` 为手工维护契约源，与 `index.js` 实际 schema 存在 17 个工具参数漂移；以 `index.js` 为准（host-smoke 校验的是真实 schema）。
 

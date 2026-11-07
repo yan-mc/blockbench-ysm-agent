@@ -17,6 +17,10 @@ import { canonLookup } from './lib/refcanon.js'
 import { collectRefs } from './lib/refcollect.js'
 import { validateSpec, derivePlan, renderSpecMarkdown, normalizeSpec, SPEC_VERSION } from './lib/spec.js'
 import { probeEnvironment, planInstall } from './lib/segprobe.js'
+import {
+  resolveT3Config, inspectT3Availability, buildSheetPrompt, callT3, estimateCostUsd,
+  T3_MODES, T3_ASPECTS, T3_IMAGE_SIZES, T3_MODELS,
+} from './lib/nanobanana.js'
 import { inspectInstall, runInstall } from './lib/seginstall.js'
 import {
   pingComfy, listSeeThroughNodes, uploadImage, buildWorkflow,
@@ -106,6 +110,22 @@ const DEFAULTS = {
   segModelDir: '',
   /** T2：ComfyUI 输出目录（空 = 从 segInstallDir 推导）。 */
   comfyOutputDir: '',
+
+  // ---- T3 云端拆解（Nano Banana Pro / Gemini 3 Pro Image，docs/25）----
+  /** Gemini API key（也可用环境变量 GEMINI_API_KEY / GOOGLE_API_KEY）。Pro Image 需付费项目。 */
+  nanoBananaApiKey: '',
+  /** 模型 id；默认 gemini-3-pro-image（Nano Banana Pro）。 */
+  nanoBananaModel: 'gemini-3-pro-image',
+  /** 可选代理/区域端点；默认官方 v1beta。 */
+  nanoBananaBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+  /** 默认输出尺寸 1K/2K/4K。 */
+  nanoBananaImageSize: '2K',
+  /** 默认宽高比。 */
+  nanoBananaAspectRatio: '16:9',
+  /** 单次最多提交几张参考图（1–14，受模型限制；建议 4–6）。 */
+  nanoBananaMaxReferences: 6,
+  /** 单次调用超时（ms）。 */
+  nanoBananaTimeoutMs: 180000,
 }
 
 function log(...args) { console.log('[blockbench-agent]', ...args) }
@@ -184,7 +204,7 @@ export function apply(ctx, config = {}) {
         return {
           protocol: 'bb-agent/1',
           transport: 'ws',
-          server: { name: 'bb-agent-runtime', version: '0.9.2', blockbench: '5.2.2' },
+          server: { name: 'bb-agent-runtime', version: '0.9.3', blockbench: '5.2.2' },
           capabilities: {
             render: { offscreen: true, transparent: true, max_size: 4096, antialias: ['off', 'msaa'] },
             texture: { layers: true, max_size: 8192 },
@@ -1672,10 +1692,13 @@ let lastRefCanon = null
 
   tool({
     name: 'bb_seg_probe',
-    description: '探测本机能否跑 See-through 分层（可选增强），给出能力分级与安装计划。'
-      + '分级：T0 零依赖（模型直接看立绘）/ T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（实测 23–29 个语义层；以返回的 layers.json 为准，含深度序与遮挡补全）。'
-      + '检查项：NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否已装可达、是否旧架构（Pascal 不支持 NF4）。'
-      + '只探测不安装；返回 plan 步骤与体积估算。非 N 卡会明确说不支持，不会假装可用。',
+    description: '探测本机能否跑分层，给出能力分级与安装计划。'
+      + '分级（优先级从高到低）：**T3 云端拆解（Nano Banana Pro / Gemini 3 Pro Image，多参考图 → 严格三视图 / 全景拆解板；需付费 API key）** / '
+      + 'T2 See-through 完整分层（实测 23–29 个语义层；以返回的 layers.json 为准，含深度序与遮挡补全）/ '
+      + 'T1 轻量分割（SAM2 ONNX）/ T0 零依赖（模型直接看立绘）。'
+      + 'T3 只看配置（nanoBanana.apiKey 或 GEMINI_API_KEY），不发网络请求、不消耗额度；没有 key 时 recommendedTier 自动落到 T2/T1。'
+      + '同时检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否已装可达、是否旧架构（Pascal 不支持 NF4）。'
+      + '只探测不安装；非 N 卡会明确说不支持，不会假装可用。',
     parameters: {
       install_dir: { type: 'string', description: '计划安装目录（用于磁盘检查），默认 ~/.dsh-seethrough' },
       comfy_url: { type: 'string', description: 'ComfyUI 地址，默认取配置 comfyUrl' },
@@ -1684,9 +1707,11 @@ let lastRefCanon = null
     async execute(args) {
       try {
         const installDir = args.install_dir || cfg.segInstallDir || undefined
+        const t3 = inspectT3Availability(cfg)
         const probe = await raceAbort(probeEnvironment({
           installDir,
           comfyUrl: args.comfy_url || cfg.comfyUrl,
+          t3,
         }))
         const plan = planInstall(probe, { installDir: args.install_dir || cfg.segInstallDir || undefined })
 
@@ -1702,7 +1727,203 @@ let lastRefCanon = null
           model_dir: modelDir,
           auto_install: '首次 bb_seg_lite 会自动下载约 59MB 模型并装 onnxruntime',
         }
-        return lossless({ ok: true, ...probe, plan })
+        return lossless({ ok: true, ...probe, plan, t3 })
+      } catch (error) { return errorResult(error) }
+    },
+  })
+
+  tool({
+    name: 'bb_seg_t3',
+    description: 'T3 云端拆解（Nano Banana Pro / Gemini 3 Pro Image）：把同一角色的 1–14 张多角度参考图交给 Google 图像模型，'
+      + '生成**严格三视图**（mode:"turnaround"，建模用）或**全景式深度拆解板**（mode:"breakdown"：三视图 + 服装分层 + 表情 + 材质 + 道具 + 箭头注释）。'
+      + '分级优先级 **T3 > T2 > T1**：需要付费 Gemini API key（配置 nanoBanana.apiKey / nanoBananaApiKey，或环境变量 GEMINI_API_KEY / GOOGLE_API_KEY）；'
+      + '没有 key 时返回 T3_NOT_CONFIGURED，请降级用 bb_seg_run（T2 本地 See-through）。'
+      + '**云端生成是推断不是还原**：背面/内侧/被遮挡部件都是模型脑补，必须逐张人工复核并把推定项写进 spec.gaps；参考图会上传到 Google，生成图含 SynthID 水印。'
+      + '官方价约 1K/2K $0.134/张、4K $0.24/张（variants 成倍计费）；可用 dry_run 先看提示词与成本。'
+      + '产物落盘到 workspace，可继续交给 bb_seg_lite/bb_seg_run 拆层或直接对照建模。',
+    parameters: {
+      references: { type: 'array', items: { type: 'string' }, description: 'workspace 内相对路径的参考图数组（同角色多角度；1–14 张，建议 4–6）' },
+      reference_dir: { type: 'string', description: 'workspace 内目录，自动取前 max_references 张图片（与 references 二选一）' },
+      max_references: { type: 'number', description: '最多用几张参考图，默认取配置（6；上限 14）' },
+      mode: { type: 'string', enum: T3_MODES, description: 'turnaround=严格三视图（默认，建模用）；breakdown=全景拆解板；custom=用 prompt' },
+      prompt: { type: 'string', description: '追加说明；custom 模式必填' },
+      character: { type: 'string', description: '角色名（提示词身份锚定，可选）' },
+      aspect_ratio: { type: 'string', enum: T3_ASPECTS, description: '默认 16:9（横向三视图/拆解板）' },
+      image_size: { type: 'string', enum: T3_IMAGE_SIZES, description: '1K/2K/4K，默认 2K' },
+      variants: { type: 'number', description: '生成几张，默认 1（成本×N，最多 4）' },
+      out_dir: { type: 'string', description: '输出目录，默认 artifacts/t3-sheets/<时间戳>' },
+      attach: { type: 'boolean', description: '是否附第一张预览图，默认 true' },
+      dry_run: { type: 'boolean', description: '只构造提示词/估算成本，不调用 API（不花钱）' },
+    },
+    output: LOOK_OUTPUT,
+    async execute(args, exec) {
+      try {
+        const t3 = resolveT3Config(cfg)
+        if (!t3.configured) {
+          return {
+            ok: false, code: 'T3_NOT_CONFIGURED',
+            message: 'T3 需要 Gemini API key（Pro Image 无免费层）',
+            hint: '配置 nanoBanana.apiKey 或环境变量 GEMINI_API_KEY；没有 key 时降级用 bb_seg_run（T2 本地 See-through）',
+            fallback: 't2',
+            tiers: { t3: inspectT3Availability(cfg) },
+          }
+        }
+        const maxRefs = Math.max(1, Math.min(14, Number(args.max_references) || t3.maxReferences))
+
+        const extSet = new Set(['.png', '.jpg', '.jpeg', '.webp'])
+        const refs = []
+        if (Array.isArray(args.references) && args.references.length) {
+          for (const raw of args.references) {
+            const rel = String(raw || '').replace(/\\/g, '/').replace(/^\/+/, '')
+            const abs = path.resolve(workspace, rel)
+            if (!(abs === workspace || abs.startsWith(workspace + path.sep))) {
+              return { ok: false, code: 'INVALID_PARAMS', message: `参考图越出 workspace: ${rel}` }
+            }
+            if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+              return { ok: false, code: 'NOT_FOUND', message: `参考图不存在: ${rel}`, hint: '先用 bb_ref_collect 落盘参考图' }
+            }
+            refs.push({ rel, abs })
+            if (refs.length >= maxRefs) break
+          }
+        } else if (args.reference_dir) {
+          const relDir = String(args.reference_dir).replace(/\\/g, '/').replace(/^\/+/, '')
+          const absDir = path.resolve(workspace, relDir)
+          if (!(absDir === workspace || absDir.startsWith(workspace + path.sep))) {
+            return { ok: false, code: 'INVALID_PARAMS', message: `reference_dir 越出 workspace: ${relDir}` }
+          }
+          if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
+            return { ok: false, code: 'NOT_FOUND', message: `reference_dir 不存在: ${relDir}` }
+          }
+          const files = fs.readdirSync(absDir)
+            .filter((f) => extSet.has(path.extname(f).toLowerCase()))
+            .sort()
+            .slice(0, maxRefs)
+          for (const f of files) refs.push({ rel: `${relDir}/${f}`, abs: path.join(absDir, f) })
+        } else {
+          return {
+            ok: false, code: 'INVALID_PARAMS',
+            message: '需要 references（数组）或 reference_dir',
+            hint: '如 references:["refs/角色/ref_001.png","refs/角色/ref_002.png"]；或 reference_dir:"refs/角色"',
+          }
+        }
+        if (!refs.length) return { ok: false, code: 'NOT_FOUND', message: '没有可用参考图（支持 png/jpg/webp）' }
+
+        const mimeOf = (p) => ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[path.extname(p).toLowerCase()] ?? 'image/png')
+        const images = []
+        let rawBytes = 0
+        for (const r of refs) {
+          const buf = await fsp.readFile(r.abs)
+          if (buf.length > 8 * 1024 * 1024) {
+            return { ok: false, code: 'T3_IMAGE_TOO_LARGE', message: `参考图超过 8MB: ${r.rel}`, hint: '先压缩到 2048px 内再试，或减少参考图数量' }
+          }
+          rawBytes += buf.length
+          images.push({ mimeType: mimeOf(r.abs), data: buf.toString('base64') })
+        }
+        const estRequestBytes = Math.ceil(rawBytes * 1.37) + 4000
+        if (estRequestBytes > 18 * 1024 * 1024) {
+          return {
+            ok: false, code: 'T3_IMAGE_TOO_LARGE',
+            message: `参考图总大小过大（base64 约 ${(estRequestBytes / 1048576).toFixed(1)}MB）`,
+            hint: 'Gemini 单请求内联数据有上限；减少参考图数量或压到 1024–1536px',
+          }
+        }
+
+        const mode = T3_MODES.includes(args.mode) ? args.mode : 'turnaround'
+        if (mode === 'custom' && !String(args.prompt || '').trim()) {
+          return { ok: false, code: 'INVALID_PARAMS', message: 'custom 模式必须给 prompt' }
+        }
+        const prompt = buildSheetPrompt({ mode, character: args.character, prompt: args.prompt })
+        const aspectRatio = T3_ASPECTS.includes(args.aspect_ratio) ? args.aspect_ratio : t3.aspectRatio
+        const imageSize = T3_IMAGE_SIZES.includes(args.image_size) ? args.image_size : t3.imageSize
+        const variants = Math.max(1, Math.min(4, Number(args.variants) || 1))
+        const cost = estimateCostUsd({ model: t3.model, imageSize, variants, referenceCount: refs.length })
+        const baseInfo = {
+          tier: 'T3',
+          model: t3.model,
+          model_label: t3.modelInfo?.label ?? t3.model,
+          mode,
+          aspect_ratio: aspectRatio,
+          image_size: imageSize,
+          variants,
+          references: refs.map((r) => r.rel),
+          reference_count: refs.length,
+          prompt_chars: prompt.length,
+          cost_estimate_usd: cost,
+          warnings: [
+            'T3 是云端生成：参考图会上传到 Google；生成图含 SynthID 水印',
+            '生成结果是「推断」不是「还原」：背面/内侧/遮挡处都是模型脑补，必须人工复核并把推定项写进 spec.gaps',
+            '不要拿生成图当官方设定或精确尺寸依据；它适合做三视图假设、部件清单与遮挡参考',
+          ],
+        }
+        if (args.dry_run) {
+          return lossless({
+            ok: true, dry_run: true, ...baseInfo, prompt,
+            next_steps: [
+              '确认提示词/参考图后去掉 dry_run 再调用',
+              '生成后人工复核；背面与遮挡处标记为推定',
+              '之后可把生成图交给 bb_seg_run(T2) 分层，或直接对照建模',
+            ],
+          })
+        }
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+        const outRel = String(args.out_dir || `artifacts/t3-sheets/${stamp}`).replace(/\\/g, '/').replace(/^\/+/, '')
+        const outAbs = path.resolve(workspace, outRel)
+        if (!(outAbs === workspace || outAbs.startsWith(workspace + path.sep))) {
+          return { ok: false, code: 'INVALID_PARAMS', message: `out_dir 越出 workspace: ${outRel}` }
+        }
+        fs.mkdirSync(outAbs, { recursive: true })
+        const slug = slugify(args.character || path.basename(refs[0].rel, path.extname(refs[0].rel)))
+        const saved = []
+        const texts = []
+        let elapsed = 0
+        for (let v = 1; v <= variants; v++) {
+          const res = await raceAbort(callT3({
+            config: t3, prompt, images, aspectRatio, imageSize, timeoutMs: t3.timeoutMs, signal: exec?.signal,
+          }), exec?.signal)
+          elapsed += res.elapsedMs ?? 0
+          if (Array.isArray(res.texts)) texts.push(...res.texts)
+          for (let i = 0; i < res.images.length; i++) {
+            const img = res.images[i]
+            const ext = /jpeg/.test(img.mimeType) ? 'jpg' : /webp/.test(img.mimeType) ? 'webp' : 'png'
+            const name = `${slug}_${stamp}_v${v}${res.images.length > 1 ? `_${i + 1}` : ''}.${ext}`
+            const abs = path.join(outAbs, name)
+            const buf = Buffer.from(img.data, 'base64')
+            await fsp.writeFile(abs, buf)
+            saved.push({
+              path: path.relative(workspace, abs).split(path.sep).join('/'),
+              bytes: buf.length, mime_type: img.mimeType, variant: v,
+            })
+          }
+        }
+        if (!saved.length) return { ok: false, code: 'T3_NO_IMAGE', message: 'API 没有返回可保存的图片', hint: '重试一次；仍失败则降级 T2' }
+
+        const metaRel = `${outRel}/t3-meta.json`
+        await fsp.writeFile(path.join(outAbs, 't3-meta.json'), JSON.stringify({
+          ...baseInfo,
+          created_at: new Date().toISOString(),
+          elapsed_ms: elapsed,
+          images: saved,
+          model_texts: texts.slice(0, 10),
+        }, null, 2))
+
+        let attachment = null
+        if (args.attach !== false) {
+          const firstBuf = await fsp.readFile(path.resolve(workspace, saved[0].path))
+          attachment = await saveInlineAttachment(firstBuf.toString('base64'), path.basename(saved[0].path))
+        }
+        return lossless({
+          ok: true, ...baseInfo,
+          images: saved,
+          meta_path: metaRel,
+          elapsed_ms: elapsed,
+          attachment,
+          next_steps: [
+            '逐张人工复核：身份、左右镜像、配色、纹样、背面自洽性；不能直接信生成图',
+            '把推定部分写进 spec.gaps（尤其背面/内侧/被挡部件）',
+            '可把生成图作为参考交给 bb_seg_run(T2) 继续分层，或对照建模',
+          ],
+        })
       } catch (error) { return errorResult(error) }
     },
   })
@@ -2379,7 +2600,7 @@ let lastRefCanon = null
         } catch { /* runtime busy */ }
         const payload = {
           ok: true,
-          version: '0.9.2',
+          version: '0.9.3',
           connected: !!state.connected,
           state: remote?.state ?? (state.connected ? 'idle' : 'offline'),
           revision: remote?.revision ?? state.revision,

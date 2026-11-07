@@ -60,6 +60,24 @@ test('T0/T1 永远可用', () => {
   assert.equal(r.tiers.t1.ok, true)
 })
 
+test('T3（云端）配置了 key 时优先级高于 T2：recommendedTier=t3', () => {
+  const r = computeTiers({ gpus: [RTX4080], diskGB: 400, platform: 'win32', t3: { ok: true, model: 'gemini-3-pro-image' } })
+  assert.equal(r.tiers.t3.ok, true)
+  assert.equal(r.tiers.t2.ok, true)
+  assert.equal(r.recommendedTier, 't3')
+})
+
+test('T3 没 key 时回落本地 T2；T2 也没有则继续回落', () => {
+  const withGpu = computeTiers({ gpus: [RTX4080], diskGB: 400, platform: 'win32', t3: { ok: false, reasons: ['no key'] } })
+  assert.equal(withGpu.tiers.t3.ok, false)
+  assert.equal(withGpu.recommendedTier, 't2')
+  assert.match(withGpu.tiers.t3.reasons[0], /no key/)
+
+  const noGpu = computeTiers({ gpus: [], diskGB: 400, platform: 'win32' })
+  assert.equal(noGpu.tiers.t3.ok, false)
+  assert.equal(noGpu.recommendedTier, 't0')
+})
+
 test('planInstall 给出完整步骤与体积估算', () => {
   const probe = {
     platform: 'win32',

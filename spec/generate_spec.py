@@ -523,10 +523,11 @@ TOOLS = [
     {
         "name": "bb_seg_probe",
         "title_zh": "分层能力探测",
-        "description": "探测本机能否跑 See-through 分层并给出能力分级与安装计划。"
-                       "T0 零依赖 / T1 轻量分割（SAM2 ONNX）/ T2 See-through 完整分层（实测 23–29 个语义层，以 layers.json 为准）。"
-                       "检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否可达、是否旧架构。"
-                       "只探测不安装；环境不支持会明确说明，不会假装可用。",
+        "description": "探测本机/云端分层能力并给出安装计划。"
+                       "分级优先级：T3 云端拆解（Nano Banana Pro，多参考图生成三视图/拆解板，需付费 API key）> "
+                       "T2 See-through 完整分层（实测 23–29 个语义层，以 layers.json 为准）> T1 轻量分割（SAM2 ONNX）> T0 零依赖。"
+                       "T3 只检查配置（nanoBanana.apiKey / GEMINI_API_KEY），不发请求、不耗额度；没有 key 时 recommendedTier 落到 T2/T1。"
+                       "同时检查 NVIDIA 显卡与显存、目标盘剩余空间、ComfyUI 是否可达、是否旧架构。只探测不安装。",
         "mutating": False, "requires_project": False, "concurrency_safe": True,
         "protocol_method": None, "timeout_ms": 30000,
         "returns": "SegProbeResult", "attachments": False,
@@ -534,6 +535,41 @@ TOOLS = [
         "parameters": obj({
             "install_dir": {"type": "string", "description": "计划安装目录（用于磁盘检查），默认 ~/.dsh-seethrough"},
             "comfy_url": {"type": "string", "description": "ComfyUI 地址，默认取配置 comfyUrl"},
+        }),
+    },
+    {
+        "name": "bb_seg_t3",
+        "title_zh": "T3 云端拆解（Nano Banana Pro）",
+        "description": "把同一角色的 1–14 张多角度参考图交给 Google Nano Banana Pro（Gemini 3 Pro Image），"
+                       "生成严格三视图（turnaround）或全景式深度拆解板（breakdown：三视图+服装分层+表情+材质+道具）。"
+                       "优先级 T3 > T2 > T1：需要付费 Gemini API key（nanoBanana.apiKey / GEMINI_API_KEY）；"
+                       "无 key 返回 T3_NOT_CONFIGURED，降级 bb_seg_run(T2)。"
+                       "云端生成是推断不是还原：背面/内侧/遮挡处为模型脑补，必须人工复核并写进 spec.gaps；"
+                       "参考图会上传到 Google，生成图含 SynthID 水印；官方价约 1K/2K $0.134/张、4K $0.24/张。"
+                       "dry_run 可只看提示词与成本不调用 API。",
+        "mutating": False, "requires_project": False, "concurrency_safe": False,
+        "protocol_method": None, "timeout_ms": 300000,
+        "returns": "SegT3Result", "attachments": True,
+        "errors": ["T3_NOT_CONFIGURED", "T3_AUTH", "T3_QUOTA", "T3_BAD_REQUEST", "T3_MODEL_NOT_FOUND",
+                   "T3_API_ERROR", "T3_NO_IMAGE", "T3_IMAGE_TOO_LARGE", "T3_BAD_RESPONSE",
+                   "T3_TIMEOUT", "T3_NETWORK",
+                   "NOT_FOUND", "INVALID_PARAMS", "REQUEST_CANCELLED"],
+        "parameters": obj({
+            "references": {"type": "array", "items": {"type": "string"},
+                           "description": "workspace 内相对路径的参考图数组（同角色多角度；1–14 张）"},
+            "reference_dir": {"type": "string", "description": "workspace 内目录，自动取前 max_references 张图片（与 references 二选一）"},
+            "max_references": {"type": "integer", "minimum": 1, "maximum": 14, "default": 6},
+            "mode": {"type": "string", "enum": ["turnaround", "breakdown", "custom"], "default": "turnaround"},
+            "prompt": {"type": "string", "description": "追加说明；custom 模式必填"},
+            "character": {"type": "string", "description": "角色名（提示词身份锚定，可选）"},
+            "aspect_ratio": {"type": "string",
+                             "enum": ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+                             "default": "16:9"},
+            "image_size": {"type": "string", "enum": ["1K", "2K", "4K"], "default": "2K"},
+            "variants": {"type": "integer", "minimum": 1, "maximum": 4, "default": 1},
+            "out_dir": {"type": "string", "description": "输出目录，默认 artifacts/t3-sheets/<时间戳>"},
+            "attach": {"type": "boolean", "default": True},
+            "dry_run": {"type": "boolean", "default": False},
         }),
     },
     {

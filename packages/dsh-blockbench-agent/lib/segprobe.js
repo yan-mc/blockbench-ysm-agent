@@ -113,11 +113,13 @@ export async function probeComfy(url, { timeoutMs = 3000 } = {}) {
  * @param {number|null} [f.diskGB]
  * @param {string} [f.platform]
  * @param {object} [f.comfy]     probeComfy() 结果
+ * @param {object} [f.t3]        inspectT3Availability() 结果（云端 Nano Banana Pro，优先级最高）
  */
 export function computeTiers(f = {}) {
   const gpus = Array.isArray(f.gpus) ? f.gpus : []
   const diskGB = f.diskGB ?? null
   const platform = f.platform ?? process.platform
+  const t3 = f.t3 && typeof f.t3 === 'object' ? f.t3 : { ok: false, reasons: ['未配置 T3'] }
 
   const best = gpus.slice().sort((a, b) => (b.vramMiB ?? 0) - (a.vramMiB ?? 0))[0] ?? null
   const isNvidia = Boolean(best)
@@ -137,6 +139,18 @@ export function computeTiers(f = {}) {
   const recommendedResolution = vramGB >= 11 ? 1024 : vramGB >= 7 ? 768 : 512
 
   const tiers = {
+    // T3 是云端能力：不依赖本机 GPU，但需要付费 API key（docs/25）。
+    t3: {
+      ok: Boolean(t3.ok),
+      label: t3.label ?? 'T3 云端拆解（Nano Banana Pro）',
+      desc: t3.desc ?? '多参考图 → 严格三视图 / 全景式深度拆解板；生成式推断，需付费 API',
+      model: t3.model,
+      api_key_source: t3.api_key_source ?? null,
+      price_per_image_usd: t3.price_per_image_usd ?? null,
+      reasons: Array.isArray(t3.reasons) ? t3.reasons : (t3.ok ? [] : ['未配置 T3 API key']),
+      fallback: t3.fallback ?? (t3.ok ? null : 't2'),
+      note: t3.note,
+    },
     t0: { ok: true, label: '零依赖', desc: '模型直接看立绘判断部件（无分层）' },
     t1: {
       ok: true,
@@ -157,7 +171,8 @@ export function computeTiers(f = {}) {
   return {
     tiers,
     bestGpu: best ? { name: best.name, vramGB, driver: best.driver, legacy } : null,
-    recommendedTier: tier2ok ? 't2' : (isNvidia ? 't1' : 't0'),
+    // 优先级：T3（云端，有 key 时）> T2（本地完整分层）> T1 > T0
+    recommendedTier: tiers.t3.ok ? 't3' : (tier2ok ? 't2' : (isNvidia ? 't1' : 't0')),
   }
 }
 
@@ -166,6 +181,7 @@ export function computeTiers(f = {}) {
  * @param {object} p
  * @param {string} p.installDir   计划安装目录（用于磁盘检查）
  * @param {string} [p.comfyUrl]
+ * @param {object} [p.t3]         inspectT3Availability() 结果（云端 T3，可选）
  * @returns {Promise<object>} 报告
  */
 export async function probeEnvironment(p = {}) {
@@ -176,7 +192,13 @@ export async function probeEnvironment(p = {}) {
     probeComfy(p.comfyUrl),
   ])
 
-  const { tiers, bestGpu, recommendedTier } = computeTiers({ gpus, diskGB, platform: process.platform })
+  const { tiers, bestGpu, recommendedTier } = computeTiers({ gpus, diskGB, platform: process.platform, t3: p.t3 })
+
+  const hint = tiers.t3.ok
+    ? 'T3（Nano Banana Pro）已配置：复杂立绘优先用它生成三视图/拆解板；结果需人工复核，之后可再交给 T2 分层'
+    : tiers.t2.ok
+      ? 'T3 未配置；可以直接装 T2（本地 See-through）。如需云端拆解，配置 nanoBanana.apiKey 后重试'
+      : 'T2 不可用，走 T1/T0；如需分层请在支持 NVIDIA 的机器上安装，或配置 T3 API key'
 
   return {
     ok: true,
@@ -189,9 +211,7 @@ export async function probeEnvironment(p = {}) {
     comfy,
     tiers,
     recommendedTier,
-    hint: tiers.t2.ok
-      ? '可以直接装 T2；也可以先用 T0 建，需要精细分层时再装'
-      : 'T2 不可用，走 T1/T0；如需分层请在支持 NVIDIA 的机器上安装',
+    hint,
   }
 }
 

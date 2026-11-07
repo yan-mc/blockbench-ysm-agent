@@ -1,6 +1,6 @@
 {
   "name": "@local/bb-agent-runtime",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "type": "module",
   "description": "BAE: headless Blockbench Agent Runtime derived from Blockbench (GPL-3.0-or-later)",

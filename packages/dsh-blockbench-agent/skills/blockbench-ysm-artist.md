@@ -39,7 +39,7 @@
 |---|---|---|---|
 | 1 | **官方基准** | `bb_ref_canon` 拿外观描述 + 罗马音 + 官方图 | 能一句话说出角色辨识特征 |
 | 2 | **深搜对照** | `bb_ref_search(depth:"deep")` → `bb_ref_collect` | **逐格真看**，错角色/错皮肤全部剔除并记录理由 |
-| 3 | **立绘拆分** | `bb_seg_probe` → **T2 有则用，没有则 T1 必做**（见 §2.4） | 有部件清单 + 占比数字，或写明拆分失败原因 |
+| 3 | **立绘拆分** | `bb_seg_probe` → **T3 有 key 优先（三视图/拆解板），否则 T2 有则用、没有则 T1 必做**（见 §2.4） | 有部件清单 + 占比数字，或写明拆分/降级原因 |
 | 4 | **写 spec** | `bb_spec_save`（references/palette/parts/budget/gaps） | 预算按档位反推；缺背面必须进 gaps |
 | 5 | **开项目** | `bb_session_start(new_ysm, resolution:[512,512])` | 已清空示例模型；rest rotation 已处理；texture_width 真为 512 |
 | 6 | **定档位/剪影/比例** | 先算数，再动方块（§3） | 头身比/肩宽/胯宽算式对得上 |
@@ -101,17 +101,35 @@
 
 缺背面是常态：**继续做，按对称推断，最后明确告诉用户**（进 spec.gaps）。
 
-### 2.4 立绘拆分（**强制步骤**：标准档 T1 默认必做；精修档 T2 优先）
+### 2.4 立绘拆分（**强制步骤**：T3 有 key 优先，T2/T1 兜底）
 
 拆分给两样东西：**部件清单**（做逐部件检查的 checklist）+ **2D 面积/占位数字**（校准比例）。
-它**不是可跳过项**；确实做不了，必须在报告写"为什么没做 + 缺什么条件"（非 N 卡/无 ComfyUI/预算不足），**不许静默省略**。
+它**不是可跳过项**；确实做不了，必须在报告写"为什么没做 + 缺什么条件"（非 N 卡/无 ComfyUI/无 API key/预算不足），**不许静默省略**。
+
+**分级与优先级（2026-11-08 起）**：
+
+| 级别 | 能力 | 需要 | 什么时候用 |
+|---|---|---|---|
+| **T3** | **Nano Banana Pro（Gemini 3 Pro Image）云端**：1–14 张多角度参考图 → **严格三视图** / **全景式深度拆解板**（三视图+服装分层+表情+材质+道具+箭头） | **付费 Gemini API key**（`nanoBanana.apiKey` 或 `GEMINI_API_KEY`；约 $0.134/张 2K、$0.24/张 4K） | 有 key 且官方立绘带动作/背景/遮挡复杂、缺背面；**产物是"假设"，必须人工复核** |
+| **T2** | See-through 本地：23–29 语义层 + 深度序 + 遮挡补全 | NVIDIA GPU + ComfyUI（本机已装） | 精修档默认；对**可见部分**最可靠 |
+| **T1** | SAM2 本地轻量分割：部件掩膜 + 面积/bbox | CPU + 59MB | 标准档必做；快速清单/比例校准 |
+| **T0** | 零依赖：模型直接看立绘 | — | 草稿/应急 |
 
 **分档规则**：
 - 粗犷/草稿档：T0 可接受，但报告要写"启用 T0 的原因"；
-- **标准/正式档：T1 必做**（成本仅 5–15 秒 + 59MB 模型，性价比最高）；
-- **精修/分层精细档：T1 必做 + 若 `bb_seg_probe` 显示 T2 可装则 T2 必做**（用户原话：有 T2 用 T2，没有 T2 用 T1）。
+- **标准/正式档：T1 必做**（成本仅 5–15 秒 + 59MB 模型，性价比最高）；若 T3 已配置，建议先 `bb_seg_t3(mode:"turnaround")` 拿一张干净三视图（可选）；
+- **精修/分层精细档：T1 必做 + T2 已装必做 + 有 T3 则先跑 T3 出"三视图/拆解假设"**（用户原话：有 T2 用 T2，没有 T2 用 T1；T3 有 key 优先）。
 
-**先探测**：`bb_seg_probe()` → 看 T0/T1/T2 哪级可用、磁盘/GPU/ComfyUI 状态、`recommendedTier`。
+**先探测**：`bb_seg_probe()` → 看 T3/T2/T1/T0 哪级可用、磁盘/GPU/ComfyUI 状态、`recommendedTier`。
+`recommendedTier` 已按 **T3 > T2 > T1 > T0** 排序：T3 没配置 key 时自动落到 T2；T3 只检查配置，不发请求、不耗额度。
+
+**T3（Nano Banana Pro，云端）——复杂立绘/缺背面时用（需要付费 API key）**
+1. 先 `bb_seg_t3({mode:"turnaround", references:[正面,侧面,...], dry_run:true})`：看提示词与成本，不花钱；
+2. 去掉 dry_run 真跑：`mode:"turnaround"` 出**严格正/侧/背三视图**（建模主用）；`mode:"breakdown"` 出**全景拆解板**（服装分层/表情/材质/道具/箭头，做部件清单与遮挡假设）；
+3. 参考图建议 4–6 张同角色多角度；`image_size:"2K"` 性价比最好，4K 只给需要放大看纹理的拆解板；
+4. **所有生成结果都是推断**：逐张复核身份/左右镜像/配色/纹样/背面自洽性；推定项写进 `spec.gaps`；**不得当官方设定或精确尺寸依据**；
+5. 生成图可交给 `bb_seg_run`（T2）继续分层：T3 出假设，T2 出可见证据；
+6. 无 key / 限流 / 内容拦截 → 返回 `T3_NOT_CONFIGURED`/`T3_QUOTA`/`T3_NO_IMAGE`，**降级 T2** 并在报告写原因。
 
 **T2（See-through，完整分层）——精修/需要遮挡补全/需要头部拆分时用**
 1. `bb_seg_install({confirm:true})`：装 ComfyUI（~7GB，可后台作业）；
@@ -132,7 +150,8 @@
 - 稠密插画（暗色人物 + 暗色大件道具 + 亮背景）会**把钢琴/沙发/底座当主体**，人物的裙/手套/腿/靴/胸饰 0 个切出（2026-11-07 实测）；
 - 因此：**拆分结果不可用时，改人工读裁切图（crop_head/face/body/legs）+ 全图对照，并把"拆分不可用"写进报告**；严禁跳过而不说。
 
-**降级顺序**：T2 → T1 → 人工裁切判读 → 纯文字描述（最差，仅当无图时）。
+**降级顺序**：**T3（有 key）→ T2 → T1 → 人工裁切判读 → 纯文字描述**（最差，仅当无图时）。
+T3 失败/无 key 不丢人，但**必须在报告写"T3 降级原因"**；不许假装跑过 T3。
 
 ### 2.5 spec
 
@@ -562,7 +581,7 @@ bb_look({isolate:"Skirt", zoom:1.6, cells:[{view:"front"},{camera:{azimuth:40,el
 | 看 | `bb_look` `bb_render_views` `bb_orbit` `bb_camera` `bb_anim_check` | 渲染自检（isolate+zoom） |
 | 参考 | `bb_ref_canon` `bb_ref_search` `bb_ref_collect` | 官方基准→深搜→对照表 |
 | 规格 | `bb_spec_save` `bb_spec_load` | 建模规格与构建计划 |
-| 分层 | `bb_seg_probe` `bb_seg_install` `bb_seg_lite` `bb_seg_run` | T0/T1/T2 立绘分层 |
+| 分层 | `bb_seg_probe` `bb_seg_t3` `bb_seg_install` `bb_seg_lite` `bb_seg_run` | T3 云端（Nano Banana Pro，需 key）/ T2 / T1 立绘分层与三视图 |
 | 动画 | `bb_animation_create/patch/delete/list` | 关键帧/控制器 |
 | 交付 | `bb_validate` `bb_save_project` `bb_export_ysm` | 校验/保存/导出 |
 

@@ -2,7 +2,7 @@
 
 > 在 **DeepSeek Harness（dsh）** 里驱动一个**隐藏运行的 Blockbench**：建模、贴图、动画、无头渲染自检、YSM 校验/保存/导出，最后在 Minecraft 里加载验证。
 >
-> 版本：v0.9.1 · 平台：Windows（Electron）· 适用：dsh Web / Desktop profile
+> 版本：v0.9.3 · 平台：Windows（Electron）· 适用：dsh Web / Desktop profile
 
 ![cover](docs/assets/cover.png)
 
@@ -91,9 +91,9 @@ dsh Host 插件  ── WebSocket / HTTP+SSE ──►  BAE（隐藏 Electron + 
 | **局部审查** | `bb_look({isolate, zoom})` 只渲染指定骨骼子树并自动对焦；`bb_orbit` 转台、`bb_anim_check` 动画采样 |
 | **参考图管线** | `bb_ref_canon`（官方基准）→ `bb_ref_search`（多源搜图）→ `bb_ref_collect`（下载去重 + 编号对照表） |
 | **建模规格** | `bb_spec_save` / `bb_spec_load`：固化规格并生成构建计划 |
-| **分层能力** | T0 无依赖；T1 SAM2 ONNX（约 59MB，CPU 可跑）；T2 See-through + ComfyUI（约 7GB）；均为可选增强 |
+| **分层能力** | **T3** Nano Banana Pro 云端（需付费 API key，多参考图 → 三视图/拆解板）；T1 SAM2 ONNX（约 59MB，CPU 可跑）；T2 See-through + ComfyUI（约 7GB）；均为可选增强，T3 无 key 时降级 T2 |
 | **上下文治理** | 图史压缩（旧图剥离为占位文本）+ 附件预算护栏 |
-| **工具规模** | **43 个 `bb_*` 定义 / 实际暴露 41 个**（GUI 2 个由命令替代）+ 5 个命令 + 1 个 Skill；**56 个 bridge 方法 / 7 事件 / 22 错误码** |
+| **工具规模** | **44 个 `bb_*` 定义 / 实际暴露 42 个**（GUI 2 个由命令替代）+ 5 个命令 + 1 个 Skill；**56 个 bridge 方法 / 7 事件 / 22 错误码** |
 
 ---
 
@@ -105,14 +105,14 @@ dsh Host 插件  ── WebSocket / HTTP+SSE ──►  BAE（隐藏 Electron + 
 - Blockbench v5.2.x 桌面版（BAE 基于 **v5.2.2** 的 Electron 43 构建）
 - 可选：Minecraft Java 1.20.1 + Forge + YSM 2.6.x（游戏内验证）
 
-> 当前正式分发是 **zip 发布包**（0.9.1 待重打），不做代码签名/安装器；Windows SmartScreen 可能提示，属于未签名应用的正常现象。
+> 当前正式分发是 **zip 发布包**（0.9.3 待重打），不做代码签名/安装器；Windows SmartScreen 可能提示，属于未签名应用的正常现象。
 
 ---
 
 ## 4. 安装
 
-> 当前版本 **0.9.1**。推荐方式：**从仓库 link 安装**（本机 DSH profile 就是这样指向 `packages/dsh-blockbench-agent`）。
-> GitHub Releases 上的 `0.4.0` 是历史发布；0.9.1 发布包尚未重打。
+> 当前版本 **0.9.3**。推荐方式：**从仓库 link 安装**（本机 DSH profile 就是这样指向 `packages/dsh-blockbench-agent`）。
+> GitHub Releases 上的 `0.4.0` 是历史发布；0.9.3 发布包尚未重打。
 
 ### 4.1 准备 Electron
 
@@ -245,7 +245,7 @@ bb_project_open({ pack_dir: "pack" })
 
 ## 7. 工具参考
 
-> `index.js` 定义 **43 个 `bb_*`**；因 `exposeGuiTools:false` 实际暴露 **41 个**（`bb_show_gui` / `bb_hide_gui` 由 `/show` `/hide` 命令替代）。
+> `index.js` 定义 **44 个 `bb_*`**；因 `exposeGuiTools:false` 实际暴露 **42 个**（`bb_show_gui` / `bb_hide_gui` 由 `/show` `/hide` 命令替代）。
 > 权威参数以 `index.js` 实际 schema 为准（`spec/tool-manifest.json` 是手工契约源，存在已知参数漂移）。
 
 ### 7.1 会话与项目
@@ -393,11 +393,12 @@ bb_look({ isolate: "AllHead", zoom: 2.5,
 
 > 推荐顺序：`bb_ref_canon` → `bb_ref_search` → `bb_ref_collect` →（看图）→ `bb_spec_save` → 建模 → `bb_spec_load` 复核。
 
-### 7.7 分层能力 T0/T1/T2（可选增强）
+### 7.7 分层能力 T3/T2/T1（可选增强）
 
 | 工具 | 说明 |
 |---|---|
-| `bb_seg_probe` | 探测本机分层能力（GPU/显存/磁盘/ComfyUI），给出 T0/T1/T2 分级与安装计划；不安装 |
+| `bb_seg_probe` | 探测分层能力（T3 配置 / GPU / 显存 / 磁盘 / ComfyUI），给出 T3/T2/T1/T0 分级与安装计划；不安装、T3 不发请求 |
+| `bb_seg_t3` | **T3**：Nano Banana Pro（Gemini 3 Pro Image）多参考图 → 严格三视图 / 全景拆解板；**需付费 Gemini API key**（`nanoBanana.apiKey` 或 `GEMINI_API_KEY`）；无 key 返回 `T3_NOT_CONFIGURED` 并降级 T2；详见 [docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md) |
 | `bb_seg_lite` | **T1**：SAM2.1（CPU 可跑）把立绘自动切成若干部件；首次自动下载 SAM2 约 **59MB** 到 `~/.dsh-blockbench-agent/sam2` |
 | `bb_seg_install` | **T2**：下载 ComfyUI 便携版 + See-through 节点 + pip 依赖（安装约 **7GB** 到 `~/.dsh-seethrough`） |
 | `bb_seg_run` | **T2**：跑 See-through 完整分层（实测 **23–29 个语义层**，以返回的 layers.json 为准，见 docs/16），含深度序与遮挡补全；不自动产 PSD |
@@ -656,7 +657,7 @@ spec/                         # 工具/协议机器可读契约
 material/                     # 本地参考语料（gitignored）
 vendor/                       # 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（gitignored）
 dist/                         # assemble.mjs 产物（gitignored）
-release/                      # 发布产物（gitignored；0.9.1 待重打）
+release/                      # 发布产物（gitignored；0.9.3 待重打）
 ```
 
 > 已无 `prototype/`、`game-test/`、`_archive/`、`workspace/`；归档统一在 `docs/archive/`。

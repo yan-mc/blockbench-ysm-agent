@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.9.2-59c2ff">
+  <img alt="version" src="https://img.shields.io/badge/version-0.9.3-59c2ff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20dsh-1b2a52">
-  <img alt="tools" src="https://img.shields.io/badge/tools-43%20defined%20%2F%2041%20exposed-3d7fd6">
+  <img alt="tools" src="https://img.shields.io/badge/tools-44%20defined%20%2F%2042%20exposed-3d7fd6">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-4ade80">
 </p>
 
@@ -25,7 +25,7 @@
 
 > **用一句话说**：给 dsh 里的模型装上“Blockbench 的手和眼睛”——它能语义化建模、精确改贴图、无头渲染看结果、检查点回滚、保存/导出 YSM，并最终在 Minecraft 里加载验证；需要人工时 `/show` 随时接管。
 
-> **发布状态**：当前版本 **0.9.2**。GitHub Releases 上的 **0.4.0 为历史发布**；0.9.2 发布包尚未重打（`release/` 已清空，待 `package-release.mjs` 重新生成）。想直接试用当前代码，按 [SETUP.md](SETUP.md) 从仓库搭建。
+> **发布状态**：当前版本 **0.9.3**（新增 **T3 云端拆解**）。GitHub Releases 上的 **0.4.0 为历史发布**；0.9.2 / 0.9.3 发布包尚未重打（`release/` 已清空，待 `package-release.mjs` 重新生成）。想直接试用当前代码，按 [SETUP.md](SETUP.md) 从仓库搭建。
 
 ## 🎬 视频介绍
 
@@ -35,6 +35,16 @@
 - 讲功能、使用与优势，不含制作过程；素材使用早期测试模型「DeepSeek 鲸鱼娘 / 蓝色大肥鱼」（该测试模型已清理）
 - 封面与投稿文案：[media/bilibili-upload.md](media/bilibili-upload.md)、[media/bilibili-cover.png](media/bilibili-cover.png)
 - **0.9.2 更新宣传片（1:50，丰川祥子案例）**：`media/sakiko-0.9.2-promo.mp4`（本地生成，不提交仓库）；重点讲 **T1/T2 立绘拆分（29 语义层）** 与 **217→355→401 块复杂逐步调整**；B 站封面/投稿文案见 [media/bilibili-cover-0.9.2.png](media/bilibili-cover-0.9.2.png)、[media/bilibili-upload-0.9.2.md](media/bilibili-upload-0.9.2.md)，制件说明 [media/README-0.9.2-promo.md](media/README-0.9.2-promo.md)
+
+## ✨ 0.9.3 新增：T3 云端拆解（Nano Banana Pro）
+
+> 分级优先级 **T3 > T2 > T1**。T3 = Google **Nano Banana Pro（Gemini 3 Pro Image）**：把同一角色的 1–14 张多角度参考图交给云端模型，生成**严格三视图**或**全景式深度拆解板**（三视图 + 服装分层 + 表情 + 材质 + 道具 + 箭头注释）。
+>
+> - **需要外接付费 API**（`gemini-3-pro-image`，约 $0.134/张 1K/2K、$0.24/张 4K）；配置 `nanoBanana.apiKey` 或环境变量 `GEMINI_API_KEY`。**没有 key 时自动降级现有 T2（See-through）**，不消耗额度。
+> - **定位**：T3 解决"官方立绘带动作/背景/打光、T1/T2 拆不干净"和"缺背面/内侧"的痛点；生成结果是**假设**不是还原，必须人工复核并把推定项写进 `spec.gaps`。T3 →（可选）T2 分层 → spec/建模。
+> - 工具：新增 **`bb_seg_t3`**；`bb_seg_probe` 增加 T3 配置探测与 `recommendedTier`。详见 [docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md)。
+>
+> 用户找到的社区爆款"像素级拆解"提示词：[mqyqingfeng/Blog#385](https://github.com/mqyqingfeng/Blog/issues/385)。
 
 ## ✨ 0.9.2 更新亮点：立绘拆分 + 复杂逐步调整（案例：丰川祥子）
 
@@ -55,17 +65,17 @@
 
 ![头部细节](docs/assets/showcase/sakiko-detail-head.png)
 
-## 工程状态（v0.9.2，2026-11-07 复核）
+## 工程状态（v0.9.3，2026-11-08 复核）
 
-**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、**43 个 `bb_*` 工具定义 / 实际暴露 41 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）、**5 个命令**（show/hide/bb-status/bb-start/bb-help）、**1 个 Skill**（`blockbench-ysm-artist`）、**56 个 bridge 方法 / 7 个事件 / 22 个错误码**、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill。
+**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、**44 个 `bb_*` 工具定义 / 实际暴露 42 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）、**5 个命令**（show/hide/bb-status/bb-start/bb-help）、**1 个 Skill**（`blockbench-ysm-artist`）、**56 个 bridge 方法 / 7 个事件 / 22 个错误码**、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill；分层能力 **T3（Nano Banana Pro 云端）+ T2（See-through）+ T1（SAM2）**。
 
-**0.9.2 实测**：
+**0.9.3 实测**：
 
 | 项 | 结果 |
 |---|---|
-| 单元测试 | **62/62 通过**（6 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 10 / spec 17 / tool-schema 5 / viewsheet 8） |
-| host-smoke | **35 步全过**，schema lint 检查 **41 个工具**（本地实跑，2026-11-07 18:40） |
-| 契约 | `spec/tool-manifest.json` 43 工具、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**，且 0.9.2 已对齐 `spec` ↔ `index.js` 的 43/43 参数（以 `index.js` 实际 schema 为准） |
+| 单元测试 | **76/76 通过**（7 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 12 / spec 17 / tool-schema 5 / viewsheet 8 / nanobanana 12） |
+| host-smoke | **35 步全过**，schema lint 检查 **42 个工具**（本地实跑，2026-11-08） |
+| 契约 | `spec/tool-manifest.json` **44 工具**、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**，且 0.9.3 已对齐 `spec` ↔ `index.js` 的 **44/44** 参数 |
 | 上游 | `vendor/blockbench` = **Blockbench 5.2.2**；`vendor/YSM-Utils-Plugins` = 2.6.0（MIT）；vendor 总体积约 **1.54GB** |
 | 参考语料 | `material/` 约 **329.1MB**；`ysm_decoded` 169 目录 / 1156 文件 / 233MB；`ysm` 9 包；`maid` 874 文件 / 446 条（含 325 个角色）；`bbmodel` 62 对 |
 | 模型工程 | `models/togawa-sakiko/`：**丰川祥子（旋律的主人）**案例模型，68 骨 / **534 方块** / 2×512 贴图 / 303 动画，`bb_validate` 0 error；见 [models/README.md](models/README.md) |
@@ -135,7 +145,7 @@
 | [docs/04-闭环状态机.md](docs/04-闭环状态机.md) | 状态机、预算/收敛/回滚、VLM 评审协议、失败恢复、伪代码 | ④ 闭环工作流 |
 | [docs/05-工程难点与避坑指南.md](docs/05-工程难点与避坑指南.md) | Electron/WebGL、启动/注入、Undo/保存、贴图/UV、YSM、Token、Windows、许可 | ⑤ 工程难点 |
 | [docs/06-实施路线图与验收.md](docs/06-实施路线图与验收.md) | M0–M6 里程碑、测试策略、验收标准、发布 | 落地计划 |
-| [spec/tool-manifest.json](spec/tool-manifest.json) | 机器可读工具清单（JSON Schema，43 工具） | ③ 契约 |
+| [spec/tool-manifest.json](spec/tool-manifest.json) | 机器可读工具清单（JSON Schema，44 工具） | ③ 契约 |
 | [spec/bridge-methods.json](spec/bridge-methods.json) | 机器可读 JSON-RPC 方法/事件/错误码（56/7/22） | ② 契约 |
 | [spec/generate_spec.py](spec/generate_spec.py) | 契约生成器（手工维护的契约源，重跑应 0 diff） | 工具链 |
 | **[ENGINEERING.md](ENGINEERING.md)** | **工程实现状态/实测数据/DSH 端完成度/已知限制**（设计不变，实现以此为准） | 落地状态 |
@@ -214,7 +224,7 @@ flowchart LR
 
 ## 6. 下一步方向
 
-1. 重打 **0.9.2 发布包**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）。
+1. 重打 **0.9.3 发布包**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）。
 2. 完成新验收项目 `togawa-sakiko`（明日方舟×BanG Dream 丰川祥子，联动皮肤「旋律」，双大角）。
 3. 完善 T1/T2 分层与 `bedrock_render`（当前未完成，勿依赖）。
 4. 补 `arm.json` 重建与 locale 加载验证（见 HANDOVER「已知限制」）。
@@ -226,7 +236,7 @@ flowchart LR
 ```
 F:\Deepseek_harness\blockbench\
 ├─ README.md                      # 门面：封面 / 工程状态 / 历史设计基线
-├─ MANUAL.md                      # 完整使用手册（v0.9.2）
+├─ MANUAL.md                      # 完整使用手册（v0.9.3）
 ├─ HANDOVER.md                    # 交接班档案（第一手）
 ├─ ENGINEERING.md                 # 工程状态/实测数据/已知限制
 ├─ FOLDER-MAP.md                  # 目录地图与维护约定
@@ -245,7 +255,7 @@ F:\Deepseek_harness\blockbench\
 ├─ media\                         # 介绍视频、幻灯片、构建脚本
 ├─ vendor\                        # 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（只读，约 1.54GB）
 ├─ dist\bb-agent-app\             # assemble.mjs 组装产物（本地运行）
-├─ release\                       # 发布物落点（当前为空，0.9.2 待重打）
+├─ release\                       # 发布物落点（当前为空，0.9.3 待重打）
 └─ .gitignore / .gitattributes / LICENSE / package.json
 ```
 

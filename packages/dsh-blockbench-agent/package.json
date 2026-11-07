@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-blockbench-agent",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "type": "module",
   "description": "dsh Host plugin: semantic Blockbench modeling/texturing tools with headless render feedback",

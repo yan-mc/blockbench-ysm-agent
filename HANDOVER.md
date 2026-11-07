@@ -1,7 +1,7 @@
 # 交接班档案 · YSM × Blockbench 无头建模 Agent
 
 > 最后更新：2026-11-07
-> 插件版本：**0.9.2**（43 个工具定义 / 实际暴露 41 个、5 个命令、1 个 Skill、56 个 bridge 方法）
+> 插件版本：**0.9.3**（44 个工具定义 / 实际暴露 42 个、5 个命令、1 个 Skill、56 个 bridge 方法；分层 T3>T2>T1）
 > 本文件是接手这个项目的**第一份必读材料**。设计细节见 `docs/`，使用方法见 `MANUAL.md`，工程实测见 `ENGINEERING.md`。
 
 ---
@@ -10,7 +10,7 @@
 
 一套让 AI 在**后台 Blockbench** 里建模、贴图、做动画、渲染自检、导出 YSM 皮肤的工具链。
 
-- **DSH 插件**（`@local/dsh-blockbench-agent`）：向 AI 注册 43 个 `bb_*` 定义（默认暴露 41 个；`bb_show_gui`/`bb_hide_gui` 由 `/show` `/hide` 命令替代），5 个命令、1 个 Skill
+- **DSH 插件**（`@local/dsh-blockbench-agent`）：向 AI 注册 44 个 `bb_*` 定义（默认暴露 42 个；`bb_show_gui`/`bb_hide_gui` 由 `/show` `/hide` 命令替代），5 个命令、1 个 Skill
 - **BAE 运行时**（Blockbench Agent Engine）：隐藏的 Electron 窗口 + WebSocket JSON-RPC（56 方法 / 7 事件 / 22 错误码）+ 离屏渲染
 - **技能文档**：教 AI 怎么建模（含 169 个现代模型实测出来的规范）
 - **参考语料**：169 个解密后的现代 YSM 模型 + 325 个女仆模组角色 + 62 对舰娘模型
@@ -24,7 +24,7 @@ F:\Deepseek_harness\blockbench\
 │
 ├── HANDOVER.md              ★ 本文件（交接班档案）
 ├── README.md                  项目介绍与功能列表（含历史设计基线）
-├── MANUAL.md                  使用手册（v0.9.2）
+├── MANUAL.md                  使用手册（v0.9.3）
 ├── SETUP.md                   从零搭建
 ├── ENGINEERING.md             工程状态/实测数据/已知限制
 ├── FOLDER-MAP.md              目录地图与维护约定
@@ -66,7 +66,7 @@ F:\Deepseek_harness\blockbench\
 ├── models/                    BAE 工作区根（workspaceRoot），当前验收模型 togawa-sakiko（见 §十）
 ├── research/                  研究证据（Blockbench 核心、YSM 格式、DSH 集成）
 ├── media/                     演示素材
-├── release/                   发布物落点（当前为空；0.9.2 发布包待重打）
+├── release/                   发布物落点（当前为空；0.9.3 发布包待重打）
 └── 根文件                     .gitignore / .gitattributes / LICENSE / package.json / README 等
 ```
 
@@ -95,7 +95,7 @@ plugin_manager remove_bundle target=@local/dsh-blockbench-agent
 plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh-blockbench-agent
 ```
 
-验证：DSH 里应能看到 **41 个暴露的 `bb_*`**（43 定义）和 skill `blockbench-ysm-artist`。
+验证：DSH 里应能看到 **42 个暴露的 `bb_*`**（44 定义）和 skill `blockbench-ysm-artist`。
 
 ### 3.2 让 BAE 启动
 
@@ -144,7 +144,7 @@ python spec\generate_spec.py                                   # 重生成契约
 | **看** | `bb_look` `bb_render_views` `bb_orbit` `bb_camera` `bb_anim_check` | ★ 渲染自检，**支持 isolate+zoom 局部审查** |
 | **参考图** | `bb_ref_canon` `bb_ref_search` `bb_ref_collect` | 官方基准 → 深度搜图 → 对照表 |
 | **规格** | `bb_spec_save` `bb_spec_load` | 建模规格与构建计划 |
-| **分层** | `bb_seg_probe` `bb_seg_install` `bb_seg_lite` `bb_seg_run` | T0/T1/T2 立绘分层 |
+| **分层** | `bb_seg_probe` `bb_seg_t3` `bb_seg_install` `bb_seg_lite` `bb_seg_run` | T3（Nano Banana Pro 云端）/ T2（See-through 本地）/ T1（SAM2）立绘分层；T3 无 API key 时降级 T2 |
 | **动画** | `bb_animation_create` `bb_animation_patch` `bb_animation_delete` `bb_animation_list` | 关键帧/控制器绑定 |
 | **交付** | `bb_validate` `bb_save_project` `bb_export_ysm` | 校验/保存/导出 zip |
 | **GUI** | `bb_show_gui` `bb_hide_gui`（默认不暴露，43 定义中的 2 个） | 用户接管（由 `/show` `/hide` 命令代替） |
@@ -235,9 +235,9 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | **系统设计** | 01 总体架构 / 02 通信协议 / 03 Tool-API / 04 闭环状态机 / 05 工程难点 / 06 路线图 |
 | **视口反馈** | 07 视口实时反馈方案（眼睛 A+B，已冻结） |
 | **建模知识** | 10 教程精要 / 11 参考图管线 / 12 建模规格 |
-| **分层与委派** | 13 能力探测 / 14 T1 SAM2 / 15 T2 安装 / 16 T2 完整分层 / 17 委派规范 / 18 官方基准与深度搜索 |
+| **分层与委派** | 13 能力探测 / 14 T1 SAM2 / 15 T2 安装 / 16 T2 完整分层 / 17 委派规范 / 18 官方基准与深度搜索 / **24 立绘转三视图与拆解调研 / 25 T3 Nano Banana Pro 接入与降级** |
 | **★ 现代语料** | **20** 169 模型大规模拆解 / **21** 现代化建模总纲 / **21a** 衣服与裙子 / **21b** 身体曲线 / **21c** 头发与面部 |
-| **测试证据** | `docs/test-evidence/`（0.9.1/0.9.2 复核证据，`README.md` 说明） |
+| **测试证据** | `docs/test-evidence/`（0.9.1/0.9.2/0.9.3 复核证据，`README.md` 说明） |
 
 ### 归档（`docs/archive/`，不随现状维护）
 
@@ -286,10 +286,11 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | `closeup` 视图 | **已修** | `focus.padding` 已修；局部审查仍推荐 `isolate` + `zoom` |
 | `arm.json`（第一人称手臂） | 无法重建 | 没有切换 Blockbench 工程 tab 的 API |
 | T1/T2 分层 | **T1 已内置；T2 已装并跑通（2026-11-07）** | T1 首次自动下 SAM2 ~59MB 到 `~/.dsh-blockbench-agent/sam2`；T2 已安装到 `~/.dsh-seethrough`（ComfyUI 0.44.0 + See-through，权重 12.5GB），首次分层约 22m43s（含下载），之后约 1–3 分钟，**实测输出 29 个语义层**；`bb_seg_run` 不产 PSD（需前端/ag-psd） |
+| **T3 云端拆解** | **已接入代码（2026-11-08），需付费 API key** | `bb_seg_t3` → Nano Banana Pro（`gemini-3-pro-image`）：1–14 张多角度参考图 → 严格三视图 / 全景拆解板；Pro Image 无免费层（约 $0.134/张 2K、$0.24/张 4K），生成图带 SynthID；**无 key 自动降级 T2**。配置 `nanoBanana.apiKey` 或 `GEMINI_API_KEY`；详见 [docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md) |
 | `dist/` 与源码同步 | **手工** | 改 bridge 后必须同步到 dist / 用 assemble 重建，见 §3.3 |
 | `locale/*.json` | 加载未验证 | 插件 package.json 已导出 locale 文件，但 dsh 侧实际加载路径/时机未做端到端验证 |
 | `spec/` 契约漂移 | 已知 | 手工维护契约源，与 `index.js` 存在 17 个工具参数漂移；以 `index.js` 实际 schema 为准 |
-| 发布包 | 待重打 | 0.4.0 为历史发布；0.9.2 发布包待 `package-release.mjs` 重新生成 |
+| 发布包 | 待重打 | 0.4.0 为历史发布；0.9.3 发布包待 `package-release.mjs` 重新生成 |
 
 ---
 
@@ -313,7 +314,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 2. bb_ref_canon({character})          拿官方基准
 3. bb_ref_search({depth:"deep"})      大面积搜图（902 候选/2s）
 4. bb_ref_collect()                   下载 → 去重 → 编号对照表，**真的看**
-5. bb_seg_probe → bb_seg_lite         立绘拆分（标准档必做；精修档再加 T2）
+5. bb_seg_probe → （有 key 先 bb_seg_t3 出三视图/拆解板，人工复核）→ bb_seg_lite / bb_seg_run（标准档必做；精修档再加 T2）
 6. bb_spec_save({spec})               固化规格 → 拿到构建计划
 7. bb_session_start({mode:"new_ysm", resolution:[512,512]}); 清空示例模型/处理 rest rotation
 8. 按四层方法建模
@@ -338,7 +339,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 **T2（See-through 29 层）逐细节修理（2026-11-07）**：T2 已完整安装（ComfyUI 0.44.0 + 权重 12.5GB，`~/.dsh-seethrough`，保持运行）；官方立绘 → 29 语义层 + crop_head 23 层。按层对照后 P1–P5 全部落地：双角重建为 **7.00×7.76 单位/只**（6 棱环+金尖/金根环，42 块）、双马尾 3 层错位垂到 y=17.2、白衬裙整圈 + 21 片落地拖尾、靴筒/鞋跟/2 扣带、胸衣面板改形。详见 [`models/togawa-sakiko/T2-REPAIR.md`](models/togawa-sakiko/T2-REPAIR.md) 与 [`T2-INSTALL-REPORT.md`](models/togawa-sakiko/T2-INSTALL-REPORT.md)。
 
-已知降级（T2 + v2 + v3 + v4 后仍存在）：角近景有段感、尖端不够锐（但 90° 侧视已是正确的 YZ 椭圆圈）；后发 5 束 z 间隙未拉开、整片感仍在；刘海仍偏直条；眼睛眼距已修正（±1.76、内缘 22% 脸宽）且四角被小方块切角，但四角片仍有直角补丁感、眼角片与脸皮约 0.05 色差、眼白边略宽、高光偏小；背面拖尾片间有缝、裙蕾丝仅 2 层；腿无小腿肚/手臂无肘收放；头身比约 6.9 偏 Q；无官方背面参考；`arm.json` 与 `blue.png` 仍是模板。
+已知降级（T2 + v2 + v3 + v4 后仍存在）：角近景有段感、尖端不够锐（但 90° 侧视已是正确的 YZ 椭圆圈）；后发 5 束 z 间隙未拉开、整片感仍在；刘海仍偏直条；眼睛眼距已修正（±1.76、内缘 22% 脸宽）、四角已拆成 6 片小方块沿眼弧排布，但 isolate 时眼心仍有约 0.4×0.4 淡色块（已知问题，正常视距 1–2px）；背面拖尾片间有缝、裙蕾丝仅 2 层；腿无小腿肚/手臂无肘收放；头身比约 6.9 偏 Q；无官方背面参考；`arm.json` 与 `blue.png` 仍是模板。
 
 **v3 结构重建（2026-11-08，510 块）**：按 [`docs/23`](docs/23-眼睛头发与角实证分析.md) 的参考模型配方重做三处最大结构问题——角 **旋转轴从 Z（前后轴）改回 X（左右轴）**（2 骨 76 块，26 段参数化螺旋，z 跨度 0.85→3.14，90° 侧视=完整椭圆圈）；眼睛从"金菱形宝石"改为**参考 6 层配方**（平眼白 2.05×1.55×0.30 齐脸 + 金/深金/竖瞳/高光 + 上眼线/眼角/下睑/肤色遮片/深灰紫眉，每眼 16 块）；头发从 2 块大平板改为**底发帽 28 + 刘海 48 + 侧发 12 + 后发 43（含内层填充）+ 双马尾 24 + 发饰 23 = 198 块**，任意角度无露皮。详见 [`MODEL-V3-REFINE.md`](models/togawa-sakiko/MODEL-V3-REFINE.md)。
 
@@ -363,7 +364,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 ## 十二、接手检查清单
 
 - [ ] `bb_session_status` 返回 `gpu_ok: true`（或 `/bb-status` 正常）
-- [ ] DSH 工具列表里有 **41 个暴露的 `bb_*`**（43 定义）
+- [ ] DSH 工具列表里有 **42 个暴露的 `bb_*`**（44 定义）
 - [ ] skill `blockbench-ysm-artist` 可加载
 - [ ] `node --test packages\dsh-blockbench-agent\test\*.test.mjs` **62 通过**
 - [ ] `node packages/dsh-blockbench-agent/test/host-smoke.mjs` **35 步 PASSED**（schema lint 41 工具）

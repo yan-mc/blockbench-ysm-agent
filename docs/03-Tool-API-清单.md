@@ -93,7 +93,8 @@
 | 参考图 | `bb_ref_collect` | 下载候选图、去重，拼成带编号对照表 |
 | 规格 | `bb_spec_save` | 固化建模规格并校验语料规律 |
 | 规格 | `bb_spec_load` | 读取规格，重新校验并返回构建计划 |
-| 分层 | `bb_seg_probe` | 探测 T0/T1/T2 能力分级与安装计划（不安装） |
+| 分层 | `bb_seg_probe` | 探测 T3/T2/T1/T0 能力分级与安装计划（不安装；T3 只查配置不发请求） |
+| 分层 | `bb_seg_t3` | **T3**：Nano Banana Pro（Gemini 3 Pro Image）多参考图 → 三视图/全景拆解板（需付费 API；无 key 降级 T2） |
 | 分层 | `bb_seg_lite` | T1：SAM2.1 立绘轻量分割（首次下载约 59MB） |
 | 分层 | `bb_seg_install` | T2：安装 ComfyUI + See-through（约 7GB） |
 | 分层 | `bb_seg_run` | T2：完整分层（实测 23–29 个语义层，以 layers.json 为准） |
