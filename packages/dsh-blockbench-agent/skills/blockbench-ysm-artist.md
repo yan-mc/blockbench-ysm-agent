@@ -380,3 +380,5 @@ deep 展开 24 条中/日/英查询词 × Bing 三语区 × 3 页分页 + 360 �
 | `animation.create` 后不保存 | 游戏里没动作 | 确认 `bb_save_project` 写了 animation 文件 |
 | 会话已连接时重复 `session_start` | 复用旧项目，改动丢失 | 先 `bb_project_close` |
 | 用世界坐标反推语料造型 | 完全错误的结论 | 语料 rotation 不能无条件重放，按尺寸+名字分析 |
+| **按右手定则推导方块 Z 轴滚转** | **裙板/披风朝反方向翻，做出"漏斗裙"** | **Blockbench 里 cube 的 Z 滚转旋向与右手公式相反**：要 A 字外扩应写 `rotation:[0,0,-pitch]`。任何"绕枢轴倾斜"的方块必须先在真实渲染里试一次，不能只靠推导 |
+| 用 PowerShell `Set-Content -NoNewline` 写生成脚本 | 中文/换行被破坏，脚本写坏 | 用 `write`/`edit` 工具写代码文件 |
