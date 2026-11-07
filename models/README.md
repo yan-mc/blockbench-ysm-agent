@@ -11,9 +11,9 @@
 | 项 | 说明 |
 |---|---|
 | `togawa-sakiko/` | 明日方舟 × BanG Dream! Ave Mujica 联动干员 **丰川祥子（Togawa Sakiko）**，皮肤「旋律的主人 / Master of Melodia」，卡普里尼双大角 |
-| 实测 | 70 bones / **217 cubes** / 2×512² 贴图 / 304 animations（模板 303 + 自定义 `sakiko_showcase`）；`bb_validate` ok=true、**0 error**（3 warning：512 贴图 ×2、可选 ViewLocator 缺省） |
-| 产物 | `pack/`（YSM 工作副本）、`exports/<ts>/pack.zip`（32 文件 / 486KB）、`artifacts/renders/r0021/*_768.png`（front/back/left/iso）、`specs/丰川祥子_*.json/.md`、`checkpoints/r0019.bbmodel`、`SEG-CHECK.md`（立绘拆分+逐部件复检） |
-| **复检结论** | 2026-11-07 T1 立绘拆分 + 8 组 isolate 复检：**major 5 / minor 4 / pass 0**。top 问题：角仅约参考 1/3、双马尾仅 4 块薄板、靴无形体、裙层/衬裙边/拖尾缺失、腹前灰框无对应物。详见 [`togawa-sakiko/SEG-CHECK.md`](togawa-sakiko/SEG-CHECK.md)；下一步 P1 角→P2 头发→P3 靴→P4 裙/拖尾→P5 胸衣 |
+| 实测 | **70 bones / 355 cubes** / 2×512² 贴图 / 303 animations；`bb_validate` ok=true、**0 error**（3 warning：512 贴图 ×2、可选 ViewLocator 缺省） |
+| 产物 | `pack/`（YSM 工作副本）、`exports/t2-repair/pack.zip`（32 文件 / 489KB）、`artifacts/renders/r0016/*_768.png`（front/back/left/iso）、`specs/丰川祥子_*.json/.md`、`checkpoints/r0016.bbmodel`、`SEG-CHECK.md`（T1+逐部件）、`T2-INSTALL-REPORT.md`（T2 29 层）、`T2-REPAIR.md`（T2 逐细节修理） |
+| **复检/修理结论** | 首轮 T1+8 组检查判 major 5/minor 4；**T2 逐细节修理后 5 个 major 全部落地**（角 7.00×7.76 单位、马尾 3 层垂到 y=17.2、裙组 79 块含 21 片落地拖尾、靴 15 块/只、胸衣改形）→ 现 355 块。剩余差距（发流/拖尾缝/蕾丝密度/头身比 6.21 偏 Q）见 `togawa-sakiko/T2-REPAIR.md` |
 | 已知降级 | 角为 10 段折线（无罗纹）、裙/蕾丝/褶皱简化、头发卷曲不足、眼睛偏圆、背面为对称推断（无背面参考）、arm.json 与 blue.png 仍是模板 |
 | 历史 `deepseek-fish/` | 已按要求删除；BUGS 记录保留到 [`../docs/archive/BUGS-deepseek-fish-testmodel.md`](../docs/archive/BUGS-deepseek-fish-testmodel.md) |
 | 历史 `sakiko-melodia/` | 已在更早提交 `8f3a09f` 删除 |

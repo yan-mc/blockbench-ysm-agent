@@ -286,7 +286,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | `tools/bedrock_render.py` | **未完成** | 自己写的软渲染器，骨骼 pivot 语义没调对，渲染会散架。**用 BAE 渲染即可，不要依赖它** |
 | `closeup` 视图 | **已修** | `focus.padding` 已修；局部审查仍推荐 `isolate` + `zoom` |
 | `arm.json`（第一人称手臂） | 无法重建 | 没有切换 Blockbench 工程 tab 的 API |
-| T1/T2 分层 | 需要额外安装/下载 | T1 首次自动下 SAM2 ~59MB 到 `~/.dsh-blockbench-agent/sam2`；T2 需 ComfyUI + See-through（安装约 7GB，首次权重约 12.5GB）到 `~/.dsh-seethrough` |
+| T1/T2 分层 | **T1 已内置；T2 已装并跑通（2026-11-07）** | T1 首次自动下 SAM2 ~59MB 到 `~/.dsh-blockbench-agent/sam2`；T2 已安装到 `~/.dsh-seethrough`（ComfyUI 0.44.0 + See-through，权重 12.5GB），首次分层约 22m43s（含下载），之后约 1–3 分钟，**实测输出 29 个语义层**；`bb_seg_run` 不产 PSD（需前端/ag-psd） |
 | `dist/` 与源码同步 | **手工** | 改 bridge 后必须同步到 dist / 用 assemble 重建，见 §3.3 |
 | `locale/*.json` | 加载未验证 | 插件 package.json 已导出 locale 文件，但 dsh 侧实际加载路径/时机未做端到端验证 |
 | `spec/` 契约漂移 | 已知 | 手工维护契约源，与 `index.js` 存在 17 个工具参数漂移；以 `index.js` 实际 schema 为准 |
@@ -326,20 +326,20 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 明日方舟 × BanG Dream! Ave Mujica 联动干员 **丰川祥子**（官方罗马音 **Togawa Sakiko**），指定皮肤 **「旋律的主人 / Master of Melodia」**（卡普里尼双大角、黑银冷色演出服）。
 
-| 项 | 实测 |
+| 项 | 实测（T2 修理后） |
 |---|---|
-| 骨架 / 方块 | 70 bones / **217 cubes** |
-| 贴图 | 2 × 512²（default / blue） |
-| 动画 | 304（模板 303 + 自定义 `sakiko_showcase` 2.4s loop） |
+| 骨架 / 方块 | 70 bones / **355 cubes**（首轮 217 → +138） |
+| 贴图 | 2 × 512²（default / blue，未改） |
+| 动画 | 303（未触碰） |
 | 校验 | `bb_validate` ok=true、**0 error**；3 warning（512 贴图 ×2、可选 ViewLocator 缺省） |
-| 导出 | 32 文件 + `export-manifest.json`；zip 486,591 B |
-| 渲染 | `models/togawa-sakiko/artifacts/renders/r0021/{front,back,left,iso_fr}_768.png` |
-| 工程 / 规格 | `models/togawa-sakiko/pack/`、`models/togawa-sakiko/specs/丰川祥子_Togawa_Sakiko（Oblivionis）.json/.md` |
-| 预算 | 写操作 ~20、显式渲染 ~10、restore 0（session 上限 60/40/2） |
+| 导出 | 32 文件 + `export-manifest.json`；zip 489,046 B |
+| 渲染 | `models/togawa-sakiko/artifacts/renders/r0016/{front,back,left,iso_fr}_768.png`；前后对比 `artifacts/t2-repair/before-after-sheet.png` |
+| 工程 / 规格 | `models/togawa-sakiko/pack/`、`specs/丰川祥子_Togawa_Sakiko（Oblivionis）.json/.md` |
+| 预算（T2 修理轮） | edits 15、renders 13、restore 0 |
 
-已知降级：角为 10 段折线（脊棱仅明暗近似，无罗纹）、裙/蕾丝/褶皱大幅简化、头发卷曲与发流不足、眼睛偏圆、**无背面/侧面参考**（背面为对称推断，已记 `spec.gaps`）、`arm.json` 与 `blue.png` 仍是模板。
+**T2（See-through 29 层）逐细节修理（2026-11-07）**：T2 已完整安装（ComfyUI 0.44.0 + 权重 12.5GB，`~/.dsh-seethrough`，保持运行）；官方立绘 → 29 语义层 + crop_head 23 层。按层对照后 P1–P5 全部落地：双角重建为 **7.00×7.76 单位/只**（6 棱环+金尖/金根环，42 块）、双马尾 3 层错位垂到 y=17.2、白衬裙整圈 + 21 片落地拖尾、靴筒/鞋跟/2 扣带、胸衣面板改形。详见 [`models/togawa-sakiko/T2-REPAIR.md`](models/togawa-sakiko/T2-REPAIR.md) 与 [`T2-INSTALL-REPORT.md`](models/togawa-sakiko/T2-INSTALL-REPORT.md)。
 
-**2026-11-07 立绘拆分（T1）+ 逐部件复检结论**：T1 可用（自动下载 SAM2 59MB），但对这张"暗色人物 + 暗色大件道具 + 亮背景"的稠密官方立绘**拆分质量低**（72 部件里人物的裙/手套/腿/靴/胸饰 0 个切出，掩膜被钢琴/沙发/基座占据）；逐部件检查仍完成 8 组，判定 **major 5 / minor 4 / pass 0**。top 问题：①双角仅约参考 1/3、无回卷棱纹 ②双马尾每条仅 4 块薄板、后发阶梯块 ③靴与黑丝糊死 ④裙层/白衬裙边缺失、拖尾仅 3 块 ⑤腹前浅灰方框无对应参考物。详见 [`models/togawa-sakiko/SEG-CHECK.md`](models/togawa-sakiko/SEG-CHECK.md)；下一步按 P1 角→P2 头发→P3 靴→P4 裙/拖尾→P5 胸衣修。
+已知降级（T2 修理后仍存在）：头发仍"薄板/栅栏"感（最大剩余项）、背面拖尾片间有缝、裙蕾丝密度仅 2 层、腿无小腿肚/手臂无肘收放、头身比 6.21 偏 Q、无官方背面参考、`arm.json` 与 `blue.png` 仍是模板。
 
 历史测试模型（deepseek-fish、sakiko-melodia）已按要求清理（sakiko-melodia 在提交 `8f3a09f` 删除；deepseek-fish 目录于 2026-11-07 删除，BUGS 记录存 `docs/archive/BUGS-deepseek-fish-testmodel.md`）。
 
