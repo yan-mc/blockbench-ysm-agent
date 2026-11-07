@@ -184,7 +184,7 @@ export function apply(ctx, config = {}) {
         return {
           protocol: 'bb-agent/1',
           transport: 'ws',
-          server: { name: 'bb-agent-runtime', version: '0.4.0', blockbench: '5.2.2' },
+          server: { name: 'bb-agent-runtime', version: '0.9.1', blockbench: '5.2.2' },
           capabilities: {
             render: { offscreen: true, transparent: true, max_size: 4096, antialias: ['off', 'msaa'] },
             texture: { layers: true, max_size: 8192 },
@@ -2372,7 +2372,7 @@ let lastRefCanon = null
         } catch { /* runtime busy */ }
         const payload = {
           ok: true,
-          version: '0.4.0',
+          version: '0.9.1',
           connected: !!state.connected,
           state: remote?.state ?? (state.connected ? 'idle' : 'offline'),
           revision: remote?.revision ?? state.revision,

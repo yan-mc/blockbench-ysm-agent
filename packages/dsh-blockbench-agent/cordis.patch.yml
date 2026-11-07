@@ -5,7 +5,7 @@
       name: '@local/dsh-blockbench-agent'
       config:
         workspaceRoot: 'F:\Deepseek_harness\blockbench\models'
-        project: 'deepseek-fish'
+        project: 'togawa-sakiko'
         autoStart: true
         executable: 'F:\Deepseek_harness\blockbench\vendor\blockbench\node_modules\electron\dist\electron.exe'
         appPath: 'F:\Deepseek_harness\blockbench\dist\bb-agent-app'

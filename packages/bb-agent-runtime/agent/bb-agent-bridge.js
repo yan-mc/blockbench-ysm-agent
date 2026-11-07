@@ -835,7 +835,7 @@
             params: {
               protocol: 'bb-agent/1',
               auth: { token: TOKEN },
-              client: { name: 'bb-agent-bridge', version: '0.4.0' },
+              client: { name: 'bb-agent-bridge', version: '0.9.1' },
               requested_capabilities: ['render.offscreen', 'gui.show', 'ysm.v2'],
             },
             _meta: { deadline_ms: 5000 },
@@ -895,7 +895,7 @@
         params: {
           protocol: 'bb-agent/1',
           auth: { token: TOKEN },
-          client: { name: 'bb-agent-bridge', version: '0.4.0', transport: 'http-sse' },
+          client: { name: 'bb-agent-bridge', version: '0.9.1', transport: 'http-sse' },
           requested_capabilities: ['render.offscreen', 'gui.show', 'ysm.v2'],
         },
         _meta: { deadline_ms: 5000 },

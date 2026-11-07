@@ -27,7 +27,7 @@ python media/build_video.py
 - 开场：让 AI 真正走进 Blockbench
 - 痛点：传统 AI 建模断在“最后一公里”
 - 方案：dsh Host + 隐藏 Blockbench 闭环
-- 能力总览：30 个语义工具
+- 能力总览：41 个工具（43 定义）
 - 建模 / 贴图 / 渲染自检 / 动画与保存
 - 游戏内验证（DeepSeek 鲸鱼娘测试模型）
 - 安全/接管、优势对比、3 分钟上手

@@ -65,6 +65,13 @@ deep 展开 24 条中/日/英查询词 × Bing 三语区 × 3 页分页 + 360 �
 （`resolution` 会真正改写贴图尺寸，**不要用默认 128**）；
 已有包用 `bb_project_open({pack_dir})`（**相对 `models/<项目名>/`，不是仓库根**）。
 
+> ⚠️ **实测（2026-11-07）**：`new_ysm` 带出的是**完整示例模型**（70 bones / 172 cubes / 303 animations / 8 controllers），
+> 不是空骨架。开完项目第一步先清空立方体：可先 `bb_checkpoint` 落盘 `.bbmodel`，读 outliner 里的 cube UUID，
+> 再用 `bb_apply_model_patch` 一次 `delete` 掉全部 cube（骨骼保留）。
+> 同时**模板骨骼带非零 rest rotation**（Ribbon / FrontSkirt / BackSkirt / Collar / SideSkirt / LeftArm / RightArm / Breast 等），
+> 按世界坐标 `add_cube` 会被整体带偏（实测出现过"蝴蝶结被甩出体外成浮空黑块"）。先 `bb_scene(scope:"bones")` 读 rotation，
+> 清零后再按世界坐标建，或直接按局部坐标计算。
+
 ---
 
 ## 2. 现代基线（先判定自己在哪一档）
@@ -455,3 +462,7 @@ bb_render_views({isolate:"Skirt", views:["front","right"], size:[640,640]})
 | 用世界坐标反推语料造型 | 完全错误的结论 | 语料 rotation 不能无条件重放，按尺寸+名字分析 |
 | **按右手定则推导方块 Z 轴滚转** | **裙板/披风朝反方向翻，做出"漏斗裙"** | **Blockbench 里 cube 的 Z 滚转旋向与右手公式相反**：要 A 字外扩应写 `rotation:[0,0,-pitch]`。任何"绕枢轴倾斜"的方块必须先在真实渲染里试一次，不能只靠推导 |
 | 用 PowerShell `Set-Content -NoNewline` 写生成脚本 | 中文/换行被破坏，脚本写坏 | 用 `write`/`edit` 工具写代码文件 |
+| **`new_ysm` 后直接建模** | 在示例模型的 172 个立方体上叠加，方块数虚高、UV 混乱 | 先 `bb_checkpoint` 落盘 `.bbmodel` → 解析 cube UUID → 一次 delete 清空，再开始建 |
+| **模板骨骼 rest rotation 未处理** | `add_cube` 世界坐标被骨骼旋转带偏（浮空配件、错位蝴蝶结） | 先读 `bb_scene(scope:"bones")` 的 rotation；对 Ribbon/FrontSkirt/BackSkirt/Collar/SideSkirt/LeftArm/RightArm/Breast 清零或按局部坐标算 |
+| `bb_get_element` 看不到 box UV 的 `size` | 误判 UV 没写进去 | box UV 用 `{offset,size}` 显式给 size（4×4 指向纯色 swatch 即纯色），以渲染为准 |
+| 外部图站 403 后不再尝试 | 参考图缺口没记录 | `bb_ref_collect` 对 arknights.wiki.gg/tvtropes 可能 403；改用 moegirl `storage` 原始路径，并缺失项写进 spec.gaps |

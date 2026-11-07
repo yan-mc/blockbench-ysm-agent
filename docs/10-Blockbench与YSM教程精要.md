@@ -8,7 +8,7 @@
 > - `材料/02-教程/动画-molang/常用的molang语言整理与收集1.6.pdf` —— 社区整理。
 >
 > 提取脚本：`tools/ocr_winrt.ps1`（Windows OCR，zh-Hans-CN）→ `tools/merge_ocr.py`
-> 原始结果：`workspace/_ocr/merged/_UNION.txt`、`workspace/_ocr/pdf/*.txt`
+> 原始结果：`workspace/_ocr/merged/_UNION.txt`、`workspace/_ocr/pdf/*.txt`（历史路径，产物已清理；脚本仍在 `tools/`）
 
 ---
 

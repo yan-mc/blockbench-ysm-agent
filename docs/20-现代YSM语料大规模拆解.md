@@ -6,11 +6,12 @@
 > 工具：`OpenYSM/YSMParser` v0.3.6（C++ 预编译），把加密的 `.ysm` 还原成
 > Blockbench 可编辑的 `main.json` + 贴图 + 动画。**520 个文件 1.3 秒解完，0 失败。**
 >
-> 语料落地：`material/refmodels/`（gitignore）
-> - `ysm_decoded/` 169 个解码工程（161 个可解析几何）
-> - `maid/` 325 个女仆模组角色模型
-> - `bbmodel/` 62 个舰娘 bbmodel
-> - `refcorpus/` 已转成可打开包的 8 个代表模型
+> 语料落地：`material/refmodels/`（gitignore，仅本地约 329.1MB）
+> - `ysm_decoded/` **169 个解码工程（169/169 可解析几何）**；其中 **8 个是 JSONC**（带 `//` 注释，需宽松解析）
+> - `maid/` 874 文件 / 446 条（其中 **325 个角色**，其余家具/载具/PvZ）
+> - `bbmodel/` 62 对舰娘 bbmodel（含建筑/载具，人物参考价值偏低）
+> - `ysm/` 9 个未加密 YSM 包（6 官方 CC0 模板 + 3 wine_fox 角色包）
+> - 索引：`inventory_ysm.json` 已更新为 **169 条**；`inventory_parts.json` 仍为 **161 条**历史派生统计
 
 ---
 
@@ -18,7 +19,7 @@
 
 | 语料 | 数量 | 方块数中位 | **旋转方块占比中位** | 贴图常见尺寸 |
 |---|---|---|---|---|
-| **现代 YSM**（解码） | 161 | **742** | **85%** | 256(81) / 512(33) / 128(32) / 1024+(8) |
+| **现代 YSM**（解码） | 169（其中 161 个可做完整统计） | **742** | **85%** | 256(81) / 512(33) / 128(32) / 1024+(8) |
 | 女仆模组 | 325 | 92 | **0%** | 128(177) / 64(71) |
 | 舰娘 bbmodel | 62 | ~62 元素 | 0% | — |
 | 酒狐（女仆改 YSM） | 1 | 412 | 75% | 256 |
@@ -39,7 +40,7 @@
 | 2556 | 75 | 95% | 512 | nvshi |
 | 2490 | 518 | 82% | 455 | kamen_rider_tycoon |
 
-> 对照：我做的 melodia 是 **386 方块 / 512 贴图**，在 161 个里排不进前 60。
+> 对照组：上一轮测试模型 melodia（已清理）是 **386 方块 / 512 贴图**，在这批语料里排不进前 60。
 
 ---
 
@@ -195,14 +196,15 @@ o=[ 0.80, 91.97, -8.87] s=[3,2.5,2]   r=[  4, -3, 37.4]   ← 明显的斜置小
 # 全量解码（1.3s 处理 169 个）
 tools\ysmparser\YSMParser.exe -i material\refmodels\_ysm_in -o material\refmodels\ysm_decoded
 
-# 打开某个解码模型（已转成标准包的 8 个）
-bb_project_open({pack_dir:"refcorpus/ysm_hi3_elysia"})
-bb_look({focus:"Head", cell:760})
-
 # 索引
-material\refmodels\inventory_ysm.json    # 161 个现代模型
-material\refmodels\inventory_maid.json   # 325 个女仆模型
+material\refmodels\inventory_ysm.json    # 169 条现代模型（169/169 可解析；8 个 JSONC）
+material\refmodels\inventory_parts.json  # 161 条历史派生统计（未重算）
+material\refmodels\inventory_maid.json   # 446 条（325 个角色）
 ```
 
-> 注意：解码出来的扁平布局是 `{name}/main.json`，标准包布局是 `{name}/models/main.json`，
-> 两种都要处理。
+打开语料模型：`bb_project_open({pack_dir})` 的路径相对 BAE 工作区（`models/<project>`），
+语料不在工作区内；要临时查看某个解码模型，需把它的目录复制进工作区并补一个 `ysm.json`
+（参考 `dist/bb-agent-app/templates/ysm_default/ysm.json`），再用 `bb_look` 观察。
+
+> 注意：解码出来的布局两种都要处理——
+> 扁平 `{name}/main.json`（168 个）与标准包 `{name}/models/main.json`（1 个：`爱莉希雅__1769436c7a73`）。

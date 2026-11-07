@@ -9,65 +9,85 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.7.0-59c2ff">
+  <img alt="version" src="https://img.shields.io/badge/version-0.9.1-59c2ff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20dsh-1b2a52">
-  <img alt="tools" src="https://img.shields.io/badge/tools-43-3d7fd6">
+  <img alt="tools" src="https://img.shields.io/badge/tools-43%20defined%20%2F%2041%20exposed-3d7fd6">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-4ade80">
 </p>
 
 <p align="center">
   <a href="MANUAL.md"><b>📖 完整使用手册</b></a> ·
-  <a href="https://github.com/yan-mc/blockbench-ysm-agent/releases">⬇️ 下载 v0.4.0</a> ·
+  <a href="https://github.com/yan-mc/blockbench-ysm-agent/releases">⬇️ Releases</a> ·
+  <a href="HANDOVER.md">交接班档案</a> ·
   <a href="ENGINEERING.md">工程状态</a> ·
-  <a href="SETUP.md">从零搭建</a> ·
-  <a href="models/deepseek-fish/README.md">测试模型：大肥鱼</a>
+  <a href="SETUP.md">从零搭建</a>
 </p>
 
 > **用一句话说**：给 dsh 里的模型装上“Blockbench 的手和眼睛”——它能语义化建模、精确改贴图、无头渲染看结果、检查点回滚、保存/导出 YSM，并最终在 Minecraft 里加载验证；需要人工时 `/show` 随时接管。
 
+> **发布状态**：当前版本 **0.9.1**。GitHub Releases 上的 **0.4.0 为历史发布**；0.9.1 发布包尚未重打（`release/` 已清空，待 `package-release.mjs` 重新生成）。想直接试用当前代码，按 [SETUP.md](SETUP.md) 从仓库搭建。
+
 ## 🎬 视频介绍
 
-[![插件介绍视频](docs/assets/cover.png)](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)
+[![插件介绍视频](docs/assets/cover.png)](#)
 
-- **B 站向介绍视频（2:46）**：[deepseek-blockbench-agent-intro.mp4](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)
-- 讲功能、使用与优势，不含制作过程；素材使用测试模型「DeepSeek 鲸鱼娘 / 蓝色大肥鱼」
+- **B 站向介绍视频（2:46）**：[deepseek-blockbench-agent-intro.mp4](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)（该视频为 0.4.0 时期录制，功能与本仓库不同步，仅作演示）
+- 讲功能、使用与优势，不含制作过程；素材使用早期测试模型「DeepSeek 鲸鱼娘 / 蓝色大肥鱼」（该测试模型已清理）
 - 封面与投稿文案：[media/bilibili-upload.md](media/bilibili-upload.md)、[media/bilibili-cover.png](media/bilibili-cover.png)
 
-## 工程状态
+## 工程状态（v0.9.1，2026-11-07 复核）
 
-**已实现并验证（v0.5.0）**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、34 个 `bb_*` 工具、`/show /hide` 命令、Skill、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、closeup/SSAA、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill、游戏内加载验证、发布打包。
+**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、**43 个 `bb_*` 工具定义 / 实际暴露 41 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）、**5 个命令**（show/hide/bb-status/bb-start/bb-help）、**1 个 Skill**（`blockbench-ysm-artist`）、**56 个 bridge 方法 / 7 个事件 / 22 个错误码**、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill。
 
-**v0.5.0 新增「视口实时反馈」（眼睛 A+B，详见 [docs/07](docs/07-视口实时反馈方案-冻结.md)）**：
+**0.9.1 实测**：
+
+| 项 | 结果 |
+|---|---|
+| 单元测试 | **62/62 通过**（6 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 10 / spec 17 / tool-schema 5 / viewsheet 8） |
+| host-smoke | **35 步全过**，schema lint 检查 **41 个工具**（本地实跑，2026-11-07 18:40） |
+| 契约 | `spec/tool-manifest.json` 43 工具、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**（手工维护的契约源，与 `index.js` 存在已知参数漂移，以 `index.js` 实际 schema 为准） |
+| 上游 | `vendor/blockbench` = **Blockbench 5.2.2**；`vendor/YSM-Utils-Plugins` = 2.6.0（MIT）；vendor 总体积约 **1.54GB** |
+| 参考语料 | `material/` 约 **329.1MB**；`ysm_decoded` 169 目录 / 1156 文件 / 233MB；`ysm` 9 包；`maid` 874 文件 / 446 条（含 325 个角色）；`bbmodel` 62 对 |
+| 模型工程 | `models/` **当前无测试模型**（历史测试模型已按要求清理）；新验收项目 `togawa-sakiko` 进行中 |
+
+### 0.5–0.9 新增能力
 
 | 能力 | 说明 |
 |---|---|
 | **编辑即看** | 写操作完成后自动附一张小拼图（同 step 合并成一张），改完立刻看见 |
 | **参数化相机** | `bb_camera` 任意方位/俯仰/距离/正交透视；`render.preview` 不落盘单帧 |
 | **多格拼图** | `bb_look` 一次返回一张 N 格拼图（2-8 帧 token 相近，比多次渲染省 2-3 倍） |
+| **局部审查** | `bb_look({isolate:"AllHead", zoom:2.5})` 只渲染指定骨骼子树并自动对焦；`closeup` 的 `focus.padding` 已修，但推荐 isolate+zoom |
 | **环绕转台** | `bb_orbit` 8 角度合一张图，替代"靠三视图脑补"，查穿模与对称性 |
 | **贴图像素放大** | `bb_render_texture` 走 inline 拼图路径，精修核对微小改动 |
 | **动画采样** | `bb_anim_check` 按时间轴采样 4-16 帧，检查动作幅度与起止姿势 |
-| **图史压缩** | 旧渲染图从上下文剥离为占位文本（surface replace，零模型调用）+ 预算护栏 |
-| **参考图收集** | `bb_ref_search` / `bb_ref_collect`：多源搜角色参考图 → 下载去重 → 一张带编号对照表；零安装（详见 [docs/11](docs/11-参考图收集管线.md)） |
-
-同时修掉 4 个实机缺陷：WebSocket 分片不支持（>64KB 响应必断连）、离屏渲染 `resize/applyCamera` 顺序导致首帧空图、`set_uv` 的 box 模式静默丢弃 `uv_size`、`bb_batch` 内图片块丢失。当前版本 **v0.5.0**。
+| **图史压缩** | 旧渲染图从上下文剥离为占位文本（surface replace，零模型调用）+ 附件预算护栏 |
+| **参考图管线** | `bb_ref_canon` / `bb_ref_search` / `bb_ref_collect`：官方基准 → 多源搜图 → 下载去重 → 带编号对照表（零安装，详见 [docs/11](docs/11-参考图收集管线.md) 与 [docs/18](docs/18-官方基准与深度搜索.md)） |
+| **建模规格** | `bb_spec_save` / `bb_spec_load` 固化规格并生成构建计划 |
+| **分层能力** | T0 无依赖 / T1 SAM2 ONNX（约 59MB，CPU 可跑）/ T2 See-through（ComfyUI 约 7GB）——可选增强，核心建模不依赖 |
+| **渲染自检** | `bb_render_views` + watchdog-v2 变化/空图/触边检测；isolate+zoom 局部审查 |
 
 ### 实战验证
 
-在 v0.5.0 视口反馈闭环下做过完整实战验证：从搜参考图、写规格、建模、贴图、
-渲染自检到导出，全程只靠工具与渲染图自我校验，没有人工建模。
-（测试模型已清理，工作区现为空，见 `models/README.md`。）
+在 0.5–0.9 的视口反馈闭环下做过完整实战验证：从搜参考图、写规格、建模、贴图、渲染自检到导出，全程只靠工具与渲染图自我校验，没有人工建模。
+
+（历史测试模型已清理，`models/` 当前为空；新验收项目 `togawa-sakiko` 进行中，最新证据见 `docs/test-evidence/`。）
 
 - 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
 - 完整使用手册：[MANUAL.md](MANUAL.md)
+- 交接班档案（第一手）：[HANDOVER.md](HANDOVER.md)
 - 目录地图：[FOLDER-MAP.md](FOLDER-MAP.md)
 - 从零搭建：[SETUP.md](SETUP.md)
 - 实现包说明：[packages/README.md](packages/README.md)
 - 机器可读契约：[spec/tool-manifest.json](spec/tool-manifest.json)、[spec/bridge-methods.json](spec/bridge-methods.json)
+- 测试证据：[docs/test-evidence/](docs/test-evidence/README.md)
 
 ---
 
-# 设计文档：YSM × Blockbench 无头建模与贴图 Agent 插件
+# 设计文档（历史设计基线）
+
+> **本节及以下为 2026-10-18 版设计稿（合并版），保留设计意图与事实依据；实现状态以 [ENGINEERING.md](ENGINEERING.md) 与 [HANDOVER.md](HANDOVER.md) 为准。**
+> 其中的工具数量、里程碑状态、目录结构均可能过时，不要当作现况引用。
 
 ## 0. 先读结论（TL;DR）
 
@@ -88,23 +108,23 @@
 
 | 文件 | 内容 | 对应需求模块 |
 |---|---|---|
-| **[系统开发与设计方案.md](<系统开发与设计方案.md>)** | 合并版主文档（推荐通读） | 全部 |
+| **[系统开发与设计方案.md](<系统开发与设计方案.md>)** | 合并版主文档（历史合订本，推荐通读设计意图） | 全部 |
 | [docs/01-总体架构与数据流.md](docs/01-总体架构与数据流.md) | 架构图、进程/生命周期、数据流、ADR、目录规范 | ① 系统架构与数据流 |
 | [docs/02-通信协议规范.md](docs/02-通信协议规范.md) | WebSocket JSON-RPC 2.0 规范、方法目录、错误码、超时/幂等、示例 | ② 通信协议 |
-| [docs/03-Tool-API-清单.md](docs/03-Tool-API-清单.md) | 21 个 `bb_*` 工具的参数/返回/错误/预算、Tool 设计原则 | ③ Tool API 声明 |
+| [docs/03-Tool-API-清单.md](docs/03-Tool-API-清单.md) | 43 定义 / 41 暴露的 `bb_*` 工具参数/返回/错误/预算、Tool 设计原则 | ③ Tool API 声明 |
 | [docs/04-闭环状态机.md](docs/04-闭环状态机.md) | 状态机、预算/收敛/回滚、VLM 评审协议、失败恢复、伪代码 | ④ 闭环工作流 |
 | [docs/05-工程难点与避坑指南.md](docs/05-工程难点与避坑指南.md) | Electron/WebGL、启动/注入、Undo/保存、贴图/UV、YSM、Token、Windows、许可 | ⑤ 工程难点 |
-| [docs/06-实施路线图与验收.md](docs/06-实施路线图与验收.md) | M0–M6 里程碑、测试策略、验收标准、发布与团队分工 | 落地计划 |
-| [spec/tool-manifest.json](spec/tool-manifest.json) | 机器可读工具清单（JSON Schema） | ③ 契约 |
-| [spec/bridge-methods.json](spec/bridge-methods.json) | 机器可读 JSON-RPC 方法/事件/错误码 | ② 契约 |
-| [spec/generate_spec.py](spec/generate_spec.py) | 契约生成器（改一处生成两份 JSON） | 工具链 |
+| [docs/06-实施路线图与验收.md](docs/06-实施路线图与验收.md) | M0–M6 里程碑、测试策略、验收标准、发布 | 落地计划 |
+| [spec/tool-manifest.json](spec/tool-manifest.json) | 机器可读工具清单（JSON Schema，43 工具） | ③ 契约 |
+| [spec/bridge-methods.json](spec/bridge-methods.json) | 机器可读 JSON-RPC 方法/事件/错误码（56/7/22） | ② 契约 |
+| [spec/generate_spec.py](spec/generate_spec.py) | 契约生成器（手工维护的契约源，重跑应 0 diff） | 工具链 |
 | **[ENGINEERING.md](ENGINEERING.md)** | **工程实现状态/实测数据/DSH 端完成度/已知限制**（设计不变，实现以此为准） | 落地状态 |
+| [HANDOVER.md](HANDOVER.md) | 交接班档案（第一手现状） | 落地状态 |
 | [packages/README.md](packages/README.md) | 两个实现包的构建、测试与运行命令 | 工程说明 |
-| [models/](models/README.md) | 测试模型仓库：DeepSeek 鲸鱼娘 YSM 模型、渲染/游戏内截图、BUG 与迭代记录 | 落地工程 |
-| [prototype/](prototype/README.md) | dsh 插件 + BAE 主进程/preload/bridge 插件骨架；WS 协议冒烟测试已通过 | 参考实现 |
-| [research/blockbench-core.md](research/blockbench-core.md) | Blockbench v5.2.2 源码级研究（847 行，文件:行号） | 事实依据 |
-| [research/ysm-format.md](research/ysm-format.md) | YSM 格式/插件导入导出研究（999 行，文件:行号） | 事实依据 |
-| [research/dsh-integration.md](research/dsh-integration.md) | dsh 插件/Tool/多模态/命令研究（565 行，取证） | 事实依据 |
+| [models/](models/README.md) | 模型工程工作区（当前无测试模型，新验收项目进行中） | 落地工程 |
+| [research/blockbench-core.md](research/blockbench-core.md) | Blockbench 5.2.2 源码级研究（677 行非空，文件:行号） | 事实依据 |
+| [research/ysm-format.md](research/ysm-format.md) | YSM 格式/插件导入导出研究（826 行非空，文件:行号） | 事实依据 |
+| [research/dsh-integration.md](research/dsh-integration.md) | dsh 插件/Tool/多模态/命令研究（439 行非空，取证） | 事实依据 |
 
 ---
 
@@ -126,7 +146,7 @@ flowchart LR
 三条关键链路：
 
 1. **语义编辑**：`bb_apply_model_patch` / `bb_texture_patch` → 一个 Undo 事务 → revision+1 → 有界回执。
-2. **无头反馈**：`bb_render_views` → 离屏 Preview 多机位渲染 → PNG 落盘 → 降采样 → `ImageBlock` → 模型视觉自检。
+2. **无头反馈**：`bb_look` / `bb_render_views` → 离屏 Preview 渲染 → PNG 落盘/拼图 → `ImageBlock` → 模型视觉自检。
 3. **人机协同**：`/show` 显示同一进程窗口 → 冻结 AI 写操作 → 用户手改 → `/hide` → 重新同步 revision。
 
 ---
@@ -149,61 +169,68 @@ flowchart LR
 
 | 你的角色 | 建议顺序 |
 |---|---|
-| 架构/负责人 | 本 README → `01` → `04` → `06` |
-| dsh / Agent 工程师 | `01` → `02` → `03` → `prototype/dsh-plugin/` |
-| Electron / 渲染工程师 | `01` §4 → `05` §1/§2 → `06` M0 |
-| YSM / 建模工程师 | `03` → `05` §3/§4/§5 → `research/ysm-format.md` → `prototype/blockbench-agent/` |
-| QA | `06` §3–§5、`04` §12 |
+| 接手/负责人 | [HANDOVER.md](HANDOVER.md) → [docs/21](docs/21-现代化建模总纲.md) → Skill → [docs/07](docs/07-视口实时反馈方案-冻结.md) |
+| 架构/设计 | 本 README 设计段 → `01` → `04` → `06` |
+| dsh / Agent 工程师 | `01` → `02` → `03` → `packages/` |
+| Electron / 渲染工程师 | `01` §4 → `05` §1/§2 → `ENGINEERING.md` |
+| YSM / 建模工程师 | `docs/20`/`21*` → `research/ysm-format.md` → Skill |
+| QA | `06` §3–§5、`docs/test-evidence/` |
 
 ---
 
-## 5. 原型状态（诚实声明）
+## 5. 历史里程碑状态（2026-10，仅供追溯）
 
-| 项 | 状态 |
+| 项 | 当时状态 |
 |---|---|
-| 传输层（WS 握手/鉴权/双向请求/事件/并发/超时） | ✅ 已用本机 Node 24 跑通 `prototype/dsh-plugin/ws-smoke-test.mjs` |
-| 原型所有 JS 文件语法 | ✅ `node --check` 全部通过 |
-| Electron 隐藏窗口 + WebGL 真实出图 | ❌ 未在本机运行（需按 M0 构建 BAE） |
-| YSM 默认包创建/导入/导出 | ❌ 骨架未实现完整 YRL（见 `research/ysm-format.md §8.4` 清单） |
-| dsh 插件安装/启用 | ❌ 未安装、未修改当前 profile |
-| 视觉闭环端到端（VLM） | ❌ 设计完成，待 M5 验证 |
+| 传输层（WS 握手/鉴权/双向请求/事件/并发/超时） | ✅ 已跑通 WS 冒烟 |
+| M0 隐藏窗口 + WebGL 真实出图 | ✅ 通过（GPU 与 SwiftShader 两条路径） |
+| YSM 默认包创建/导入/导出 | ✅ 已实现 |
+| dsh 插件安装/启用 | ✅ 已安装并激活 |
+| 视觉闭环端到端（VLM） | 🟡 规则 watchdog + 外部模型看图，无内置 critic |
+
+> 完整进展见 [ENGINEERING.md](ENGINEERING.md)，2026-10 的 M0 报告已归档到 `docs/archive/`。
 
 ---
 
-## 6. 下一步（M0，1–3 天）
+## 6. 下一步方向
 
-1. 构建 BAE：`node prototype/blockbench-agent/build.mjs`（需 Node ≥20、npm、网络）。
-2. 启动隐藏窗口，用 `executeJavaScript` 对 `MediaPreview` 做 5 机位渲染 → 检查 PNG 非空/尺寸/alpha。
-3. 连续 50 次渲染 + show/hide 往返 + 无 GPU（`--disable-gpu`）三组测试。
-4. 结果写入 `docs/M0-report.md`；**未通过不进入 M1**。
-5. 详见 [docs/06](docs/06-实施路线图与验收.md) 的 M0 清单。
+1. 重打 **0.9.1 发布包**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）。
+2. 完成新验收项目 `togawa-sakiko`（明日方舟×BanG Dream 丰川祥子，联动皮肤「旋律」，双大角）。
+3. 完善 T1/T2 分层与 `bedrock_render`（当前未完成，勿依赖）。
+4. 补 `arm.json` 重建与 locale 加载验证（见 HANDOVER「已知限制」）。
 
 ---
 
-## 7. 目录
+## 7. 目录（当前真实布局）
 
 ```
 F:\Deepseek_harness\blockbench\
-├─ README.md                      # 门面：封面 / 快速链接
-├─ MANUAL.md                      # 完整使用手册
+├─ README.md                      # 门面：封面 / 工程状态 / 历史设计基线
+├─ MANUAL.md                      # 完整使用手册（v0.9.1）
+├─ HANDOVER.md                    # 交接班档案（第一手）
 ├─ ENGINEERING.md                 # 工程状态/实测数据/已知限制
-├─ 系统开发与设计方案.md          # 合并版设计主文档
-├─ docs\                          # 01–06 分章 + test-evidence + assets(封面)
+├─ FOLDER-MAP.md                  # 目录地图与维护约定
+├─ SETUP.md                       # 从零搭建
+├─ NOTICE.md                      # 第三方许可
+├─ 系统开发与设计方案.md          # 历史设计合订本（2026-10-18）
+├─ docs\                          # 设计文档 01–07/10–18/20/21* + archive + test-evidence + assets
 ├─ spec\                          # 机器可读契约 + 生成器
 ├─ packages\
-│  ├─ bb-agent-runtime\           # BAE 组装/bridge/测试脚本
-│  └─ dsh-blockbench-agent\       # dsh Host 插件 + Client pill + Skill
-├─ models\                        # 测试模型仓库
-│  └─ deepseek-fish\              # 鲸鱼娘 YSM pack / 截图 / 导出 zip
-├─ media\                         # 介绍视频、幻灯片、构建脚本
-├─ prototype\                     # 早期骨架代码（历史参考）
+│  ├─ bb-agent-runtime\           # BAE 运行时（main/preload/bridge/selftest/scripts）
+│  ├─ dsh-blockbench-agent\       # dsh Host 插件 + Client pill + Skill + reference
+│  └─ bb-protocol\                # 协议常量/共享类型（骨架）
+├─ models\                        # BAE 工作区根（当前无测试模型，README 说明约定）
+├─ material\                      # 本地参考语料（gitignored，约 329.1MB）
+├─ tools\                         # 分析脚本 + ysmparser 解密器 + extract_corpus.py
 ├─ research\                      # Blockbench / YSM / dsh 研究证据
-├─ vendor\blockbench\             # 上游 v5.2.2（只读）
-├─ vendor\YSM-Utils-Plugins\      # 上游 v2.6.0（只读）
-├─ dist\bb-agent-app\             # 组装后的 BAE（本地运行）
-├─ release\                       # 发布 zip（gitignored）
-└─ game-test\                     # 可选隔离 Forge/YSM 验证环境（gitignored）
+├─ media\                         # 介绍视频、幻灯片、构建脚本
+├─ vendor\                        # 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（只读，约 1.54GB）
+├─ dist\bb-agent-app\             # assemble.mjs 组装产物（本地运行）
+├─ release\                       # 发布物落点（当前为空，0.9.1 待重打）
+└─ .gitignore / .gitattributes / LICENSE / package.json
 ```
+
+> 没有 `prototype/`、`game-test/`、`_archive/`；`workspace/` 已在 2026-11-07 清理。归档统一放 `docs/archive/`。
 
 ---
 
@@ -214,5 +241,4 @@ F:\Deepseek_harness\blockbench\
 - **YSM-Utils-Plugins**：MIT；复用其规范化规则/代码需保留版权与许可声明。
 - **YSM 默认模型**：官方文档注明以 CC 0 发布（可修改分发）；用户提供的参考图/皮肤版权由用户负责。
 - **Minecraft**：遵守 Mojang EULA，不分发原始游戏资产。
-
-
+- **参考语料**（`material/`）：第三方模型/贴图，仅本地研究使用，不随仓库分发（已 gitignore）。

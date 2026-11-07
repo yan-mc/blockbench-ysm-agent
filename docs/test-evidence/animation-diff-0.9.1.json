@@ -1,0 +1,16 @@
+{
+  "a": "F:\\Deepseek_harness\\blockbench\\dist\\bb-agent-app\\templates\\ysm_default",
+  "b": "F:\\Deepseek_harness\\blockbench\\workspace\\_hosttest\\workspaces\\demo\\pack",
+  "animations": {
+    "a": 302,
+    "b": 303
+  },
+  "added": [
+    "hosttest_wave"
+  ],
+  "removed": [],
+  "changed": [],
+  "strict_equal": false,
+  "equal": true,
+  "allow_added": true
+}

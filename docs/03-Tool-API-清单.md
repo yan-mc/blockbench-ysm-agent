@@ -3,6 +3,11 @@
 > 这些 Tool 由 dsh Host 插件（DBA）通过 `ctx.tools.register()` 注册，直接出现在模型的工具列表中。
 > 底层经 `02-通信协议规范.md` 的 JSON-RPC 转发给 BABP；模型**永远不直接读写** bbmodel/bedrock JSON。
 > 完整 JSON Schema 见 `spec/tool-manifest.json`；本文件是设计说明与行为契约。
+>
+> **当前规模（0.9.1）：43 个 `bb_*` 定义 / 实际暴露 41 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）。
+> **权威清单：`spec/tool-manifest.json`（43 工具）与 `packages/dsh-blockbench-agent/index.js`（实际 schema）。**
+> 注意：`spec/` 为手工维护契约源，与 `index.js` 存在 17 个工具参数漂移；行为/参数以 `index.js` 为准。
+> 本文 §2.3 是 0.1 时期设计稿的 21 个工具；0.5–0.9 新增 22 个见 §2.4。
 
 ---
 
@@ -41,7 +46,7 @@
 
 短 id 生成规则：`<前缀>_<uuid 前 4-8 位>`；`b_`=bone、`cu_`=cube、`tex_`=texture、`anim_`=animation、`ctrl_`=controller。重新打开项目时 id 稳定（由 uuid 派生）。
 
-### 2.3 工具总览
+### 2.3 工具总览（0.1 设计稿：21 个；当前 43 定义 / 41 暴露）
 
 | # | Tool | 作用 | 变更 | 返回预算 |
 |---|---|---|---|---|
@@ -68,6 +73,37 @@
 | 21 | `bb_hide_gui` * | 隐藏窗口并同步用户改动 | ✓ | ~300 tok |
 
 > `*` 默认关闭：人机协同由 dsh 原生命令 `/show`、`/hide` 完成，避免模型在闭环中突然弹出 GUI。
+
+### 2.4 0.5–0.9 新增工具（22 个）
+
+> 当前 43 个定义 = 上表 21 个 + 下表 22 个。参数以 `index.js`/`spec/tool-manifest.json` 为准，这里只列一句话用途。
+
+| 组 | 工具 | 用途（一句话） |
+|---|---|---|
+| 贴图 | `bb_texture_layer` | 纹理图层 list/create/select/delete/flatten（保存时合成回单张 PNG） |
+| 贴图 | `bb_texture_pbr` | PBR `_n`/`_s` 贴图的 list/create |
+| 贴图 | `bb_texture_export_png` | 把指定纹理导出为 workspace 内 PNG |
+| 贴图 | `bb_texture_import_png` | 从 workspace PNG 或 base64 导入并定位到纹理 |
+| 看/渲染 | `bb_look` | **最常用**：多机位/多格合成一张图；支持 `isolate` + `zoom` 局部审查 |
+| 看/渲染 | `bb_camera` | 读/设离屏相机位姿（get 返回当前角度） |
+| 看/渲染 | `bb_orbit` | 环绕转台：N 个角度合成一张拼图 |
+| 看/渲染 | `bb_anim_check` | 动画按时间采样若干帧合成一张拼图 |
+| 参考图 | `bb_ref_canon` | 取角色官方基准（百科外观描述 + 官方配图） |
+| 参考图 | `bb_ref_search` | 多源搜索造型参考图（支持 deep 深搜） |
+| 参考图 | `bb_ref_collect` | 下载候选图、去重，拼成带编号对照表 |
+| 规格 | `bb_spec_save` | 固化建模规格并校验语料规律 |
+| 规格 | `bb_spec_load` | 读取规格，重新校验并返回构建计划 |
+| 分层 | `bb_seg_probe` | 探测 T0/T1/T2 能力分级与安装计划（不安装） |
+| 分层 | `bb_seg_lite` | T1：SAM2.1 立绘轻量分割（首次下载约 59MB） |
+| 分层 | `bb_seg_install` | T2：安装 ComfyUI + See-through（约 7GB） |
+| 分层 | `bb_seg_run` | T2：完整分层（原始 24 层 → 22 层语义输出） |
+| 会话 | `bb_revisions` | 列出检查点与当前 revision |
+| 会话 | `bb_project_close` | 关闭当前项目（可 force） |
+| 动画 | `bb_animation_create` | 创建动画 |
+| 动画 | `bb_animation_delete` | 删除动画 |
+| 诊断 | `bb_diagnostics` | 连接/进程/端口/版本/心跳/日志尾部运行诊断 |
+
+> 0.5–0.9 同时为旧工具扩了能力：`bb_look` 的 `isolate`/`zoom`、写操作自动附图、图史压缩；`bb_apply_model_patch` 的 `inflate`/`rotation`/`pivot` 与 `set_uv` 每面 `uv_size`；`bb_batch` 内图片块回收等。
 
 ---
 

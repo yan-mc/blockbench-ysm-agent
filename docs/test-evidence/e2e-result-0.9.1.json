@@ -1,0 +1,202 @@
+{
+  "ok": true,
+  "steps": [
+    {
+      "name": "bridge connected",
+      "at": "2026-11-07T11:16:26.862Z"
+    },
+    {
+      "name": "session.status",
+      "at": "2026-11-07T11:16:26.866Z",
+      "state": "booting",
+      "revision": 0
+    },
+    {
+      "name": "project.create_ysm",
+      "at": "2026-11-07T11:16:27.329Z",
+      "project_id": "e2e_model-8e0ef19d",
+      "revision": 1,
+      "summary": {
+        "bones": 70,
+        "cubes": 182,
+        "textures": 2,
+        "animations": 303,
+        "controllers": 8
+      }
+    },
+    {
+      "name": "project.get_scene",
+      "at": "2026-11-07T11:16:27.333Z",
+      "counts": {
+        "bones": 64,
+        "cubes": 172,
+        "textures": 2,
+        "animations": 303
+      },
+      "bounds": {
+        "center": [
+          0,
+          21.649999618530273,
+          1.4355185966939739
+        ],
+        "size": [
+          19.035741180302054,
+          43.29999923706055,
+          13.271037193387947
+        ]
+      }
+    },
+    {
+      "name": "model.apply_patch",
+      "at": "2026-11-07T11:16:27.346Z",
+      "revision": 2,
+      "changed": [
+        {
+          "kind": "bone",
+          "id": "407f6979-c780-6e1e-9748-fce47dab249a",
+          "op": "add",
+          "name": "E2E_Arm"
+        },
+        {
+          "kind": "cube",
+          "id": "f8a36a6d-737f-01d8-2c0e-02b59e507852",
+          "op": "add",
+          "bone": "E2E_Arm"
+        },
+        {
+          "kind": "cube",
+          "id": "f8a36a6d-737f-01d8-2c0e-02b59e507852",
+          "op": "update"
+        }
+      ]
+    },
+    {
+      "name": "texture.create",
+      "at": "2026-11-07T11:16:27.380Z",
+      "id": "a5f1779d-e547-fc99-c53e-d4913bf6a901",
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "name": "texture.apply_patch",
+      "at": "2026-11-07T11:16:27.385Z",
+      "painted_pixels": 307,
+      "revision": 4
+    },
+    {
+      "name": "texture.read",
+      "at": "2026-11-07T11:16:27.388Z",
+      "colors": 16
+    },
+    {
+      "name": "render.views",
+      "at": "2026-11-07T11:16:27.499Z",
+      "images": [
+        {
+          "view": "front",
+          "bytes": 11737
+        },
+        {
+          "view": "right",
+          "bytes": 11926
+        },
+        {
+          "view": "iso_fr",
+          "bytes": 19127
+        }
+      ]
+    },
+    {
+      "name": "render change detection",
+      "at": "2026-11-07T11:16:27.524Z",
+      "changed_any": false,
+      "warning": "NO_VISIBLE_CHANGE"
+    },
+    {
+      "name": "render visible-change detection",
+      "at": "2026-11-07T11:16:27.569Z",
+      "changed_any": true,
+      "alpha": [
+        0.1862,
+        0.1272,
+        0.1891
+      ]
+    },
+    {
+      "name": "checkpoint/restore + arm",
+      "at": "2026-11-07T11:16:28.503Z",
+      "restored_from": 6,
+      "revision": 7,
+      "arm_loaded": true,
+      "debug": {
+        "project_open": true,
+        "active": "r0005",
+        "main": "r0005",
+        "main_open": true
+      }
+    },
+    {
+      "name": "save after restore",
+      "at": "2026-11-07T11:16:28.584Z",
+      "files": 15
+    },
+    {
+      "name": "gui.show/hide",
+      "at": "2026-11-07T11:16:28.684Z",
+      "shown": true,
+      "hidden": false
+    },
+    {
+      "name": "project.save",
+      "at": "2026-11-07T11:16:28.734Z",
+      "files": 3,
+      "pack_dir": "F:\\Deepseek_harness\\blockbench\\workspace\\_e2e\\pack"
+    },
+    {
+      "name": "save idempotence",
+      "at": "2026-11-07T11:16:28.777Z",
+      "files_checked": 3,
+      "changed": 0,
+      "second_save_files": 3
+    },
+    {
+      "name": "project.validate",
+      "at": "2026-11-07T11:16:28.783Z",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        {
+          "code": "YSM_LOCATOR_OPTIONAL_MISSING",
+          "target": "ViewLocator",
+          "message": "optional locator group missing: ViewLocator"
+        }
+      ]
+    },
+    {
+      "name": "project.export_ysm",
+      "at": "2026-11-07T11:16:28.900Z",
+      "export_dir": "F:\\Deepseek_harness\\blockbench\\workspace\\_e2e\\exports\\20261107111628\\pack",
+      "files": {
+        "total": 32,
+        "models": 6,
+        "textures": 8,
+        "animations": 12
+      },
+      "manifest_files": 31,
+      "zip": {
+        "files": 32,
+        "bytes": 532842
+      }
+    }
+  ],
+  "started_at": "2026-11-07T11:16:25.626Z",
+  "lastHeartbeat": {
+    "revision": 7,
+    "queue_len": 0,
+    "mem_mb": 38,
+    "gpu_ok": true
+  },
+  "finished_at": "2026-11-07T11:16:33.984Z"
+}

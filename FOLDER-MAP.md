@@ -1,35 +1,43 @@
 # 目录地图与维护约定
 
 > 目标：源码、模型、测试、发布物、媒体素材各自独立；大目录不误提交。
+> 现状基线：v0.9.1 / 2026-11-07（`docs/archive/` 为历史归档，不再使用 `_archive/`）。
 
-## 顶层
+## 顶层（当前真实布局）
 
 | 路径 | 内容 | 是否提交 | 说明 |
 |---|---|---|---|
-| `README.md` | 仓库门面/快速链接 | ✅ | 封面 + 工程状态 + 设计文档 |
-| `MANUAL.md` | 完整使用手册 | ✅ | 安装/命令/30 工具/工作流/排障 |
-| `ENGINEERING.md` | 工程状态/实测数据/已知限制 | ✅ | 设计不变，实现以此为准 |
-| `系统开发与设计方案.md` | 合并版设计主文档 | ✅ | 不随实现频繁改 |
-| `docs/` | 01–06 设计分章、test-evidence、assets | ✅ | 封面在 `docs/assets/` |
-| `spec/` | tool/bridge 契约 JSON + 生成器 | ✅ | 改代码后跑 `python spec/generate_spec.py` |
-| `packages/` | BAE + dsh Host 插件 + Skill | ✅ | 核心源码 |
-| `models/` | 测试模型仓库 | ✅（reference 除外） | 每个模型一个目录 |
+| `README.md` | 仓库门面/快速链接 | ✅ | 封面 + 工程状态 + 历史设计基线 |
+| `MANUAL.md` | 完整使用手册 | ✅ | 安装/命令/41 工具/工作流/排障（v0.9.1） |
+| `HANDOVER.md` | 交接班档案（第一手） | ✅ | 接手先读这个 |
+| `ENGINEERING.md` | 工程状态/实测数据/已知限制 | ✅ | 实现状态以此为准 |
+| `FOLDER-MAP.md` | 目录地图与维护约定 | ✅ | 本文件 |
+| `SETUP.md` | 从零搭建 | ✅ | vendor/dist 重建与插件安装 |
+| `NOTICE.md` | 第三方许可 | ✅ | Blockbench GPL / YSM-Utils MIT / YSM 模板 CC0 |
+| `系统开发与设计方案.md` | 历史设计合订本（2026-10-18） | ✅ | 只读设计意图，不随实现维护 |
+| `docs/` | 设计文档 01–07/10–18/20/21* + `archive/` + `test-evidence/` + `assets/` | ✅ | 封面在 `docs/assets/`；归档在 `docs/archive/` |
+| `spec/` | tool/bridge 契约 JSON + 生成器 | ✅ | 手工维护契约源；改后跑 `python spec/generate_spec.py`（应 0 diff） |
+| `packages/` | BAE 运行时 + dsh Host 插件 + Skill + 协议骨架 | ✅ | 核心源码（改代码见 HANDOVER §3.3） |
+| `models/` | BAE 工作区根（`workspaceRoot`） | ✅（运行时产物除外） | 当前无测试模型；`<project>` 子目录运行时生成 |
+| `material/` | 本地参考语料（约 329.1MB） | ❌（gitignored） | 第三方模型/贴图版权，仅本地研究，不随仓库分发 |
+| `tools/` | 分析脚本 + `ysmparser` 解密器 + `extract_corpus.py` | ✅（二进制除外） | `tools/ysmparser/YSMParser.exe` 为本地二进制 |
+| `research/` | Blockbench/YSM/dsh 研究 | ✅ | 事实依据（677/826/439 非空行） |
 | `media/` | 介绍视频、幻灯片、构建脚本 | ✅（输出视频除外） | 视频输出在 `.gitignore` |
-| `prototype/` | 早期骨架代码 | ❌（已归档） | 移入 `_archive/prototype/` |
-| `research/` | Blockbench/YSM/dsh 研究 | ✅ | 事实依据 |
-| `vendor/` | 上游 Blockbench/YSM（只读） | ❌ | 体积大，按 SETUP 重建 |
-| `dist/` | 组装后的 BAE | ❌ | 由 `assemble.mjs` 生成 |
-| `release/` | 发布 zip | ❌ | 由 `package-release.mjs` 生成 |
-| `game-test/` | 隔离 Forge/YSM 测试环境 | ❌（已归档） | 移入 `_archive/game-test/` |
-| `workspace/` | 测试脚本的临时输出 | ❌（已归档） | 移入 `_archive/workspace/` |
-| `_archive/` | **测试/参考资料归档** | ❌（gitignored） | 见下节 |
+| `vendor/` | 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（只读） | ❌ | 体积约 1.54GB，按 SETUP 重建 |
+| `dist/` | 组装后的 BAE（`bb-agent-app`） | ❌ | 由 `assemble.mjs` 生成（2026-11-07 重建：190 文件/36MB） |
+| `release/` | 发布 zip/目录 | ❌ | 由 `package-release.mjs` 生成；当前为空，0.9.1 待重打 |
+| `workspace/` | 测试脚本临时输出 | ❌ | 已清理；`npm run test` 会重新生成 |
+
+> 已不存在：`prototype/`（早期骨架，已删除）、`game-test/`（隔离游戏验证环境，已删除）、`_archive/`（旧归档方案，已废弃）、`models/deepseek-fish/`（测试模型已清理）。
 
 ## 模型目录约定（`models/<name>/`）
 
+> `workspaceRoot=models`，当前 `project=togawa-sakiko`（见 `packages/dsh-blockbench-agent/cordis.patch.yml`），
+> 即工作区为 `models/togawa-sakiko/`。
+
 ```text
-models/deepseek-fish/
-├─ README.md          # 模型说明/设定/状态
-├─ BUGS.md            # 建模过程问题记录
+models/<name>/
+├─ README.md          # 模型说明/设定/状态（可选）
 ├─ pack/              # YSM 工作副本（可重新打开）
 ├─ model-export/      # 可分发 zip
 ├─ screenshots/       # 渲染 + 游戏内截图
@@ -37,45 +45,34 @@ models/deepseek-fish/
 └─ reference/         # 参考图（版权原因不提交）
 ```
 
-插件配置：`workspaceRoot=models`、`project=deepseek-fish` → 工作区 `models/deepseek-fish`。
+运行时目录（由 BAE 自愈生成，**可以清空内容，但不要删除目录本身**）：
+
+```text
+models/<name>/
+├─ .bb/               # BAE userdata
+├─ logs/              # runtime.log / agent.log
+├─ artifacts/         # 渲染产物
+└─ checkpoints/       # .bbmodel 检查点
+```
+
+> 历史教训：`logs/` 目录被删导致宿主未捕获异常退出；v0.5.0 起 spawn 前确保目录存在 + 监听 stream error + apply 时重建。
 
 ## 测试证据
 
-- `docs/test-evidence/test-all-final.log`：全量回归 6/6 PASSED
-- `docs/test-evidence/hosttest-result.json`：Host 插件工具回归
-- `docs/test-evidence/e2e-result.json`：WS/HTTP+SSE 协议回归
-- `workspace/_logs/`：测试脚本临时输出（不提交）
-
----
-
-## `_archive/` · 测试与参考资料归档（不提交）
-
-> 为保持仓库干净，测试产物与参考资料统一移到这里；`_archive/` 已加入 `.gitignore`。
-
-```text
-_archive/
-├─ workspace/                      # 旧测试脚本临时输出
-├─ game-test/                      # 隔离 Forge/YSM 游戏内验证环境（~1.1 GB）
-├─ prototype/                      # 早期骨架代码
-└─ model-scratch/                  # 模型测试中间产物
-   ├─ .bb/                         # BAE userdata 历史目录
-   ├─ checkpoints/  artifacts/  logs/
-   ├─ reference/                   # 参考图（版权原因不随仓库分发）
-```
-
-**注意**：`models/<name>/logs/`、`artifacts/`、`checkpoints/`、`.bb/` 是**运行时目录**，
-插件运行期间会持续写入。可以清空内容，但**不要删除目录本身**（host 插件写
-`logs/runtime.log` 时若目录缺失，曾导致宿主未捕获异常退出；v0.5.0 已改为自愈创建 + 错误监听）。
-
+- `docs/test-evidence/README.md`：0.9.1 证据说明（`test-all-0.9.1.log` / `hosttest-result-0.9.1.json` 由 Lead 写入）
+- `docs/archive/test-evidence-0.4.0/`：0.4.0 时期旧证据（历史，不代表现状）
+- `docs/archive/M0-report*.md`：2026-10 M0 报告
 
 ## 发布
 
-- GitHub Release 资产：`bb-agent-0.4.0-*.zip`
-- 本地 `release/` 只留最新 zip；解包目录不提交
-- 发布包内含 `INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`
+- 本地 `release/` 只留最新 zip；解包目录不提交。
+- 发布包内含 `INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`。
+- 当前 **0.9.1 发布包待重打**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）；GitHub Releases 上的 0.4.0 为历史发布。
 
 ## 清理规则
 
-- 不提交 `.bb/`、`checkpoints/`、`artifacts/`、`logs/`、`node_modules/`、`dist/`、`release/`、`game-test/`、`vendor/`。
-- 模型参考图、临时截图、`*.log`、本机绝对路径不进入提交。
-- 每次大改后跑 `npm run test`，把最新证据拷到 `docs/test-evidence/`。
+- 不提交：`.bb/`、`checkpoints/`、`artifacts/`、`logs/`、`node_modules/`、`dist/`、`release/`、`vendor/`、`material/`、`workspace/`。
+- 不提交：`__pycache__/`、`*.pyc`、参考图、临时截图、`*.log`（`docs/test-evidence/*.log` 例外）、本机绝对路径。
+- 模型参考图、临时截图不进入提交。
+- 每次大改后跑 `npm run test`，把最新证据放到 `docs/test-evidence/`。
+- **归档一律放 `docs/archive/`（不再用 `_archive/`）**；归档文件不随现状维护，见 `docs/archive/README.md`。
