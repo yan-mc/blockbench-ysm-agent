@@ -1,0 +1,22 @@
+﻿feat: part-isolation rendering and finer segmentation (v0.9.0)
+
+Two capabilities the modelling loop kept needing.
+
+Part isolation: the bridge had no way to hide bones, so every check rendered the whole
+model and every close-up had to be framed by hand. Added nodeVisible/modelBounds that
+respect visibility, a withIsolation(refs, fn) helper that hides every group and cube
+except the requested subtrees and their ancestor chains (ancestors must stay visible or
+nothing renders), restores all flags in a finally block, and an isolate parameter on
+render.views / render.preview / render.sheet that recurses with isolate stripped. Because
+modelBounds now ignores hidden geometry, framing automatically snaps to the isolated part.
+
+Exposed as isolate on bb_look and bb_render_views, taking a bone name or a
+comma-separated list, e.g. isolate with value LeftArm or AllHead,Bangs. Deliberately a
+plain string rather than a string-or-array union, because a rejected JSON Schema
+construct takes down every tool in the plugin (that happened once already).
+
+Finer segmentation: bb_seg_lite now defaults to grid 24 (576 prompt points, roughly 30s
+instead of 8s), max_parts 24, min_area 0.0015 and min_iou 0.30, so hair, skirt layers and
+trim can actually be split out instead of being merged into a few blobs.
+
+62 unit tests pass, host-smoke PASSED with the real schemas, contract regenerated.

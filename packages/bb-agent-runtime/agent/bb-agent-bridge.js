@@ -1305,17 +1305,68 @@
     throw err('UNSUPPORTED', `unsupported scope: ${scope}`, { code: 'UNSUPPORTED' })
   }
 
+  function nodeVisible(node) {
+    let n = node
+    while (n) {
+      if (n.visibility === false) return false
+      n = n.parent
+    }
+    return true
+  }
+
   function modelBounds() {
     if (!Cube.all.length) return [[0, 0, 0], [0, 0, 0]]
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity]
+    let any = false
     for (const cube of Cube.all) {
+      if (!nodeVisible(cube)) continue
+      any = true
       const from = vec(cube.from), to = vec(cube.to)
       for (let i = 0; i < 3; i++) {
         min[i] = Math.min(min[i], from[i], to[i])
         max[i] = Math.max(max[i], from[i], to[i])
       }
     }
+    if (!any) return [[0, 0, 0], [0, 0, 0]]
     return [min, max]
+  }
+
+  // ---- 部件隔离渲染：只显示指定骨骼/方块子树（含祖先链，否则子级不渲染）----
+  function resolvePartRefs(refs) {
+    const list = []
+    for (const ref of (Array.isArray(refs) ? refs : [refs]).filter(Boolean)) {
+      const e = findGroup(ref) || findCube(ref)
+      if (!e) throw err('INVALID_REFERENCE', `isolate target not found: ${ref}`, { code: 'INVALID_REFERENCE' })
+      list.push(e)
+    }
+    if (!list.length) throw err('INVALID_PARAMS', 'isolate needs at least one element', { code: 'INVALID_PARAMS' })
+    return list
+  }
+
+  async function withIsolation(refs, fn) {
+    const targets = resolvePartRefs(refs)
+    const keep = new Set()
+    const addTree = (node) => {
+      if (!node || keep.has(node)) return
+      keep.add(node)
+      for (const ch of (node.children || [])) addTree(ch)
+    }
+    for (const t of targets) {
+      addTree(t)
+      let p = t.parent
+      while (p && p !== 'root') { keep.add(p); p = p.parent }
+    }
+    const saved = []
+    const toggle = (node) => { saved.push([node, node.visibility]); node.visibility = keep.has(node) }
+    for (const g of Group.all) toggle(g)
+    for (const c of Cube.all) toggle(c)
+    try {
+      Canvas.scene.updateMatrixWorld(true)
+      return await fn()
+    } finally {
+      for (const [node, vis] of saved) node.visibility = vis
+      Canvas.scene.updateMatrixWorld(true)
+    }
   }
 
   handlers['project.get_element'] = (params) => handlers['project.get_scene']({ scope: params.id && findCube(params.id) ? 'cube' : 'bone', id: params.id })
@@ -1899,6 +1950,8 @@
 
   handlers['render.views'] = async (params = {}) => {
     ensureProject()
+    const isolateRefs = params.isolate ? (Array.isArray(params.isolate) ? params.isolate : [params.isolate]) : null
+    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.views']({ ...params, isolate: null }))
     const views = Array.isArray(params.views) && params.views.length ? params.views : ['front', 'right', 'iso_fr']
     const size = Array.isArray(params.size) ? params.size : [768, 768]
     const ssaa = params.antialias === 'ssaa' ? 2 : 1
@@ -2417,8 +2470,10 @@
    * render.preview：单帧预览。
    * 与 render.views 的区别：不落盘、不做 pngStats/缩略图、不参与 changed 判定、elapsed_ms 真实。
    */
-  handlers['render.preview'] = (params = {}) => {
+  handlers['render.preview'] = async (params = {}) => {
     ensureProject()
+    const isolateRefs = params.isolate ? (Array.isArray(params.isolate) ? params.isolate : [params.isolate]) : null
+    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.preview']({ ...params, isolate: null }))
     const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
     const preview = offscreenPreview()
     const size = Array.isArray(params.size) ? params.size : [640, 640]
@@ -2611,6 +2666,8 @@
    */
   handlers['render.sheet'] = async (params = {}) => {
     ensureProject()
+    const isolateRefs = params.isolate ? (Array.isArray(params.isolate) ? params.isolate : [params.isolate]) : null
+    if (isolateRefs) return await withIsolation(isolateRefs, () => handlers['render.sheet']({ ...params, isolate: null }))
     const tStart = (typeof performance !== 'undefined' ? performance.now() : Date.now())
     const preview = offscreenPreview()
 

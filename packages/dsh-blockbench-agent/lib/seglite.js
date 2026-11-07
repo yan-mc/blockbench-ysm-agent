@@ -120,8 +120,8 @@ export function runSegmentation(p = {}) {
     '--model-dir', p.modelDir,
     '--image', p.image,
     '--out-dir', p.outDir,
-    '--grid', String(p.grid ?? 12),
-    '--max-parts', String(p.maxParts ?? 9),
+    '--grid', String(p.grid ?? 24),
+    '--max-parts', String(p.maxParts ?? 24),
   ]
   if (p.threads) args.push('--threads', String(p.threads))
   if (p.minArea != null) args.push('--min-area', String(p.minArea))

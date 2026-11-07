@@ -521,6 +521,14 @@ export function apply(ctx, config = {}) {
    * @param {number} [p.timeoutMs=30000]
    * @param {AbortSignal} [p.signal]
    */
+  /** isolate 支持 "A,B" 字符串或数组；统一成数组或 undefined */
+  function normalizeIsolate(v) {
+    if (!v) return undefined
+    const list = (Array.isArray(v) ? v : String(v).split(','))
+      .map((s) => String(s).trim()).filter(Boolean)
+    return list.length ? list : undefined
+  }
+
   async function renderSheet(p) {
     const t0 = Date.now()
     const params = {
@@ -534,6 +542,7 @@ export function apply(ctx, config = {}) {
       padding: p.padding,
       animation: p.animation,
       focus: p.focus,
+      isolate: normalizeIsolate(p.isolate),
     }
     const result = await raceAbort(call('render.sheet', params, p.timeoutMs ?? 30000), p.signal)
 
@@ -924,6 +933,7 @@ export function apply(ctx, config = {}) {
       cells: { type: 'array', description: '格子列表：[{view:"front"} | {camera:{azimuth:45,elevation:15}}]；默认 front+iso_fr' },
       camera: { type: 'object', description: '统一相机：{azimuth,elevation,distance,projection:"ortho"|"persp",fov,padding}', additionalProperties: false },
       focus: { type: 'string', description: '聚焦元素名（骨骼/方块），如 "Head"' },
+      isolate: { type: 'string', description: '只渲染指定部件（骨骼名，多个用英文逗号分隔），其余隐藏并自动对焦到该部件。局部检查用：isolate:"LeftArm" 或 "AllHead,Bangs"' },
       cell: { type: 'number', description: '单格像素，默认 320；要看清细节用 512/640' },
       cols: { type: 'number', description: '列数；默认自动接近正方形' },
       background: { type: 'string', description: '底色 #RRGGBB；传 "transparent" 用透明背景' },
@@ -939,7 +949,7 @@ export function apply(ctx, config = {}) {
         const autoCols = args.cols ?? Math.max(1, Math.ceil(Math.sqrt(cells.length * 1.33)))
         const r = await renderSheet({
           tool: 'bb_look', cells, cell: args.cell, cols: autoCols,
-          background: bg, focus: args.focus, signal: exec?.signal,
+          background: bg, focus: args.focus, isolate: args.isolate, signal: exec?.signal,
         })
         if (!r.ok) return r
         if (args.attach === false) return { ok: true, meta: r.meta }
@@ -1081,6 +1091,7 @@ export function apply(ctx, config = {}) {
       transparent: { type: 'boolean' },
       antialias: { type: 'string', description: 'off|msaa|ssaa（ssaa 为 2x 超采样后缩小）' },
       focus: { type: 'object', description: '{element:"Head", padding?} 局部特写；closeup 默认 Head', properties: { element: { type: 'string' }, padding: { type: 'number' } }, additionalProperties: false },
+      isolate: { type: 'string', description: '只渲染指定部件（骨骼名，多个用英文逗号分隔），其余隐藏并自动对焦到该部件。局部检查用：isolate:"LeftArm" 或 "AllHead,Bangs"' },
       attach_images: { type: 'boolean', description: '是否附图（默认 true）' },
       attach_size: { type: 'number', description: '附件缩略图边长，默认 512' },
     },
@@ -1696,10 +1707,10 @@ let lastRefCanon = null
       + '注意：它只给可见区域，**不补全被遮挡部分**（那需要 T2/See-through）。',
     parameters: {
       file: { type: 'string', required: true, description: 'workspace 内相对路径的图片，如 refs/角色/ref_001.png' },
-      grid: { type: 'number', description: '提示点网格边长，默认 12（144 点，约 8 秒）' },
-      max_parts: { type: 'number', description: '最多输出几个部件，默认 9' },
-      min_area: { type: 'number', description: '最小面积占比，默认 0.004' },
-      min_iou: { type: 'number', description: '最小置信度，默认 0.35' },
+      grid: { type: 'number', description: '提示点网格边长，默认 24（576 点，约 30 秒）——**拆得细才能拆出小部件**；嫌慢可降到 16' },
+      max_parts: { type: 'number', description: '最多输出几个部件，默认 24（头发/裙子/饰边都能单独拆出来）' },
+      min_area: { type: 'number', description: '最小面积占比，默认 0.0015（越小越能保留小部件）' },
+      min_iou: { type: 'number', description: '最小置信度，默认 0.30' },
       install: { type: 'boolean', description: '缺失时是否自动装依赖/下模型，默认 true' },
       attach: { type: 'boolean', description: '是否附图，默认 true' },
     },
