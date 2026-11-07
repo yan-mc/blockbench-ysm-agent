@@ -45,3 +45,6 @@ models/*/logs/
 
 # 全新用户验收跑出来的模型包（保留产物，但这份是过程证据，随来源变化）
 models/*/sakiko-fresh-acceptance/
+
+# 参考模型语料（来自用户本机 MC 安装，第三方版权，只本地用）
+models/*/refcorpus/
