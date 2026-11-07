@@ -546,7 +546,7 @@ TOOLS = [
                        "无 key 返回 T3_NOT_CONFIGURED，降级 bb_seg_run(T2)。"
                        "云端生成是推断不是还原：背面/内侧/遮挡处为模型脑补，必须人工复核并写进 spec.gaps；"
                        "参考图会上传到 Google，生成图含 SynthID 水印；官方价约 1K/2K $0.134/张、4K $0.24/张。"
-                       "dry_run 可只看提示词与成本不调用 API。",
+                       "dry_run:true 不需要 key，可只看提示词与成本不调用 API。",
         "mutating": False, "requires_project": False, "concurrency_safe": False,
         "protocol_method": None, "timeout_ms": 300000,
         "returns": "SegT3Result", "attachments": True,

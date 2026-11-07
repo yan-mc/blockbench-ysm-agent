@@ -220,7 +220,8 @@ config:
 | 参数/参考图问题 | `T3_BAD_REQUEST` | 检查图片格式/大小/宽高比；减少参考图 |
 | 模型 id/端点错 | `T3_MODEL_NOT_FOUND` | 检查 model/baseUrl |
 | 内容被拦 | `T3_NO_IMAGE` + `blockReason/finishReason` | 换参考图、去掉敏感描述；降级 T2 |
-| 超时 | `T3_API_ERROR`/取消 | 重试一次；仍失败降级 T2 |
+| 超时 | `T3_TIMEOUT` / 取消 | 重试一次；仍失败降级 T2 |
+| 网络/代理失败 | `T3_NETWORK` | 检查网络/代理/baseUrl；重试或降级 T2 |
 | 返回无图 | `T3_NO_IMAGE` | 重试；降级 T2 |
 
 ---
@@ -237,7 +238,7 @@ config:
 ## 8. 验收清单
 
 - [ ] 未配置 key：`bb_seg_probe` 显示 `tiers.t3.ok=false`、`recommendedTier` 落 `t2`；`bb_seg_t3` 返回 `T3_NOT_CONFIGURED`（不崩溃、不扣费）。
-- [ ] `dry_run:true` 返回提示词/成本，不发请求。
+- [ ] `dry_run:true` **在没 key 时也能**返回提示词/成本（不发请求、不花钱）；配 key 后仍可用。
 - [ ] 配 key：`turnaround` 生成 2K 三视图，落盘 + meta.json + 附件预览。
 - [ ] `breakdown` 生成拆解板（中心角色 + 服装分层 + 表情 + 道具 + 箭头）。
 - [ ] 多参考图（4–6 张）身份一致；单图也能跑。

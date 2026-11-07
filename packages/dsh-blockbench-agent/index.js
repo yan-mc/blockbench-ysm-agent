@@ -1739,7 +1739,7 @@ let lastRefCanon = null
       + '分级优先级 **T3 > T2 > T1**：需要付费 Gemini API key（配置 nanoBanana.apiKey / nanoBananaApiKey，或环境变量 GEMINI_API_KEY / GOOGLE_API_KEY）；'
       + '没有 key 时返回 T3_NOT_CONFIGURED，请降级用 bb_seg_run（T2 本地 See-through）。'
       + '**云端生成是推断不是还原**：背面/内侧/被遮挡部件都是模型脑补，必须逐张人工复核并把推定项写进 spec.gaps；参考图会上传到 Google，生成图含 SynthID 水印。'
-      + '官方价约 1K/2K $0.134/张、4K $0.24/张（variants 成倍计费）；可用 dry_run 先看提示词与成本。'
+      + '官方价约 1K/2K $0.134/张、4K $0.24/张（variants 成倍计费）；`dry_run:true` 不需要 key，可先看提示词与成本。'
       + '产物落盘到 workspace，可继续交给 bb_seg_lite/bb_seg_run 拆层或直接对照建模。',
     parameters: {
       references: { type: 'array', items: { type: 'string' }, description: 'workspace 内相对路径的参考图数组（同角色多角度；1–14 张，建议 4–6）' },
@@ -1759,15 +1759,6 @@ let lastRefCanon = null
     async execute(args, exec) {
       try {
         const t3 = resolveT3Config(cfg)
-        if (!t3.configured) {
-          return {
-            ok: false, code: 'T3_NOT_CONFIGURED',
-            message: 'T3 需要 Gemini API key（Pro Image 无免费层）',
-            hint: '配置 nanoBanana.apiKey 或环境变量 GEMINI_API_KEY；没有 key 时降级用 bb_seg_run（T2 本地 See-through）',
-            fallback: 't2',
-            tiers: { t3: inspectT3Availability(cfg) },
-          }
-        }
         const maxRefs = Math.max(1, Math.min(14, Number(args.max_references) || t3.maxReferences))
 
         const extSet = new Set(['.png', '.jpg', '.jpeg', '.webp'])
@@ -1858,12 +1849,22 @@ let lastRefCanon = null
         if (args.dry_run) {
           return lossless({
             ok: true, dry_run: true, ...baseInfo, prompt,
+            configured: t3.configured,
             next_steps: [
-              '确认提示词/参考图后去掉 dry_run 再调用',
+              t3.configured ? '确认提示词/参考图后去掉 dry_run 再调用' : '当前未配置 API key：先配置 nanoBanana.apiKey 或 GEMINI_API_KEY，才能真跑',
               '生成后人工复核；背面与遮挡处标记为推定',
               '之后可把生成图交给 bb_seg_run(T2) 分层，或直接对照建模',
             ],
           })
+        }
+        if (!t3.configured) {
+          return {
+            ok: false, code: 'T3_NOT_CONFIGURED',
+            message: 'T3 需要 Gemini API key（Pro Image 无免费层）',
+            hint: '配置 nanoBanana.apiKey 或环境变量 GEMINI_API_KEY；或先用 dry_run:true 看提示词；没有 key 时降级 bb_seg_run（T2 本地 See-through）',
+            fallback: 't2',
+            tiers: { t3: inspectT3Availability(cfg) },
+          }
         }
 
         const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
