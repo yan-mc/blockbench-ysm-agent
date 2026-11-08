@@ -328,7 +328,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 | 项 | 实测（T2 + v2 + v3 优化后） |
 |---|---|
-| 骨架 / 方块 | **71 bones / 1117 cubes**（217 → 355 → 401 → 510 → 534 → v5 1100 → v6 裙层 1117） |
+| 骨架 / 方块 | **72 bones / 1182 cubes**（217 → 355 → 401 → 510 → 534 → v5 1100 → v6 1117 → v7 1182） |
 | 贴图 | 2 × 512²（default / blue，未改） |
 | 动画 | 303（未触碰） |
 | 校验 | `bb_validate` ok=true、**0 error**；3 warning（512 贴图 ×2、可选 ViewLocator 缺省） |
@@ -345,7 +345,9 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 **v5 按 T3 拆解重建（2026-11-08，1100 块 · 历史）**：用 Nano Banana Pro（APIYI）以官方立绘 + 局部 + Q 版小人 5 参考图生成 2K turnaround/breakdown（`docs/25`），据此重建服装/下肢（三层短裙 + corset + 泡泡袖 + 腕套 + 丝袜/garter + 厚底靴 + 星空披风）、头发/角/头部（HairBack 150 块 5 层、43 段粗卷角、额饰/耳环/choker）；R5/R6 修正裁切错误后移除三视图中不存在的披风、后发加宽、背裙改黑并补体积。最终 71 骨 / 1100 块 / 303 动画未动；`bb_validate` 0 error；导出 `exports/v5-final2/pack.zip`（511,459 B）。详见 [`V5-FINAL-REPORT.md`](models/togawa-sakiko/V5-FINAL-REPORT.md)。
 
-**v6 曲面裙层（2026-11-08，1117 块）**：按 skill §3.6 用三轴斜置薄板重做裙层，v6.2 为 182 片 + 内层黑壳堵缝（裙三轴 100%、板厚中位 0.30），总 71 骨 / 1117 块 / 303 动画未动；validate 0 error；导出 `exports/v6-final/pack.zip`（513,051 B）。详见 [`V6-CURVED-SKIRT-REPORT.md`](models/togawa-sakiko/V6-CURVED-SKIRT-REPORT.md)。
+**v6 曲面裙层（2026-11-08，1117 块 · 历史）**：按 skill §3.6 用三轴斜置薄板重做裙层，v6.2 为 182 片 + 内层黑壳堵缝（裙三轴 100%、板厚中位 0.30），总 71 骨 / 1117 块 / 303 动画未动；validate 0 error；导出 `exports/v6-final/pack.zip`（513,051 B）。详见 [`V6-CURVED-SKIRT-REPORT.md`](models/togawa-sakiko/V6-CURVED-SKIRT-REPORT.md)。
+
+**v7 裙对齐/斜面锥 + 头发全覆盖（2026-11-08，1182 块）**：修正裙生成器双旋转误差与左右扇区错配，裙中心对齐身体、前下摆 15.4/后 12.4（差 3.0u）；头发新增 `HairCap` 骨与全覆盖穹顶，后发/侧发/刘海改平滑段链（相邻段旋转差 5–12°、重叠 0.2–0.3）。最终 72 骨 / 1182 块 / 303 动画未动；validate 0 error；导出 `exports/v7-final-clean/pack.zip`（516,768 B）。详见 [`V7-FINAL-REPORT.md`](models/togawa-sakiko/V7-FINAL-REPORT.md)。
 
 **v4 眼睛精修（2026-11-08，534 块）**：按 [`docs/23 §6`](docs/23-眼睛头发与角实证分析.md) 实测——现代模板眼中心 ±1.76（双眼内缘间距 20–24% 脸宽），我们 v3 的 ±2.315（37%）明显偏宽；"多边形眼"靠眼周一圈 0.2–0.8 单位小方块把方形四角遮掉。据此：眼中心 ±2.315→**±1.76**（眼/眉 8 骨 pivot 同步，动画未动）；每眼约 18 块（平板眼白 1.95×1.42 齐脸 / 金环 / 深金内环 / 竖瞳 / 2 高光 / 上眼线 / 外眼角 2 片深色翼 / 内眼角 / 下睑 + **四角 6 片小片沿眼弧排列** + 上下睑压边），四角片用脸皮同色格心；v4.1–v4.4 迭代修掉"四角片在虹膜后无效/紫块/大直角补丁"。**已知未解**：isolate 眼心约 0.4×0.4 淡色块（采样 default 纹理但改 uv 无效，疑极小面 box-UV 混合；正常视距约 1–2px）。详见 [`MODEL-V3-REFINE.md`](models/togawa-sakiko/MODEL-V3-REFINE.md) §12–§16 与模型 README。
 

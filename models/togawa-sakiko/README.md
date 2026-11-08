@@ -1,20 +1,20 @@
 # togawa-sakiko · 丰川祥子（明日方舟 × BanG Dream! Ave Mujica「旋律的主人」）
 
 > 2026-11-07 全新建模验收模型。工作区即本目录（`workspaceRoot=models` + `project=togawa-sakiko`）。
-> 已完成七轮：**首轮 217 块（T1 复检）→ T2 逐细节修理 355 块 → v2 美术优化 401 块 → v3 结构重建 510 块（角/眼/发）→ v4 眼睛精修 534 块 → v5 按 T3（Nano Banana Pro）拆解图重建服装/头发/角 1100 块 → v6 按 skill §3.6 用三轴斜置薄板重做裙层 1117 块**。
+> 已完成八轮：**首轮 217 块 → T2 修理 355 → v2 401 → v3 510（角/眼/发）→ v4 534（眼睛）→ v5 1100（按 T3 重建服装/头发/角）→ v6 1117（三轴斜板裙）→ v7 1182（裙对齐斜面锥 + 头发全覆盖平滑化）**。
 
-## 规格（v6.2 成品，2026-11-08）
+## 规格（v7 成品，2026-11-08）
 
 | 项 | 值 |
 |---|---|
 | 角色 | 明日方舟联动干员 **丰川祥子**（官方罗马音 Togawa Sakiko，Ave Mujica / Oblivionis） |
 | 皮肤 | **「旋律的主人」/ Master of Melodia**（Ave Mujica 合作服装；卡普里尼双大角、黑银演出服） |
-| 骨架 | **71 bones**（v3 68 骨 + v5 新增 Cape / CapeLow / HairBow_R；全部原骨名保留，303 动画引用不变） |
-| 方块 | **1117 cubes**（217 → 355 → 401 → 510 → 534 → 1100 → **1117**） |
+| 骨架 | **72 bones**（v3 68 + v5 新增 Cape / CapeLow / HairBow_R + v7 新增 HairCap；原骨名全保留，303 动画引用不变） |
+| 方块 | **1182 cubes**（217 → 355 → 401 → 510 → 534 → 1100 → 1117 → **1182**） |
 | 贴图 | 2 × 512²（`textures/default.png`、`blue.png`；swatch 调色板式） |
 | 动画 | 303（未触碰） |
 | 校验 | `bb_validate` ok=true，**0 error**；3 warning（512 贴图 ×2、可选 ViewLocator 缺省） |
-| 导出 | `exports/v6-final/pack/`（32 文件 + manifest）、`pack.zip`（**513,051 B / 32 文件**） |
+| 导出 | `exports/v7-final-clean/pack/`（32 条目 + manifest）、`pack.zip`（**516,768 B / 32 条目**） |
 
 ## 产物
 
@@ -26,10 +26,11 @@
 - **v3 结构重建报告**：[`MODEL-V3-REFINE.md`](MODEL-V3-REFINE.md)（角绕 X 轴螺旋、眼睛 6 层配方、头发底发帽+附属束；§9 v3.1 / §10 v3.2 / §11 v3.3）
 - **参考模型实证分析**：[`../../docs/23-眼睛头发与角实证分析.md`](../../docs/23-眼睛头发与角实证分析.md)（逐个打开 8 个参考模型后的眼睛/头发/角配方）
 - **v5 T3 参考与重建（历史）**：[`V5-FINAL-REPORT.md`](V5-FINAL-REPORT.md)、[`T3-V5-BRIEF.md`](T3-V5-BRIEF.md)、[`T3-V5-BRIEF-PHASE2.md`](T3-V5-BRIEF-PHASE2.md)、[`V5-PHASE1-REPORT.md`](V5-PHASE1-REPORT.md)、[`V5-R3-REPORT.md`](V5-R3-REPORT.md)、[`V5-R4-REPORT.md`](V5-R4-REPORT.md)；重建/校对脚本 `tools/v5*/`
-- **v6 曲面裙层**：[`V6-CURVED-SKIRT-REPORT.md`](V6-CURVED-SKIRT-REPORT.md)；重建脚本 `tools/v6*/`；对照图 `docs/assets/showcase/sakiko-v5-vs-v6-skirt.png`、`sakiko-t3-vs-v6.png`
+- **v6 曲面裙层（历史）**：[`V6-CURVED-SKIRT-REPORT.md`](V6-CURVED-SKIRT-REPORT.md)；重建脚本 `tools/v6*/`；对照图 `docs/assets/showcase/sakiko-v5-vs-v6-skirt.png`、`sakiko-t3-vs-v6.png`
+- **v7 裙对齐/斜面锥 + 头发全覆盖**：[`V7-FINAL-REPORT.md`](V7-FINAL-REPORT.md)；对照图 `docs/assets/showcase/sakiko-t3-vs-v7.png`、`sakiko-hair-coverage-v7.png`、`sakiko-skirt-detail-v7.png`、`sakiko-v6-vs-v7-skirt.png`
 - **T3 参考图**（gitignored）：`artifacts/t3-sheets/run2-turnaround/`、`run2-breakdown/`（APIYI / Nano Banana Pro）
 - 首轮拆分/逐部件复检：[`SEG-CHECK.md`](SEG-CHECK.md)
-- 最终渲染（2400²）：`artifacts/v6/final-v62/final-{front,iso_fr,back,left}-2400.png` + 特写；**对照** `docs/assets/showcase/sakiko-t3-vs-v6.png`、`sakiko-v5-vs-v6-skirt.png`、`sakiko-final-4views.png`、`sakiko-detail-head.png`、`sakiko-t3-crop-proof.png`
+- 最终渲染（2400²）：`artifacts/v7/final/final-{front,iso_fr,back,left}-2400.png` + 特写；**对照** `docs/assets/showcase/sakiko-t3-vs-v7.png`、`sakiko-hair-coverage-v7.png`、`sakiko-skirt-detail-v7.png`、`sakiko-v6-vs-v7-skirt.png`、`sakiko-final-4views.png`、`sakiko-t3-crop-proof.png`
 - 参考研究裁切（gitignored）：`artifacts/refstudy/`（doggo/kaltsis/ganyu/jingliu 等参考渲染 + 官方角 5× 裁切）
 - T2 分层产物（gitignored）：`seg/sakiko_skin1-layers/`（29 层 + depth + layers.json + PSD）、`seg/crop_head-layers/`（23 层 + PSD）
 - 参考图（不提交）：`refs/skin/sakiko_skin1.png`（官方立绘 2176²）、`refs/skin/crop_*.png`、`refs/sakiko/ref_00*.png`
@@ -89,7 +90,7 @@ T3（Nano Banana Pro / Gemini 3 Pro Image，经 APIYI 中转）用官方立绘 +
 4. **裁切错误修正（R5/R6）**：发现 T3 对照图面板裁切错误后，用正确独立面板重查——移除三视图中不存在的星空披风、后发加宽 33 块、背面蓝层改黑、后裙补 9 片钟形裙片；最终 **1100 块**。
 5. **交付**：`bb_validate` 0 error、303 动画未动、`exports/v5-final2/` + zip **511,459 B**。
 
-## v6 曲面裙层：三轴斜置薄板（2026-11-08，1117 块）
+## v6 曲面裙层：三轴斜置薄板（2026-11-08，1117 块 · 历史）
 
 v5-r6 的裙 165 块全部只绕 Y（竖片环/圆筒）。按 skill §3.6 对 160 个参考工程统计（85.4% 方块带旋转、裙类 93.3%、5,275 块三轴裙板），重做三轮：
 1. **v6**：裙 165 → 233 块三轴斜板，可见斜面；特写仍漏光/碎片多。
@@ -98,10 +99,18 @@ v5-r6 的裙 165 块全部只绕 Y（竖片环/圆筒）。按 skill §3.6 对 1
 - 五裙骨保留：`Skirt 12 / FrontSkirt 56 / BackSkirt 56 / LeftSkirt 29 / RightSkirt 29`。
 - 导出 `exports/v6-final/pack.zip`（513,051 B）。
 
+## v7 裙体对齐 + 斜面截断锥 + 头发全覆盖（2026-11-08，1182 块）
+
+针对用户反馈的三类问题：
+1. **裙歪/连接错位**：查出 v6.2 生成器 `origin=pivot−R·loc` 把旋转乘了两次（设计中心偏 1.87u），且左/右裙扇区骨分配反；v7a/v7c 改为世界坐标重建、按方位重分五骨，裙中心 x=-0.15、顶环 y≈23.6 贴胯，透明背景无偏。
+2. **斜面截断圆锥**：前下摆 y≈15.4、后 y≈12.4（差 3.0u），侧≈14.0；连续黑内壳 36 片挡腿，蓝衬裙 + 白细边连续；腰封/内衬衔接上身。
+3. **头发全覆盖/平滑**：新增 `HairCap` 骨（实心叠层穹顶 + 内填充），顶视无孔/无白块；后发 9 缕×8 段、侧发 3 缕/侧、刘海 12 缕（去针刺），相邻段重叠 0.2–0.3、旋转差 5–12°；顶/侧/背覆盖射线 0 孔。
+- 最终 72 骨 / 1182 块 / 303 动画 / validate 0 error；导出 `exports/v7-final-clean/pack.zip`（516,768 B）。
+
 ## 剩余差距（诚实）
 
 1. **角**：43 段近立方块仍有"块状/正面钩形"感（T3 是粗圆卷角）；已加棱环，但近看仍能看出分段。
-2. **后发**：5 层波浪已加，但上半段仍偏 tile、近看有横带；顶视图仍有 0.36 旧发缝露头皮（正/侧/背/iso 不可见）。
+2. **后发/侧发**：v7 已全覆盖、无露头皮；但远看仍偏片状/叠瓦，不如 T3 的连续大波浪；发帽顶为实心叠层（稳定性优先），不是蓬松细发。
 3. **披风**：星空披风已可见，但纯侧视只剩薄边、背面会遮裙后幅；alpha 0.72 在浅色背景下略暗。
 4. **裙**：v6.2 已改为三轴斜置薄板 + 内壳，漏光消除；但黑摆比 T3 少两层明显荷叶/peplum、蓝白条纹偏宽块、裙摆前后等长（T3 前短后长），侧/背裙宽仍略大。
 5. **耳环**受侧发厚度限制，只能挂发外略浮；**额头金饰**已缩小但仍比 T3 略大。

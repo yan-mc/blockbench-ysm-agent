@@ -1,0 +1,13 @@
+{
+ "cubes": 386,
+ "per_bone": {
+  "HairCap": 129,
+  "HairBack": 123,
+  "hl_side": 32,
+  "front_h1": 96,
+  "corner_h1": 6
+ },
+ "coverage_fail": 0,
+ "coverage_samples": 1020,
+ "deleted": 342
+}
