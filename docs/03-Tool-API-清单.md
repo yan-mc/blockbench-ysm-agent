@@ -4,10 +4,10 @@
 > 底层经 `02-通信协议规范.md` 的 JSON-RPC 转发给 BABP；模型**永远不直接读写** bbmodel/bedrock JSON。
 > 完整 JSON Schema 见 `spec/tool-manifest.json`；本文件是设计说明与行为契约。
 >
-> **当前规模（0.9.2）：43 个 `bb_*` 定义 / 实际暴露 41 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）。
-> **权威清单：`spec/tool-manifest.json`（43 工具）与 `packages/dsh-blockbench-agent/index.js`（实际 schema）。**
-> 注意：0.9.2 起 `spec/` 已与 `index.js` 实际 schema 对齐（`spec/generate_spec.py` 为唯一契约源，两边参数一致）。
-> 本文 §2.3 是 0.1 时期设计稿的 21 个工具；0.5–0.9 新增 22 个见 §2.4。
+> **当前规模（0.9.4）：44 个 `bb_*` 定义 / 默认暴露 42 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）。
+> **权威清单：`spec/tool-manifest.json`（44 工具）与 `packages/dsh-blockbench-agent/index.js`（实际 schema）。**
+> 注意：0.9.4 起 `spec/` 已与 `index.js` 实际 schema 对齐（`spec/generate_spec.py` 为唯一契约源，两边参数一致）。
+> 本文 §2.3 是 0.1 时期设计稿的 21 个工具；0.5–0.9 新增 23 个见 §2.4。
 
 ---
 
@@ -46,7 +46,7 @@
 
 短 id 生成规则：`<前缀>_<uuid 前 4-8 位>`；`b_`=bone、`cu_`=cube、`tex_`=texture、`anim_`=animation、`ctrl_`=controller。重新打开项目时 id 稳定（由 uuid 派生）。
 
-### 2.3 工具总览（0.1 设计稿：21 个；当前 43 定义 / 41 暴露）
+### 2.3 工具总览（0.1 设计稿：21 个；当前 44 定义 / 42 暴露）
 
 | # | Tool | 作用 | 变更 | 返回预算 |
 |---|---|---|---|---|
@@ -76,7 +76,7 @@
 
 ### 2.4 0.5–0.9 新增工具（22 个）
 
-> 当前 43 个定义 = 上表 21 个 + 下表 22 个。参数以 `index.js`/`spec/tool-manifest.json` 为准，这里只列一句话用途。
+> 当前 44 个定义 = 上表 21 个 + 下表 23 个。参数以 `index.js`/`spec/tool-manifest.json` 为准，这里只列一句话用途。
 
 | 组 | 工具 | 用途（一句话） |
 |---|---|---|

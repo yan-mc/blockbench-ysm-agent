@@ -1,13 +1,13 @@
 # SETUP · 从仓库到可运行环境
 
 > 目标：在一台干净的 Windows 机器上，从 clone 仓库开始，重建 `vendor/`、`dist/`，并把插件装进 DSH profile。
-> 当前版本基线：**0.9.1** / Blockbench **5.2.2** / YSM-Utils-Plugins **2.6.0** / Node ≥ 20。
+> 当前版本基线：**0.9.4** / Blockbench **5.2.2** / YSM-Utils-Plugins **2.6.0** / Node ≥ 20。
 
 ## 0. 前置
 
 - Windows 10/11 x64
 - **Node.js ≥ 20**：优先用 DSH 自带的 Node（无需全局安装）：
-  `D:\deepseekharness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe`
+  `<DSH 自带 node>`
   如果系统有 `node`（≥20）也可以直接用；后文用 `node` 代指其一。
 - **pnpm**（用于安装上游 Blockbench 依赖）
 - **Python 3.10+**：仅用于生成 `spec/` 契约（`python spec/generate_spec.py`）
@@ -68,8 +68,8 @@ node packages/bb-agent-runtime/scripts/assemble.mjs
 ## 5. 快速验证（可选但推荐）
 
 ```powershell
-node --test packages/dsh-blockbench-agent/test/*.test.mjs   # 62 项
-node packages/dsh-blockbench-agent/test/host-smoke.mjs      # 35 步 / 41 工具 schema lint
+node --test packages/dsh-blockbench-agent/test/*.test.mjs   # 84 项
+node packages/dsh-blockbench-agent/test/host-smoke.mjs      # 35 步 / 42 工具 schema lint
 python spec/generate_spec.py                                # 契约重生成，应 0 diff
 ```
 
@@ -132,7 +132,7 @@ node packages/bb-agent-runtime/scripts/package-release.mjs
 ```
 
 产物在 `release/`（bundle 目录 + zip + SHA256SUMS + INSTALL.md）。
-当前 **0.9.1 尚未重打**；GitHub Releases 上的 0.4.0 是历史发布。
+当前 **0.9.4 已生成**；GitHub Releases 上的 0.4.0 是历史发布。
 
 ## 8. 游戏内加载验证（可选，自备环境）
 

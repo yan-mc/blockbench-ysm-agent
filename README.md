@@ -1,274 +1,287 @@
 <p align="center">
-  <img src="docs/assets/cover.png" alt="DSH × Blockbench Agent" width="100%">
+  <img src="docs/assets/cover.png" alt="DSH × Blockbench Agent：让 AI 真正走进 Blockbench" width="100%">
 </p>
 
 <h1 align="center">DSH × Blockbench Agent</h1>
 
 <p align="center">
-  <b>让 AI 真正走进 Blockbench：隐藏建模 · 无头渲染 · 像素贴图 · 动画 · YSM 游戏验证</b>
+  <b>让 AI 真正走进 Blockbench：隐藏建模 · 无头渲染 · 像素贴图 · 动画 · YSM 游戏导出</b>
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.9.3-59c2ff">
+  <img alt="version" src="https://img.shields.io/badge/version-0.9.4-59c2ff">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20dsh-1b2a52">
   <img alt="tools" src="https://img.shields.io/badge/tools-44%20defined%20%2F%2042%20exposed-3d7fd6">
+  <img alt="tests" src="https://img.shields.io/badge/tests-84%2F84%20pass-2ea043">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-4ade80">
 </p>
 
 <p align="center">
-  <a href="MANUAL.md"><b>📖 完整使用手册</b></a> ·
-  <a href="https://github.com/yan-mc/blockbench-ysm-agent/releases">⬇️ Releases</a> ·
-  <a href="HANDOVER.md">交接班档案</a> ·
-  <a href="ENGINEERING.md">工程状态</a> ·
-  <a href="SETUP.md">从零搭建</a>
+  <a href="MANUAL.md"><b>📖 使用手册</b></a> ·
+  <a href="SETUP.md"><b>⚙️ 从零搭建</b></a> ·
+  <a href="models/togawa-sakiko/README.md"><b>🧩 丰川祥子案例</b></a> ·
+  <a href="packages/dsh-blockbench-agent/skills/blockbench-ysm-artist.md"><b>🎨 建模 Skill</b></a> ·
+  <a href="HANDOVER.md">交接档案</a> ·
+  <a href="https://github.com/yan-mc/blockbench-ysm-agent/releases">Releases</a>
 </p>
 
-> **用一句话说**：给 dsh 里的模型装上“Blockbench 的手和眼睛”——它能语义化建模、精确改贴图、无头渲染看结果、检查点回滚、保存/导出 YSM，并最终在 Minecraft 里加载验证；需要人工时 `/show` 随时接管。
+> **一句话**：给 dsh 里的 AI 装上“Blockbench 的手和眼睛”——它能用语义工具建 YSM 模型、按像素改贴图、无头渲染自检、做动画、保存/导出并在 Minecraft 里验证；需要人工时 `/show` 把同一窗口交给你。
 
-> **发布状态**：当前版本 **0.9.3**（新增 **T3 云端拆解**）。GitHub Releases 上的 **0.4.0 为历史发布**；0.9.2 / 0.9.3 发布包尚未重打（`release/` 已清空，待 `package-release.mjs` 重新生成）。想直接试用当前代码，按 [SETUP.md](SETUP.md) 从仓库搭建。
+> **当前状态（2026-11-08）**：发布版 **0.9.4**（发布包 `bb-agent-0.9.4` zip，10.2MB / 226 文件，已构建并随 GitHub Releases 提供）。44 个 `bb_*` 工具定义 / 42 个实际暴露、5 个命令、1 个 Skill、56 个 bridge 方法 / 7 个事件 / 22 个错误码；单元测试 **84/84**、host-smoke **35 步**、契约 **44/44** 对齐；案例模型 **丰川祥子「旋律的主人」72 骨 / 1182 块 / 303 动画**，`bb_validate` 0 error。GitHub Releases 上的 **0.4.0 为历史发布**；0.9.4 为当前发布。
 
-## 🎬 视频介绍
+---
 
-[![插件介绍视频](docs/assets/cover.png)](#)
+## ✨ 这个项目是什么
 
-- **B 站向介绍视频（2:46）**：[deepseek-blockbench-agent-intro.mp4](https://github.com/yan-mc/blockbench-ysm-agent/releases/download/v0.4.0/deepseek-blockbench-agent-intro.mp4)（该视频为 0.4.0 时期录制，功能与本仓库不同步，仅作演示）
-- 讲功能、使用与优势，不含制作过程；素材使用早期测试模型「DeepSeek 鲸鱼娘 / 蓝色大肥鱼」（该测试模型已清理）
-- 封面与投稿文案：[media/bilibili-upload.md](media/bilibili-upload.md)、[media/bilibili-cover.png](media/bilibili-cover.png)
-- **0.9.2 更新宣传片（1:50，丰川祥子案例）**：`media/sakiko-0.9.2-promo.mp4`（本地生成，不提交仓库）；重点讲 **T1/T2 立绘拆分（29 语义层）** 与 **217→355→401 块复杂逐步调整**；B 站封面/投稿文案见 [media/bilibili-cover-0.9.2.png](media/bilibili-cover-0.9.2.png)、[media/bilibili-upload-0.9.2.md](media/bilibili-upload-0.9.2.md)，制件说明 [media/README-0.9.2-promo.md](media/README-0.9.2-promo.md)
+**DSH × Blockbench Agent** 是一个面向 **Minecraft YSM（Yes Steve Model）皮肤/模型** 的 AI 建模工作台。它不是“让模型直接输出一段 JSON”，而是把 Blockbench 变成一个**可被 Agent 语义化操纵、可观察、可回滚、可交付**的后台服务：
 
-## ✨ 0.9.3 新增：T3 云端拆解（Nano Banana Pro）
+- **Blockbench 被隐藏运行**：Agent 操作真实的 Blockbench 5.2.2（Blockbench Agent Runtime / BAE），不是模拟器；
+- **Agent 不写原始 JSON**：通过 `bb_*` 语义工具操作骨骼、方块、UV、贴图、动画、控制器；
+- **Agent 能看见结果**：无头离屏渲染回传 PNG，编辑即看、隔离检查、环绕转台、动画采样；
+- **Agent 能判断“像不像”**：参考图管线（官方基准 → 多源搜图 → T3/T2/T1 分层）把 2D 角色拆成可逐部件核对的部件图；
+- **Agent 能交付**：检查点/回滚、YSM 校验、保存、导出目录 + zip，最终进入 Minecraft 验证。
 
-> 分级优先级 **T3 > T2 > T1**。T3 = Google **Nano Banana Pro（Gemini 3 Pro Image）**：把同一角色的 1–14 张多角度参考图交给云端模型，生成**严格三视图 + 逐部位图（头/上身/下身/手/脚）+ 服装单品拆解**，或**全展开部件拆解板**（只拆参考图里存在的部件，不再要求"脑补生活物品"）。
->
-> - **需要外接付费 API**；支持官方 Gemini 与兼容中转站（如 **APIYI**：`provider:"apiyi"`，baseUrl `https://api.apiyi.com/v1beta` + Bearer 鉴权；请求体与官方一致）。官方价约 $0.134/张 1K/2K、$0.24/张 4K；中转站以账单为准。**没有 key 时自动降级现有 T2（See-through）**，不消耗额度。
-> - **参考图先给用户筛**：`bb_ref_search`/`bb_ref_collect` 出带编号对照表 → 让用户按编号挑"角度正确"的几张 → 再喂 `bb_seg_t3`。
-> - **定位**：T3 解决"官方立绘带动作/背景/打光、T1/T2 拆不干净"和"缺背面/内侧"的痛点；生成结果是**假设**不是还原，必须人工复核并把推定项写进 `spec.gaps`。T3 →（可选）T2 分层 → spec/建模。
-> - 工具：新增 **`bb_seg_t3`**；`bb_seg_probe` 增加 T3 配置探测与 `recommendedTier`。**2026-11-08 已用 APIYI 实跑**：丰川祥子「旋律的主人」5 张参考图 → turnaround / breakdown 各 1 张 2K（2752×1536，约 40s/张，$0.1415/张）。详见 [docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md)。
->
-> 用户找到的社区爆款"像素级拆解"提示词：[mqyqingfeng/Blog#385](https://github.com/mqyqingfeng/Blog/issues/385)。
+它解决的痛点很具体：Blockbench 是 GUI 软件、YSM 是复杂私有格式、参考图是 2D 插画而模型是 3D 体素——这三层之间过去只能靠人来回看、来回改。这个项目把三层接成了一条**可自动验证的闭环**。
 
-## ✨ 0.9.2 更新亮点：立绘拆分 + 复杂逐步调整（案例：丰川祥子）
+---
 
-> 案例模型：明日方舟 × BanG Dream! Ave Mujica 联动干员 **丰川祥子「旋律的主人」**（YSM，2×512 贴图）。
-> 完整过程与数据：[models/togawa-sakiko/](models/togawa-sakiko/README.md) · [T2 安装/分层报告](models/togawa-sakiko/T2-INSTALL-REPORT.md) · [逐细节修理报告](models/togawa-sakiko/T2-REPAIR.md)
-
-![最终模型四视图](docs/assets/showcase/sakiko-final-4views.png)
-
-**① 立绘拆分（T1/T2）让 AI 能"逐部件看图"**：一张官方立绘 → T1 SAM2 轻量分割（59MB，CPU 秒级）→ T2 See-through 完整分层（ComfyUI + 权重，首次约 23 分钟；实测输出 **29 个语义层**：前发/后发/脸/眼/上衣/裙/手套/靴… + 深度顺序 + 遮挡补全）。AI 不再是"凭整体印象改模型"，而是对着 29 张部件图逐层核对。
-
-![T2 29 层语义分层](docs/assets/showcase/t2-29-layers.png)
-
-**② 复杂逐步调整：从 217 块到 534 块**：首轮验收 → T1 逐部件复检发现 5 个 major → T2 层对照 + P1–P5 逐项修理（355 块）→ v2 美术优化（401 块）→ v3 结构重建（510 块：角绕左右轴 X 的参数化螺旋、眼睛按参考 6 层配方重做、头发改为底发帽 + 附属束分层）→ v4 眼睛精修（534 块：眼距 ±1.76、四角小方块切角）→ v5 按 T3 拆解图重建（1100 块）→ v6 三轴斜置薄板裙（1117 块）→ **v7 裙对齐/斜面截断锥 + 头发全覆盖（1182 块，72 骨）**。最终 `bb_validate` 0 error。
-
-![修理前后对比](docs/assets/showcase/sakiko-before-after.png)
-
-**③ 头部细节**（角/发/眼睛；v3 结构重建 + v4 眼距/眼角小方块精修，见 [docs/23](docs/23-眼睛头发与角实证分析.md)）：
-
-![头部细节](docs/assets/showcase/sakiko-detail-head.png)
-
-## 工程状态（v0.9.3，2026-11-08 复核）
-
-**已实现并验证**：隐藏窗口 BAE、JSON-RPC bridge（WS + HTTP/SSE 双传输）、**44 个 `bb_*` 工具定义 / 实际暴露 42 个**（`bb_show_gui`、`bb_hide_gui` 由 `/show` `/hide` 命令替代）、**5 个命令**（show/hide/bb-status/bb-start/bb-help）、**1 个 Skill**（`blockbench-ysm-artist`）、**56 个 bridge 方法 / 7 个事件 / 22 个错误码**、YSM 创建/打开/保存/zip 导出、动画/贴图/图层/PBR/控制器绑定、检查点/回滚（内嵌贴图 + arm 快照）、增量保存与幂等、动画合并回写、渲染变化/空图检测、watchdog-v2、512px 附件、GPU 降级、Client UI 状态 pill；分层能力 **T3（Nano Banana Pro 云端）+ T2（See-through）+ T1（SAM2）**。
-
-**0.9.3 实测**：
-
-| 项 | 结果 |
-|---|---|
-| 单元测试 | **84/84 通过**（7 个 `*.test.mjs`：imageprune 13 / refcanon 9 / segprobe 12 / spec 17 / tool-schema 5 / viewsheet 8 / nanobanana 20） |
-| host-smoke | **35 步全过**，schema lint 检查 **42 个工具**（本地实跑，2026-11-08） |
-| 契约 | `spec/tool-manifest.json` **44 工具**、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**，且 0.9.3 已对齐 `spec` ↔ `index.js` 的 **44/44** 参数 |
-| 上游 | `vendor/blockbench` = **Blockbench 5.2.2**；`vendor/YSM-Utils-Plugins` = 2.6.0（MIT）；vendor 总体积约 **1.54GB** |
-| 参考语料 | `material/` 约 **329.1MB**；`ysm_decoded` 169 目录 / 1156 文件 / 233MB；`ysm` 9 包；`maid` 874 文件 / 446 条（含 325 个角色）；`bbmodel` 62 对 |
-| 模型工程 | `models/togawa-sakiko/`：**丰川祥子（旋律的主人）**案例模型，72 骨 / **1182 方块** / 2×512 贴图 / 303 动画，`bb_validate` 0 error；见 [models/README.md](models/README.md) |
-
-### 0.5–0.9 新增能力
+## 🚀 核心能力
 
 | 能力 | 说明 |
 |---|---|
-| **编辑即看** | 写操作完成后自动附一张小拼图（同 step 合并成一张），改完立刻看见 |
-| **参数化相机** | `bb_camera` 任意方位/俯仰/距离/正交透视；`render.preview` 不落盘单帧 |
-| **多格拼图** | `bb_look` 一次返回一张 N 格拼图（2-8 帧 token 相近，比多次渲染省 2-3 倍） |
-| **局部审查** | `bb_look({isolate:"AllHead", zoom:2.5})` 只渲染指定骨骼子树并自动对焦；`closeup` 的 `focus.padding` 已修，但推荐 isolate+zoom |
-| **环绕转台** | `bb_orbit` 8 角度合一张图，替代"靠三视图脑补"，查穿模与对称性 |
-| **贴图像素放大** | `bb_render_texture` 走 inline 拼图路径，精修核对微小改动 |
-| **动画采样** | `bb_anim_check` 按时间轴采样 4-16 帧，检查动作幅度与起止姿势 |
-| **图史压缩** | 旧渲染图从上下文剥离为占位文本（surface replace，零模型调用）+ 附件预算护栏 |
-| **参考图管线** | `bb_ref_canon` / `bb_ref_search` / `bb_ref_collect`：官方基准 → 多源搜图 → 下载去重 → 带编号对照表（零安装，详见 [docs/11](docs/11-参考图收集管线.md) 与 [docs/18](docs/18-官方基准与深度搜索.md)） |
-| **建模规格** | `bb_spec_save` / `bb_spec_load` 固化规格并生成构建计划 |
-| **分层能力** | T1 SAM2 ONNX（约 59MB，CPU 秒级；**标准档必做**）/ T2 See-through（安装约 6.5GB + 权重约 12.5GB；**精修档推荐**；实测输出 29 语义层 + 深度序 + 遮挡补全） |
-| **渲染自检** | `bb_render_views` + watchdog-v2 变化/空图/触边检测；isolate+zoom 局部审查 |
-
-### 实战验证
-
-在视口反馈闭环下做过完整实战验证：从搜参考图、写规格、建模、贴图、渲染自检到导出，全程只靠工具与渲染图自我校验，没有人工建模。
-
-**0.9.2 新案例**：丰川祥子「旋律的主人」— 首轮 T1 验收（217 块）→ T1 逐部件复检（5 major）→ T2 完整分层（29 层）逐细节修理（355 块）→ v2 美术优化（401 块）→ **v3 结构重建（510 块：角改绕左右轴 X 的螺旋、眼睛按参考 6 层配方、头发底发帽+附属束）→ v4 眼睛精修（534 块：眼距 ±1.76、四角小方块切角）**。产线与剩余差距见 [models/togawa-sakiko/README.md](models/togawa-sakiko/README.md)、[docs/22](docs/22-建模实战复盘与经验（2026-11-07）.md) 与 [docs/23](docs/23-眼睛头发与角实证分析.md)。
-
-- 工程状态/实测数据：[ENGINEERING.md](ENGINEERING.md)
-- 完整使用手册：[MANUAL.md](MANUAL.md)
-- 交接班档案（第一手）：[HANDOVER.md](HANDOVER.md)
-- 目录地图：[FOLDER-MAP.md](FOLDER-MAP.md)
-- 从零搭建：[SETUP.md](SETUP.md)
-- 实现包说明：[packages/README.md](packages/README.md)
-- 机器可读契约：[spec/tool-manifest.json](spec/tool-manifest.json)、[spec/bridge-methods.json](spec/bridge-methods.json)
-- 测试证据：[docs/test-evidence/](docs/test-evidence/README.md)
+| **隐藏 BAE** | 隐藏 Electron Blockbench 窗口运行；`/show` 显示同一窗口人工接管，`/hide` 交还 Agent 并同步用户改动 |
+| **语义建模** | 加/删/改骨骼与方块、批量 patch、`expected_revision` 并发保护、一个 patch 一个 Undo |
+| **像素贴图** | 纹理创建/绘制/导入导出、图层、PBR normal/specular、按颜色 swatch 的像素级编辑 |
+| **无头渲染反馈** | `bb_look` / `bb_render_views` / `bb_orbit` / `bb_camera` / `bb_render_texture`；支持 isolate 局部、多格拼图、参数化相机 |
+| **动画** | 动画 CRUD、关键帧 patch、控制器绑定、`bb_anim_check` 时间轴采样 |
+| **参考图管线** | `bb_ref_canon` 官方基准 → `bb_ref_search` 多源深搜 → `bb_ref_collect` 去重对照表；用户选图后再喂分层 |
+| **三层立体参考** | **T3** Nano Banana Pro 云端三视图/拆解板（付费 key）、**T2** See-through 本地 29 语义层、**T1** SAM2 轻量分割；T3 > T2 > T1 |
+| **规格驱动** | `bb_spec_save` / `bb_spec_load` 固化角色/比例/配色/部件/预算/gaps，生成构建计划 |
+| **检查点/回滚** | `bb_checkpoint` 内嵌当前贴图与 arm 快照，`bb_restore` 回滚 |
+| **YSM 交付** | 创建/打开/保存/`bb_validate`/`bb_export_ysm`（目录 + zip + manifest），保留 303 动画与控制器 |
+| **Agent Team / Skill** | 内置 `blockbench-ysm-artist` 作业手册；主代理只做验收，子代理执行建模/贴图/检查 |
+| **安全与预算** | 编辑/渲染/回滚预算、GUI_BUSY 冻结写操作、渲染 watchdog、图片附件压缩、API key 只从 profile/env 读取 |
 
 ---
 
-# 设计文档（历史设计基线）
-
-> **本节及以下为 2026-10-18 版设计稿（合并版），保留设计意图与事实依据；实现状态以 [ENGINEERING.md](ENGINEERING.md) 与 [HANDOVER.md](HANDOVER.md) 为准。**
-> 其中的工具数量、里程碑状态、目录结构均可能过时，不要当作现况引用。
-
-## 0. 先读结论（TL;DR）
-
-| 问题 | 结论 |
-|---|---|
-| 怎么隐藏 Blockbench？ | 上游 `electron/main.js` **硬编码 `win.show()`**，必须 fork 主进程（3 处小改：不 show、`backgroundThrottling:false`、注入 bridge 插件）；渲染层零改动。 |
-| 怎么无头出图？ | 复用 Blockbench 内置**离屏 Preview**（`MediaPreview`/`NoAAPreview`）+ `Screencam.advancedScreenshot(cb)` + `Blockbench.writeFile`；renderer 已 `preserveDrawingBuffer:true`，全程无对话框。 |
-| 怎么让 AI 不写原始 JSON？ | dsh 侧注册 `bb_*` 语义工具（建模 patch / 像素绘制 / 渲染 / 校验），底层 JSON-RPC 转给 Blockbench 插件；回执只给 changed ids + diff + 摘要，列表全部分页。 |
-| 怎么让 AI "看见"？ | `ctx.attachments.saveImage()` + `output.render()` 返回 `image` block；v0.5 起支持**编辑即看**（写操作自动附图）、`bb_look`/`bb_orbit` 多格拼图、参数化相机、动画采样；旧图可被剥离为占位文本以控上下文。 |
-| 怎么保证 YSM 能进游戏？ | YSM-Utils 是 **UI 插件、无导出 API、只写 ysm.json**；必须自研 YRL（规范化/骨架/导出编排），并强制 `export_empty_groups=true`（否则 30 根空定位骨骼被剪，进游戏缺手持物/鞘翅）。 |
-| 怎么人机协同？ | dsh 原生 `/show` `/hide` 命令（`ctx.commands.register`），不消耗模型 token；GUI 期间冻结写操作，`/hide` 后 resync revision 并注入用户改动摘要。 |
-| 通信走什么？ | 本地 WebSocket JSON-RPC 2.0（dsh 为 server，BBAR 为 client）；首包 token 鉴权；协议与传输解耦，可回退 HTTP+SSE / Python client。 |
-| 最大的技术风险？ | 隐藏窗口下 WebGL 的稳定性（不同 GPU/驱动/远程桌面）。**必须先用 M0 Spike 验证**，再投入开发。 |
-
----
-
-## 1. 交付物导航
-
-| 文件 | 内容 | 对应需求模块 |
-|---|---|---|
-| **[系统开发与设计方案.md](<系统开发与设计方案.md>)** | 合并版主文档（历史合订本，推荐通读设计意图） | 全部 |
-| [docs/01-总体架构与数据流.md](docs/01-总体架构与数据流.md) | 架构图、进程/生命周期、数据流、ADR、目录规范 | ① 系统架构与数据流 |
-| [docs/02-通信协议规范.md](docs/02-通信协议规范.md) | WebSocket JSON-RPC 2.0 规范、方法目录、错误码、超时/幂等、示例 | ② 通信协议 |
-| [docs/03-Tool-API-清单.md](docs/03-Tool-API-清单.md) | 43 定义 / 41 暴露的 `bb_*` 工具参数/返回/错误/预算、Tool 设计原则 | ③ Tool API 声明 |
-| [docs/04-闭环状态机.md](docs/04-闭环状态机.md) | 状态机、预算/收敛/回滚、VLM 评审协议、失败恢复、伪代码 | ④ 闭环工作流 |
-| [docs/05-工程难点与避坑指南.md](docs/05-工程难点与避坑指南.md) | Electron/WebGL、启动/注入、Undo/保存、贴图/UV、YSM、Token、Windows、许可 | ⑤ 工程难点 |
-| [docs/06-实施路线图与验收.md](docs/06-实施路线图与验收.md) | M0–M6 里程碑、测试策略、验收标准、发布 | 落地计划 |
-| [spec/tool-manifest.json](spec/tool-manifest.json) | 机器可读工具清单（JSON Schema，44 工具） | ③ 契约 |
-| [spec/bridge-methods.json](spec/bridge-methods.json) | 机器可读 JSON-RPC 方法/事件/错误码（56/7/22） | ② 契约 |
-| [spec/generate_spec.py](spec/generate_spec.py) | 契约生成器（手工维护的契约源，重跑应 0 diff） | 工具链 |
-| **[ENGINEERING.md](ENGINEERING.md)** | **工程实现状态/实测数据/DSH 端完成度/已知限制**（设计不变，实现以此为准） | 落地状态 |
-| [HANDOVER.md](HANDOVER.md) | 交接班档案（第一手现状） | 落地状态 |
-| [packages/README.md](packages/README.md) | 两个实现包的构建、测试与运行命令 | 工程说明 |
-| [models/](models/README.md) | 模型工程工作区（当前无测试模型，新验收项目进行中） | 落地工程 |
-| [research/blockbench-core.md](research/blockbench-core.md) | Blockbench 5.2.2 源码级研究（677 行非空，文件:行号） | 事实依据 |
-| [research/ysm-format.md](research/ysm-format.md) | YSM 格式/插件导入导出研究（826 行非空，文件:行号） | 事实依据 |
-| [research/dsh-integration.md](research/dsh-integration.md) | dsh 插件/Tool/多模态/命令研究（439 行非空，取证） | 事实依据 |
-
----
-
-## 2. 系统一览
+## 🏗️ 架构
 
 ```mermaid
 flowchart LR
-  M["主模型 / VLM"] --> D["DBA · dsh Host 插件<br/>bb_* 工具 + /show 命令"]
-  D -- "JSON-RPC 2.0 over WebSocket" --> B["BABP · Blockbench 插件<br/>renderer 侧"]
-  B --> C["Blockbench Core<br/>Project/Cube/Texture/Undo/Preview"]
-  B --> Y["YRL · YSM 资源层<br/>骨架/规范化/导出"]
-  C --> R["离屏 Preview<br/>MediaPreview.render()"]
-  R --> P["PNG 落盘 + 附件回灌"]
+  M["主 Agent / VLM"] --> D["DBA · dsh Host 插件<br/>44 个 bb_* 工具 + 5 命令 + Skill"]
+  D -- "JSON-RPC 2.0 / WebSocket 或 HTTP+SSE" --> B["BABP · Blockbench 插件<br/>renderer 侧"]
+  B --> C["Blockbench Core<br/>Project / Cube / Texture / Undo / Preview"]
+  B --> Y["YRL · YSM 资源层<br/>骨架 / 规范化 / 导出"]
+  C --> R["离屏 Preview<br/>MediaPreview / NoAAPreview"]
+  R --> P["PNG 落盘 / 拼图 / 附件回灌"]
   P --> D
-  D --> M
   E["BBAR · 隐藏 Electron 进程"] --- B
 ```
 
 三条关键链路：
 
 1. **语义编辑**：`bb_apply_model_patch` / `bb_texture_patch` → 一个 Undo 事务 → revision+1 → 有界回执。
-2. **无头反馈**：`bb_look` / `bb_render_views` → 离屏 Preview 渲染 → PNG 落盘/拼图 → `ImageBlock` → 模型视觉自检。
-3. **人机协同**：`/show` 显示同一进程窗口 → 冻结 AI 写操作 → 用户手改 → `/hide` → 重新同步 revision。
+2. **无头反馈**：`bb_look` / `bb_render_views` → 离屏 Preview → PNG/拼图 → 附件 → Agent 视觉自检。
+3. **人机协同**：`/show` 显示同一进程 → 冻结 AI 写操作 → 用户手改 → `/hide` → revision resync。
+
+更细的协议、状态机与工程坑见 [docs/01](docs/01-总体架构与数据流.md)、[docs/02](docs/02-通信协议规范.md)、[docs/04](docs/04-闭环状态机.md)、[docs/05](docs/05-工程难点与避坑指南.md)。
 
 ---
 
-## 3. 已核实的事实基线（节选）
+## 🧰 工具面（44 定义 / 42 暴露）
 
-- Blockbench v5.2.2：Electron 43 + Vue2 + three.js r129；`electron/main.js` 在 `loadURL().finally()` 中 `win.show()`；窗口无 `backgroundThrottling`。
-- Preview renderer：`alpha:true`、`preserveDrawingBuffer:true`；存在离屏 `MediaPreview`/`Screencam.NoAAPreview`；`Screencam.advancedScreenshot(..., cb)` 在传入 cb 时不弹 UI。
-- 贴图：`Texture.getActiveCanvas()` + `updateChangesAfterEdit()` 才能刷新 3D；Undo aspects `{textures:[t],bitmap:true}`。
-- 保存：`Codecs.*.compile()/write()`、`Blockbench.writeFile` 无对话框；`export()/exportFile()/Action.trigger()` 会弹 native 模态（`window.confirm/alert` 在桌面端被替换为同步 MessageBox，会卡死 renderer）。
-- 插件：`source:'file'` 条目按绝对路径加载；可在主进程 `did-finish-load` 后用 `executeJavaScript` 执行 `new Plugin().loadFromFile({path}, false)` 注入并持久化。
-- YSM：`ysm.json` spec 2；默认主模型 64 bones / 172 cubes / 30 空骨骼（26 个 Locator）；贴图 128×128 per-face UV；动画 Bedrock 1.8、控制器 1.19；YSM-Utils 为纯 UI 插件、只写 ysm.json。
-- dsh：`ctx.tools.register(defineTool(...))`、`ctx.commands.register(...)`、`ctx.attachments.saveImage()`、`ctx.effect()` 清理；图片会从产生起在每次请求中重复计费。
+机器可读契约：[`spec/tool-manifest.json`](spec/tool-manifest.json) · 协议：[`spec/bridge-methods.json`](spec/bridge-methods.json)（56 方法 / 7 事件 / 22 错误码）。
 
-> 完整证据（文件:行号、官方文档链接）见三份 research 报告与各章末尾的引用。
+| 组 | 工具 | 用途 |
+|---|---|---|
+| 会话 | `bb_session_start` `bb_session_status` `bb_project_open` `bb_project_close` | 建/开/关 YSM 工程 |
+| 读 | `bb_scene` `bb_get_element` `bb_revisions` `bb_diagnostics` | 骨骼/方块/UV/诊断 |
+| 写 | `bb_apply_model_patch` `bb_batch` `bb_checkpoint` `bb_restore` | 建模 patch / 批量 / 检查点 / 回滚 |
+| 贴图 | `bb_texture_create` `bb_texture_patch` `bb_texture_read` `bb_texture_import_png` `bb_texture_export_png` `bb_texture_layer` `bb_texture_pbr` `bb_render_texture` | 像素编辑 / 图层 / PBR / 放大核对 |
+| 观察 | `bb_look` `bb_render_views` `bb_orbit` `bb_camera` `bb_anim_check` | 拼图 / 多视图 / 转台 / 相机 / 动画采样 |
+| 参考 | `bb_ref_canon` `bb_ref_search` `bb_ref_collect` | 官方基准 / 多源搜图 / 对照表 |
+| 规格 | `bb_spec_save` `bb_spec_load` | 建模规格与构建计划 |
+| 分层 | `bb_seg_probe` `bb_seg_t3` `bb_seg_install` `bb_seg_lite` `bb_seg_run` | T3 云端 / T2 / T1 参考与三视图 |
+| 动画 | `bb_animation_create` `bb_animation_patch` `bb_animation_delete` `bb_animation_list` | 关键帧 / 控制器 |
+| 交付 | `bb_validate` `bb_save_project` `bb_export_ysm` | 校验 / 保存 / YSM 导出 |
+
+> `bb_show_gui` / `bb_hide_gui` 有定义但默认不暴露，由 `/show` `/hide` 命令接管；完整参数/错误/预算见 [docs/03](docs/03-Tool-API-清单.md) 与 `spec/tool-manifest.json`。
 
 ---
 
-## 4. 如何阅读
+## 🔍 参考图管线：T3 > T2 > T1
 
-| 你的角色 | 建议顺序 |
+模型像不像，上限由参考决定。项目把参考处理分成可降级的三级：
+
+| 级别 | 能力 | 前置 | 适用 |
+|---|---|---|---|
+| **T3** | **Nano Banana Pro（Gemini 3 Pro Image）**：多张参考 → 严格三视图 + 头/上身/下身/手/脚 + 服装单品拆解，或全展开部件板 | 付费 API key（官方或 APIYI 中转） | 官方立绘带动作/背景/遮挡、缺背面 |
+| **T2** | **See-through**：本地 ComfyUI，23–29 语义层 + 深度序 + 遮挡补全 | NVIDIA GPU + ComfyUI + 权重 | 精修档；可见部分最可靠 |
+| **T1** | **SAM2.1 ONNX**：轻量分割，部件掩膜 + bbox/面积 | CPU + 59MB 模型 | 标准档必做；快速部件清单/比例 |
+
+**T3 的实际工作流**：搜图 → 带编号对照表 → **给用户挑选** → 喂 `bb_seg_t3` → 逐张人工复核 → 把 T3 结果当“假设”写进 `spec.gaps`，再建模。T3 不是官方设定，也不是精确尺寸依据。
+
+关键教训（已写进 Skill）：**参考板必须按原图像素独立裁切 front/side/back 并逐张目检**——T3 生成的拆解板经常把多个视图/部件排在同一张图里，按比例估算会裁串（我们真实踩过：front 混进 side、side 混进 back）。正确裁切示例见 [`sakiko-t3-crop-proof.png`](docs/assets/showcase/sakiko-t3-crop-proof.png)。
+
+---
+
+## 👁️ 视觉反馈闭环
+
+Agent 不靠“脑补”验收，靠渲染：
+
+- **编辑即看**：写操作自动附一张小拼图；
+- **局部检查**：`bb_look({isolate:"Skirt", zoom:1.5})` 只渲染指定骨骼子树；
+- **多角度**：front/back/left/iso/45°，`bb_orbit` 一次 8 角度；
+- **多格拼图**：2–8 帧合一张，token 比多次渲染低 2–3 倍；
+- **watchdog-v2**：变化/空图/裁剪/无进展检测；
+- **动画采样**：`bb_anim_check` 按时间轴采 4–16 帧。
+
+> 规则判断不等于视觉判断：造型、配色、神态仍由 Agent/人看图确认；项目里的 case study 就是这么一轮轮修出来的。
+
+---
+
+## 🎨 案例：丰川祥子「旋律的主人」v7
+
+> 明日方舟 × BanG Dream! Ave Mujica 联动干员；YSM 皮肤，2×512 贴图，303 动画。
+> 完整过程：[`models/togawa-sakiko/README.md`](models/togawa-sakiko/README.md) · [`V7-FINAL-REPORT.md`](models/togawa-sakiko/V7-FINAL-REPORT.md)
+
+<img src="docs/assets/showcase/sakiko-final-4views.png" alt="丰川祥子 v7 四视图">
+
+| 指标 | 值 |
 |---|---|
-| 接手/负责人 | [HANDOVER.md](HANDOVER.md) → [docs/21](docs/21-现代化建模总纲.md) → Skill → [docs/07](docs/07-视口实时反馈方案-冻结.md) |
-| 架构/设计 | 本 README 设计段 → `01` → `04` → `06` |
-| dsh / Agent 工程师 | `01` → `02` → `03` → `packages/` |
-| Electron / 渲染工程师 | `01` §4 → `05` §1/§2 → `ENGINEERING.md` |
-| YSM / 建模工程师 | `docs/20`/`21*` → `research/ysm-format.md` → Skill |
-| QA | `06` §3–§5、`docs/test-evidence/` |
+| 迭代 | 217 → 355 → 401 → 510 → 534 → 1100 → 1117 → **1182 块** |
+| 骨骼 | **72**（含 `Cape` / `CapeLow` / `HairBow_R` / `HairCap`） |
+| 动画 | **303**（未触碰） |
+| 校验 | `bb_validate` strict **0 error** |
+| 导出 | `pack.zip` **516,768 B / 32 条目** |
+
+这一版修了三个典型问题：
+
+1. **裙体对齐/连接**：生成器 `origin=pivot−R·loc` 把旋转乘了两次，裙中心偏 1.87u；改为世界坐标重建、五裙骨按方位重分，裙中心对齐身体、腰封贴胯。
+2. **斜面截断锥**：前下摆 15.4 / 后 12.4（差 3.0u），不是水平圆锥；连续内壳挡腿，蓝衬裙+白细边连续。
+3. **头发全覆盖 + 平滑段链**：`HairCap` 实心叠层穹顶 + 内填充（顶视 0 孔），刘海/后发/侧发按 5–12° 段间旋转、0.2–0.3 重叠，去掉针刺与错位台阶。
+
+<img src="docs/assets/showcase/sakiko-t3-vs-v7.png" alt="T3 参考 vs v7 成品">
+<img src="docs/assets/showcase/sakiko-hair-coverage-v7.png" alt="v7 头发覆盖检查">
+
+更多：裙细节 [`sakiko-skirt-detail-v7.png`](docs/assets/showcase/sakiko-skirt-detail-v7.png) · v6→v7 裙对比 [`sakiko-v6-vs-v7-skirt.png`](docs/assets/showcase/sakiko-v6-vs-v7-skirt.png) · T2 29 层 [`t2-29-layers.png`](docs/assets/showcase/t2-29-layers.png)。
 
 ---
 
-## 5. 历史里程碑状态（2026-10，仅供追溯）
+## 📦 快速开始
 
-| 项 | 当时状态 |
-|---|---|
-| 传输层（WS 握手/鉴权/双向请求/事件/并发/超时） | ✅ 已跑通 WS 冒烟 |
-| M0 隐藏窗口 + WebGL 真实出图 | ✅ 通过（GPU 与 SwiftShader 两条路径） |
-| YSM 默认包创建/导入/导出 | ✅ 已实现 |
-| dsh 插件安装/启用 | ✅ 已安装并激活 |
-| 视觉闭环端到端（VLM） | 🟡 规则 watchdog + 外部模型看图，无内置 critic |
+前置：**Windows 10/11 x64、Node ≥ 20、pnpm、Python 3.10+**；可选 Java 17 + Minecraft 1.20.1（仅游戏内验证）。
 
-> 完整进展见 [ENGINEERING.md](ENGINEERING.md)，2026-10 的 M0 报告已归档到 `docs/archive/`。
+```powershell
+git clone https://github.com/yan-mc/blockbench-ysm-agent.git <仓库目录>
+cd <仓库目录>
+
+# 1) 重建上游（vendor 不入库）
+git clone --depth 1 --branch v5.2.2 https://github.com/JannisX11/blockbench vendor/blockbench
+cd vendor/blockbench; pnpm install --node-linker=hoisted; npm run build-electron; cd ../..
+
+git clone --depth 1 --branch v2.6.0 https://github.com/YesSteveModel/YSM-Utils-Plugins vendor/YSM-Utils-Plugins
+
+# 2) 组装隐藏 BAE
+node packages/bb-agent-runtime/scripts/assemble.mjs
+
+# 3) 装 dsh 插件（在 DSH 中执行）
+plugin_manager install_bundle target=<仓库目录>/packages/dsh-blockbench-agent
+```
+
+安装后：`/bb-status` 查看连接，`/bb-start` 手动启动，`/bb-help` 列出工具。详细配置（`workspaceRoot` / `executable` / `appPath` / `pluginPath`）见 [SETUP.md](SETUP.md)。
+
+> **API key 只放 dsh profile / 环境变量**（`nanoBananaApiKey` 或 `GEMINI_API_KEY`）。仓库里的 `cordis.patch.yml` 只有占位符，**不会提交任何真实 key**。
 
 ---
 
-## 6. 下一步方向
+## 🔒 配置与安全
 
-1. 重打 **0.9.3 发布包**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）。
-2. 完成新验收项目 `togawa-sakiko`（明日方舟×BanG Dream 丰川祥子，联动皮肤「旋律」，双大角）。
-3. 完善 T1/T2 分层与 `bedrock_render`（当前未完成，勿依赖）。
-4. 补 `arm.json` 重建与 locale 加载验证（见 HANDOVER「已知限制」）。
+- 本仓库**不包含** `vendor/`、`dist/`、`material/`、`release/`、`workspace/`、模型 artifacts/exports/checkpoints/refs；
+- 模型参考图是第三方版权素材，**只留本地，绝不分发**；
+- API key 从 dsh profile 或环境变量读取；`bb_seg_probe` 只检查配置、不发请求、不耗额度；
+- BAE 通过本地 WebSocket/HTTP JSON-RPC 通信，首包 token 鉴权；写操作带 revision 保护，GUI 可见时冻结写操作；
+- 模型导出包只包含 YSM 资源，不包含游戏本体资产；Blockbench 衍生部分遵循 GPL-3.0，插件部分 MIT（见 [NOTICE.md](NOTICE.md)）。
 
 ---
 
-## 7. 目录（当前真实布局）
+## 🗂️ 仓库布局
 
 ```
-<仓库根目录>\
-├─ README.md                      # 门面：封面 / 工程状态 / 历史设计基线
-├─ MANUAL.md                      # 完整使用手册（v0.9.3）
-├─ HANDOVER.md                    # 交接班档案（第一手）
-├─ ENGINEERING.md                 # 工程状态/实测数据/已知限制
-├─ FOLDER-MAP.md                  # 目录地图与维护约定
-├─ SETUP.md                       # 从零搭建
-├─ NOTICE.md                      # 第三方许可
-├─ 系统开发与设计方案.md          # 历史设计合订本（2026-10-18）
-├─ docs\                          # 设计文档 01–07/10–18/20/21* + archive + test-evidence + assets
-├─ spec\                          # 机器可读契约 + 生成器
-├─ packages\
-│  ├─ bb-agent-runtime\           # BAE 运行时（main/preload/bridge/selftest/scripts）
-│  ├─ dsh-blockbench-agent\       # dsh Host 插件 + Client pill + Skill + reference
-├─ models\                        # BAE 工作区根（当前无测试模型，README 说明约定）
-├─ material\                      # 本地参考语料（gitignored，约 329.1MB）
-├─ tools\                         # 分析脚本 + ysmparser 解密器 + extract_corpus.py
-├─ research\                      # Blockbench / YSM / dsh 研究证据
-├─ media\                         # 介绍视频、幻灯片、构建脚本
-├─ vendor\                        # 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（只读，约 1.54GB）
-├─ dist\bb-agent-app\             # assemble.mjs 组装产物（本地运行）
-├─ release\                       # 发布物落点（当前为空，0.9.3 待重打）
-└─ .gitignore / .gitattributes / LICENSE / package.json
+<仓库根目录>/
+├─ README.md                  # 本文件：门面 / 功能 / 架构 / 案例 / 快速开始
+├─ MANUAL.md                  # 完整使用手册
+├─ SETUP.md                   # 从零搭建
+├─ ENGINEERING.md             # 工程状态 / 实测数据 / 已知限制
+├─ HANDOVER.md                # 交接班档案
+├─ FOLDER-MAP.md              # 目录地图
+├─ NOTICE.md                  # 第三方许可
+├─ docs/                      # 架构/协议/工具 API/状态机/建模方法/实证分析/案例
+│  ├─ 01–07, 10–18, 20–25    # 设计与实战文档
+│  ├─ assets/                 # 封面 / 展示图
+│  ├─ test-evidence/          # 回归证据（历史）
+│  └─ archive/                # 历史设计基线 / 旧证据
+├─ spec/                      # 机器可读契约 + 生成器
+├─ packages/
+│  ├─ bb-agent-runtime/       # BAE：隐藏 Electron + bridge + 构建脚本
+│  └─ dsh-blockbench-agent/   # dsh Host 插件：44 工具 + 5 命令 + Skill + Client pill
+├─ models/togawa-sakiko/      # 案例模型工作区（pack/ 随仓库，artifacts/refs/exports 本地）
+└─ tools/ research/ media/    # 分析脚本 / 源码研究 / 宣传素材
 ```
-
-> 没有 `prototype/`、`game-test/`、`_archive/`；`workspace/` 已在 2026-11-07 清理。归档统一放 `docs/archive/`。
 
 ---
 
-## 8. 许可与声明
+## 🧪 质量与验证
 
-- 本方案与原创代码/文档：按项目需要授权；引用第三方内容遵循其原许可。
-- **Blockbench**：GPL-3.0-or-later。BAE 是衍生发行版，发布时必须随包提供对应源码/修改说明与许可证；不得暗示官方背书。
-- **YSM-Utils-Plugins**：MIT；复用其规范化规则/代码需保留版权与许可声明。
-- **YSM 默认模型**：官方文档注明以 CC 0 发布（可修改分发）；用户提供的参考图/皮肤版权由用户负责。
-- **Minecraft**：遵守 Mojang EULA，不分发原始游戏资产。
-- **参考语料**（`material/`）：第三方模型/贴图，仅本地研究使用，不随仓库分发（已 gitignore）。
+| 项 | 结果 |
+|---|---|
+| 单元测试 | **84/84**（7 个 `*.test.mjs`） |
+| host-smoke | **35 步**，schema lint 42 工具 |
+| 契约 | `spec/tool-manifest.json` 44 工具；`spec/bridge-methods.json` 56/7/22；`generate_spec.py` 重跑 0 diff |
+| 模型校验 | 丰川祥子 v7：`bb_validate` strict 0 error（3 个已知 warning：512 贴图 ×2、可选 ViewLocator） |
+| 导出 | 32 条目 zip + export-manifest（逐文件 sha256） |
+
+```powershell
+node --test packages/dsh-blockbench-agent/test/*.test.mjs
+node packages/dsh-blockbench-agent/test/host-smoke.mjs
+python spec/generate_spec.py
+```
+
+---
+
+## 📚 文档地图
+
+| 想了解 | 读 |
+|---|---|
+| 总体架构/数据流 | [docs/01](docs/01-总体架构与数据流.md) |
+| 通信协议 | [docs/02](docs/02-通信协议规范.md) |
+| 44 个工具 API | [docs/03](docs/03-Tool-API-清单.md)、[spec/tool-manifest.json](spec/tool-manifest.json) |
+| 闭环状态机/预算/回滚 | [docs/04](docs/04-闭环状态机.md) |
+| 工程难点/避坑 | [docs/05](docs/05-工程难点与避坑指南.md) |
+| 参考图收集 | [docs/11](docs/11-参考图收集管线.md)、[docs/18](docs/18-官方基准与深度搜索.md) |
+| T3 Nano Banana Pro | [docs/24](docs/24-立绘转三视图与拆解方案调研.md)、[docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md) |
+| 建模方法/语料规律 | [docs/21 总纲](docs/21-现代化建模总纲.md)、[21a 衣服/裙](docs/21a-衣服与裙子结构.md)、[21b 身体](docs/21b-身体曲线塑造.md)、[21c 头发/面部](docs/21c-头发与面部.md) |
+| 眼睛/头发/角实证 | [docs/23](docs/23-眼睛头发与角实证分析.md) |
+| 建模 Skill | [blockbench-ysm-artist.md](packages/dsh-blockbench-agent/skills/blockbench-ysm-artist.md) |
+| 案例复盘 | [models/togawa-sakiko/README.md](models/togawa-sakiko/README.md) · [V7 报告](models/togawa-sakiko/V7-FINAL-REPORT.md) |
+| 历史设计基线 | [docs/archive/README-design-baseline-2026-10.md](docs/archive/README-design-baseline-2026-10.md) |
+
+---
+
+## 🛣️ 已知边界 / 下一步
+
+- **Windows 优先**：BAE 基于 Electron 43 + Blockbench 5.2.2；跨平台未验证。
+- **T3 需要付费 key**：无 key 自动降级 T2/T1；生成结果是“假设”，必须人工复核。
+- **VLM critic 未内置**：当前以渲染 watchdog + Agent/人看图判定为主。
+- **发布包**：0.9.4 通过 `node packages/bb-agent-runtime/scripts/package-release.mjs` 构建（需先 assemble）；GitHub Releases 0.4.0 为历史发布。
+- **模型精度**：v7 仍有后发片状/发帽叠层、裙层次简化、蓝白宽色块等差距（详见 V7 报告）；后续可继续用 Skill 的曲面/发缕规则迭代。
+
+---
+
+## 📄 许可与声明
+
+- 本仓库原创代码/文档：**MIT**（插件部分）；BAE 衍生自 **Blockbench 5.2.2（GPL-3.0-or-later）**，分发时随包提供源码/修改说明与许可证，不暗示官方背书。
+- **YSM-Utils-Plugins**（MIT）：复用其规范化规则时保留版权声明。
+- **Minecraft / YSM**：遵守 Mojang EULA 与 YSM 许可，不分发游戏本体资产。
+- 角色「丰川祥子」及参考图版权归原权利方；仓库内的模型/展示图仅用于技术案例，参考图本身不随仓库分发。
+- 第三方参考模型语料（`material/`）来自本地安装，**仅本地研究，不提交仓库**。

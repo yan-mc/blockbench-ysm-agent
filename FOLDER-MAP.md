@@ -1,14 +1,14 @@
 # 目录地图与维护约定
 
 > 目标：源码、模型、测试、发布物、媒体素材各自独立；大目录不误提交。
-> 现状基线：v0.9.1 / 2026-11-07（`docs/archive/` 为历史归档，不再使用 `_archive/`）。
+> 现状基线：v0.9.4 / 2026-11-07（`docs/archive/` 为历史归档，不再使用 `_archive/`）。
 
 ## 顶层（当前真实布局）
 
 | 路径 | 内容 | 是否提交 | 说明 |
 |---|---|---|---|
 | `README.md` | 仓库门面/快速链接 | ✅ | 封面 + 工程状态 + 历史设计基线 |
-| `MANUAL.md` | 完整使用手册 | ✅ | 安装/命令/41 工具/工作流/排障（v0.9.1） |
+| `MANUAL.md` | 完整使用手册 | ✅ | 安装/命令/44 定义 / 42 暴露/工作流/排障（v0.9.4） |
 | `HANDOVER.md` | 交接班档案（第一手） | ✅ | 接手先读这个 |
 | `ENGINEERING.md` | 工程状态/实测数据/已知限制 | ✅ | 实现状态以此为准 |
 | `FOLDER-MAP.md` | 目录地图与维护约定 | ✅ | 本文件 |
@@ -25,7 +25,7 @@
 | `media/` | 介绍视频、幻灯片、构建脚本 | ✅（输出视频除外） | 视频输出在 `.gitignore` |
 | `vendor/` | 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（只读） | ❌ | 体积约 1.54GB，按 SETUP 重建 |
 | `dist/` | 组装后的 BAE（`bb-agent-app`） | ❌ | 由 `assemble.mjs` 生成（2026-11-07 重建：190 文件/36MB） |
-| `release/` | 发布 zip/目录 | ❌ | 由 `package-release.mjs` 生成；当前为空，0.9.1 待重打 |
+| `release/` | 发布 zip/目录 | ❌ | 由 `package-release.mjs` 生成；当前为空，0.9.4 待重打 |
 | `workspace/` | 测试脚本临时输出 | ❌ | 已清理；`npm run test` 会重新生成 |
 
 > 已不存在：`prototype/`（早期骨架，已删除）、`game-test/`（隔离游戏验证环境，已删除）、`_archive/`（旧归档方案，已废弃）、`models/deepseek-fish/`（测试模型已清理）。
@@ -59,7 +59,7 @@ models/<name>/
 
 ## 测试证据
 
-- `docs/test-evidence/README.md`：0.9.1 证据说明（`test-all-0.9.1.log` / `hosttest-result-0.9.1.json` 由 Lead 写入）
+- `docs/test-evidence/README.md`：0.9.4 证据说明（`test-all-0.9.4.log` / `hosttest-result-0.9.4.json` 由 Lead 写入）
 - `docs/archive/test-evidence-0.4.0/`：0.4.0 时期旧证据（历史，不代表现状）
 - `docs/archive/M0-report*.md`：2026-10 M0 报告
 
@@ -67,7 +67,7 @@ models/<name>/
 
 - 本地 `release/` 只留最新 zip；解包目录不提交。
 - 发布包内含 `INSTALL.md`、`SHA256SUMS.txt`、GPL `SOURCE.txt`。
-- 当前 **0.9.1 发布包待重打**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）；GitHub Releases 上的 0.4.0 为历史发布。
+- 当前 **0.9.4 发布包待重打**（`node packages/bb-agent-runtime/scripts/package-release.mjs`）；GitHub Releases 上的 0.4.0 为历史发布。
 
 ## 清理规则
 

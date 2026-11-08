@@ -2,7 +2,7 @@
 
 > 在 **DeepSeek Harness（dsh）** 里驱动一个**隐藏运行的 Blockbench**：建模、贴图、动画、无头渲染自检、YSM 校验/保存/导出，最后在 Minecraft 里加载验证。
 >
-> 版本：v0.9.3 · 平台：Windows（Electron）· 适用：dsh Web / Desktop profile
+> 版本：v0.9.4 · 平台：Windows（Electron）· 适用：dsh Web / Desktop profile
 
 ![cover](docs/assets/cover.png)
 
@@ -105,14 +105,14 @@ dsh Host 插件  ── WebSocket / HTTP+SSE ──►  BAE（隐藏 Electron + 
 - Blockbench v5.2.x 桌面版（BAE 基于 **v5.2.2** 的 Electron 43 构建）
 - 可选：Minecraft Java 1.20.1 + Forge + YSM 2.6.x（游戏内验证）
 
-> 当前正式分发是 **zip 发布包**（0.9.3 待重打），不做代码签名/安装器；Windows SmartScreen 可能提示，属于未签名应用的正常现象。
+> 当前正式分发是 **zip 发布包**（0.9.4 已生成），不做代码签名/安装器；Windows SmartScreen 可能提示，属于未签名应用的正常现象。
 
 ---
 
 ## 4. 安装
 
-> 当前版本 **0.9.3**。推荐方式：**从仓库 link 安装**（本机 DSH profile 就是这样指向 `packages/dsh-blockbench-agent`）。
-> GitHub Releases 上的 `0.4.0` 是历史发布；0.9.3 发布包尚未重打。
+> 当前版本 **0.9.4**。推荐方式：**从仓库 link 安装**（本机 DSH profile 就是这样指向 `packages/dsh-blockbench-agent`）。
+> GitHub Releases 上的 `0.4.0` 是历史发布；0.9.4 发布包已生成：`release/bb-agent-0.9.4-*.zip`。
 
 ### 4.1 准备 Electron
 
@@ -415,7 +415,7 @@ bb_look({ isolate: "AllHead", zoom: 2.5,
 | `bb_restore` | 回滚（需 `confirm:true`） |
 | `bb_save_project` | 保存回 pack（增量） |
 | `bb_export_ysm` | 校验 + 导出目录/zip |
-| `bb_show_gui` / `bb_hide_gui` | 可选 GUI 工具（43 定义中的 2 个，默认不暴露；用 `/show` `/hide`） |
+| `bb_show_gui` / `bb_hide_gui` | 可选 GUI 工具（44 定义中的 2 个，默认不暴露；用 `/show` `/hide`） |
 
 ---
 
@@ -657,7 +657,7 @@ spec/                         # 工具/协议机器可读契约
 material/                     # 本地参考语料（gitignored）
 vendor/                       # 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（gitignored）
 dist/                         # assemble.mjs 产物（gitignored）
-release/                      # 发布产物（gitignored；0.9.3 待重打）
+release/                      # 发布产物（gitignored；0.9.4 已生成）
 ```
 
 > 已无 `prototype/`、`game-test/`、`_archive/`、`workspace/`；归档统一在 `docs/archive/`。
@@ -666,19 +666,19 @@ release/                      # 发布产物（gitignored；0.9.3 待重打）
 
 ## 15. 限制与许可
 
-**已知限制（v0.9.1）**
+**已知限制（v0.9.4）**
 
 - 动画文件已做合并回写，但还不是 YSM-Utils `saveNormalization` 的完整移植；`ysm.json`/控制器文件的字节级规范化未做。
 - `tools/bedrock_render.py` 软渲染器未完成（骨骼 pivot 语义不对），请用 BAE 渲染。
 - `arm.json`（第一人称手臂）无法重建（没有切换 Blockbench 工程 tab 的 API）。
 - T1/T2 分层需要额外下载（T1 SAM2 约 59MB；T2 ComfyUI 安装约 7GB + 首次权重约 12.5GB），核心建模不依赖。
 - `dist/` 与源码同步是手工的（改 bridge 后要复制/assemble 重建）。
-- `spec/` 是手工契约源，与 `index.js` 实际 schema 存在 17 个工具参数漂移；以 `index.js` 为准。
+- `spec/` 是手工契约源，与 `index.js` 的 44 个工具参数已对齐（0 漂移），以 `index.js` 为准。
 - watchdog-v2 是规则检测 + 外部 VLM 判断，不内置视觉模型。
 - PBR 贴图会生成/保存，但 Blockbench 离屏渲染不显示 PBR 效果。
 - Client UI 状态 pill 需要刷新 dsh Web 页面加载；Host `/bb-agent/status` 已可用。
 - `locale/*.json` 加载路径/时机未做端到端验证。
-- 0.9.1 发布包待重打；未提供 electron-builder 安装器/代码签名（zip 为正式分发方式）。
+- 0.9.4 发布包待重打；未提供 electron-builder 安装器/代码签名（zip 为正式分发方式）。
 - 游戏内验证只覆盖单模型加载/第三人称/第一人称（历史验证），不含多人同步/服务端校验；仓库不再自带 `game-test/`。
 
 **许可**

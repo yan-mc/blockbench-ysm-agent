@@ -1,7 +1,9 @@
 import json, os, sys, collections, math, pickle, re, glob
 
-ROOT = r"F:\Deepseek_harness\blockbench\material\refmodels\ysm_decoded"
-OUT = r"F:\Deepseek_harness\blockbench\material\refmodels\_cache.pkl"
+from pathlib import Path
+_REPO = Path(__file__).resolve().parents[1]
+ROOT = str(_REPO / "material" / "refmodels" / "ysm_decoded")
+OUT = str(_REPO / "material" / "refmodels" / "_cache.pkl")
 
 def strip_jsonc(s):
     out = []

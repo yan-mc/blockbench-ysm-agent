@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""整理 F:\\Deepseek_harness\\blockbench\\材料 目录。
+"""整理仓库根目录下的 material/ 材料目录。
 
 用法:
     python tidy_materials.py --dry     # 只打印计划

@@ -46,7 +46,7 @@ for (const dir of ['lib', 'locale', 'skills']) {
 
 const docsDir = path.join(bundleDir, 'docs')
 fs.mkdirSync(docsDir, { recursive: true })
-for (const entry of ['ENGINEERING.md', 'MANUAL.md', 'FOLDER-MAP.md', 'docs/M0-report.md', 'docs/M0-report-safe.md', 'docs/assets/cover.png', 'packages/README.md', 'spec/tool-manifest.json', 'spec/bridge-methods.json', 'spec/generate_spec.py']) {
+for (const entry of ['README.md', 'ENGINEERING.md', 'MANUAL.md', 'SETUP.md', 'HANDOVER.md', 'FOLDER-MAP.md', 'NOTICE.md', 'docs/M0-report.md', 'docs/M0-report-safe.md', 'docs/assets/cover.png', 'docs/RELEASE-0.9.4.md', 'packages/README.md', 'spec/tool-manifest.json', 'spec/bridge-methods.json', 'spec/generate_spec.py']) {
   const src = path.join(REPO_ROOT, entry)
   if (!fs.existsSync(src)) continue
   const dst = path.join(docsDir, entry.replace(/[\\/]/g, '__'))
@@ -58,7 +58,7 @@ const installMd = `# BB-Agent 发布包 ${version}
 包含：
 
 - \`bb-agent-app/\`：BAE（隐藏 Blockbench Agent Runtime，含 agent 插件、YSM 默认模板、GPL SOURCE.txt）。
-- \`dsh-blockbench-agent/\`：dsh Host 插件 bundle（30 个 bb_* 工具、命令、Skill、Client UI 状态 pill）。
+- \`dsh-blockbench-agent/\`：dsh Host 插件 bundle（44 个 bb_* 定义 / 42 个默认暴露、5 个命令、Skill、Client UI 状态 pill）。
 - \`docs/\`：工程状态、M0 报告、契约文件。
 
 ## 安装（dsh）

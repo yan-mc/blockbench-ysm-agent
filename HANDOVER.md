@@ -1,7 +1,7 @@
 # 交接班档案 · YSM × Blockbench 无头建模 Agent
 
 > 最后更新：2026-11-07
-> 插件版本：**0.9.3**（44 个工具定义 / 实际暴露 42 个、5 个命令、1 个 Skill、56 个 bridge 方法；分层 T3>T2>T1）
+> 插件版本：**0.9.4**（44 个工具定义 / 实际暴露 42 个、5 个命令、1 个 Skill、56 个 bridge 方法；分层 T3>T2>T1）
 > 本文件是接手这个项目的**第一份必读材料**。设计细节见 `docs/`，使用方法见 `MANUAL.md`，工程实测见 `ENGINEERING.md`。
 
 ---
@@ -17,14 +17,14 @@
 
 ---
 
-## 二、目录地图（所有东西都在 `F:\Deepseek_harness\blockbench` 下）
+## 二、目录地图（所有东西都在 `<仓库目录>` 下）
 
 ```
-F:\Deepseek_harness\blockbench\
+<仓库目录>/
 │
 ├── HANDOVER.md              ★ 本文件（交接班档案）
 ├── README.md                  项目介绍与功能列表（含历史设计基线）
-├── MANUAL.md                  使用手册（v0.9.3）
+├── MANUAL.md                  使用手册（v0.9.4）
 ├── SETUP.md                   从零搭建
 ├── ENGINEERING.md             工程状态/实测数据/已知限制
 ├── FOLDER-MAP.md              目录地图与维护约定
@@ -35,7 +35,7 @@ F:\Deepseek_harness\blockbench\
 │
 ├── packages/                  ★ 源码
 │   ├── dsh-blockbench-agent/     DSH 插件（host 侧）
-│   │   ├── index.js              43 个工具定义（41 暴露）
+│   │   ├── index.js              44 个工具定义（42 默认暴露）
 │   │   ├── lib/                  工具实现（refcanon/refsearch/refcollect/spec/seg*/viewsheet/imageprune/ws-server）
 │   │   ├── skills/               ★ 技能文档（AI 读这个）
 │   │   │   └── blockbench-ysm-artist.md
@@ -43,7 +43,7 @@ F:\Deepseek_harness\blockbench\
 │   │   │   ├── blockbench-ysm-playbook.md
 │   │   │   └── ysm-corpus-rules.md
 │   │   ├── assets/               委派任务书模板、SAM2 推理脚本
-│   │   └── test/                 6 个单测文件（62 项）+ host-smoke（35 步）
+│   │   └── test/                 7 个单测文件（84 项）+ host-smoke（35 步）
 │   ├── bb-agent-runtime/         BAE 运行时（Electron 主进程 + preload + bridge + scripts）
 │   │   └── agent/bb-agent-bridge.js   ★ 所有 bridge 方法都在这里
 │
@@ -66,14 +66,14 @@ F:\Deepseek_harness\blockbench\
 ├── models/                    BAE 工作区根（workspaceRoot），当前验收模型 togawa-sakiko（见 §十）
 ├── research/                  研究证据（Blockbench 核心、YSM 格式、DSH 集成）
 ├── media/                     演示素材
-├── release/                   发布物落点（当前为空；0.9.3 发布包待重打）
+├── release/                   发布物落点（当前为空；0.9.4 发布包已生成：`release/bb-agent-0.9.4-*.zip`）
 └── 根文件                     .gitignore / .gitattributes / LICENSE / package.json / README 等
 ```
 
 > 已不存在：`prototype/`、`game-test/`、`_archive/`、`workspace/`、`models/deepseek-fish/`。归档统一在 `docs/archive/`。
 
 **模型工程目录（BAE 的 workspace）**：`models/<project>/`，由 `packages/dsh-blockbench-agent/cordis.patch.yml` 的 `workspaceRoot` + `project` 决定：
-当前 `workspaceRoot=F:\Deepseek_harness\blockbench\models`、`project=togawa-sakiko`。
+当前 `workspaceRoot=<仓库目录>/models`、`project=togawa-sakiko`。
 所有 `bb_project_open({pack_dir})` 的路径都**相对 `<workspaceRoot>/<project>`**，不是仓库根。
 
 ---
@@ -117,11 +117,11 @@ plugin_manager install_bundle target=F:/Deepseek_harness/blockbench/packages/dsh
 ### 3.4 改完必须验证
 
 ```powershell
-cd F:\Deepseek_harness\blockbench
+cd <仓库目录>
 # node 不在 PATH 时用 DSH 自带：
 # $node = 'D:\deepseekharness\resources\runtime\primary-runtime\dependencies\node\bin\node.exe'
-node --test packages\dsh-blockbench-agent\test\*.test.mjs     # 6 文件 / 62 项
-node packages\dsh-blockbench-agent\test\host-smoke.mjs        # 35 步，真实 schema 校验 41 工具
+node --test packages\dsh-blockbench-agent\test\*.test.mjs     # 7 文件 / 84 项
+node packages\dsh-blockbench-agent\test\host-smoke.mjs        # 35 步，真实 schema 校验 42 工具
 python spec\generate_spec.py                                   # 重生成契约（应 0 diff）
 ```
 
@@ -131,7 +131,7 @@ python spec\generate_spec.py                                   # 重生成契约
 
 ---
 
-## 四、工具分组速查（43 定义 / 41 暴露）
+## 四、工具分组速查（44 定义 / 42 默认暴露）
 
 > 完整参数以 `index.js` 实际 schema 为准；`spec/tool-manifest.json` 是手工维护契约源，存在已知参数漂移。
 
@@ -147,7 +147,7 @@ python spec\generate_spec.py                                   # 重生成契约
 | **分层** | `bb_seg_probe` `bb_seg_t3` `bb_seg_install` `bb_seg_lite` `bb_seg_run` | T3（Nano Banana Pro 云端）/ T2（See-through 本地）/ T1（SAM2）立绘分层；T3 无 API key 时降级 T2 |
 | **动画** | `bb_animation_create` `bb_animation_patch` `bb_animation_delete` `bb_animation_list` | 关键帧/控制器绑定 |
 | **交付** | `bb_validate` `bb_save_project` `bb_export_ysm` | 校验/保存/导出 zip |
-| **GUI** | `bb_show_gui` `bb_hide_gui`（默认不暴露，43 定义中的 2 个） | 用户接管（由 `/show` `/hide` 命令代替） |
+| **GUI** | `bb_show_gui` `bb_hide_gui`（默认不暴露，44 定义中的 2 个） | 用户接管（由 `/show` `/hide` 命令代替） |
 
 ### 两个最常用的
 
@@ -237,7 +237,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | **建模知识** | 10 教程精要 / 11 参考图管线 / 12 建模规格 |
 | **分层与委派** | 13 能力探测 / 14 T1 SAM2 / 15 T2 安装 / 16 T2 完整分层 / 17 委派规范 / 18 官方基准与深度搜索 / **24 立绘转三视图与拆解调研 / 25 T3 Nano Banana Pro 接入与降级** |
 | **★ 现代语料** | **20** 169 模型大规模拆解 / **21** 现代化建模总纲 / **21a** 衣服与裙子 / **21b** 身体曲线 / **21c** 头发与面部 |
-| **测试证据** | `docs/test-evidence/`（0.9.1/0.9.2/0.9.3 复核证据，`README.md` 说明） |
+| **测试证据** | `docs/test-evidence/`（0.9.1/0.9.2/0.9.3/0.9.4 复核证据，`README.md` 说明） |
 
 ### 归档（`docs/archive/`，不随现状维护）
 
@@ -274,7 +274,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | §8 | 保存/导出/回滚 |
 | §9 | YSM 约束、骨架树/命名、arm、动画槽位、MoLang |
 | §10 | 工具坑（致命静默类 + 效率类） |
-| 附录 | 41 暴露工具速查、常见美术错误 |
+| 附录 | 44 定义 / 42 暴露工具速查、常见美术错误 |
 
 ---
 
@@ -289,8 +289,8 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 | **T3 云端拆解** | **已接入代码（2026-11-08），需付费 API key** | `bb_seg_t3` → Nano Banana Pro（`gemini-3-pro-image`）：1–14 张多角度参考图 → 严格三视图 / 全景拆解板；Pro Image 无免费层（约 $0.134/张 2K、$0.24/张 4K），生成图带 SynthID；**无 key 自动降级 T2**。配置 `nanoBanana.apiKey` 或 `GEMINI_API_KEY`；详见 [docs/25](docs/25-NanoBananaPro-T3云端拆解接入.md) |
 | `dist/` 与源码同步 | **手工** | 改 bridge 后必须同步到 dist / 用 assemble 重建，见 §3.3 |
 | `locale/*.json` | 加载未验证 | 插件 package.json 已导出 locale 文件，但 dsh 侧实际加载路径/时机未做端到端验证 |
-| `spec/` 契约漂移 | 已知 | 手工维护契约源，与 `index.js` 存在 17 个工具参数漂移；以 `index.js` 实际 schema 为准 |
-| 发布包 | 待重打 | 0.4.0 为历史发布；0.9.3 发布包待 `package-release.mjs` 重新生成 |
+| `spec/` 契约漂移 | 已知 | 手工维护契约源，与 `index.js` 44 个工具参数已对齐（0 漂移），以 `index.js` 实际 schema 为准 |
+| 发布包 | 待重打 | 0.4.0 为历史发布；0.9.4 发布包已生成：`release/bb-agent-0.9.4-*.zip` |
 
 ---
 
@@ -372,8 +372,8 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 - [ ] `bb_session_status` 返回 `gpu_ok: true`（或 `/bb-status` 正常）
 - [ ] DSH 工具列表里有 **42 个暴露的 `bb_*`**（44 定义）
 - [ ] skill `blockbench-ysm-artist` 可加载
-- [ ] `node --test packages\dsh-blockbench-agent\test\*.test.mjs` **62 通过**
-- [ ] `node packages/dsh-blockbench-agent/test/host-smoke.mjs` **35 步 PASSED**（schema lint 41 工具）
+- [ ] `node --test packages\dsh-blockbench-agent\test\*.test.mjs` **84 通过**
+- [ ] `node packages/dsh-blockbench-agent/test/host-smoke.mjs` **35 步 PASSED**（schema lint 42 工具）
 - [ ] `material/refmodels/ysm_decoded/` 有 **169 个目录**（其中 8 个 JSONC）
 - [ ] `tools/ysmparser/YSMParser.exe` 存在
 - [ ] `dist/bb-agent-app/agent/` 4 文件 sha256 与 `packages/bb-agent-runtime/agent/` 一致

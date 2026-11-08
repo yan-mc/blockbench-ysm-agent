@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
-repo = r"F:\Deepseek_harness\blockbench"
+from pathlib import Path
+repo = str(Path(__file__).resolve().parents[3])
 out = os.path.join(repo, "docs", "assets", "showcase")
 os.makedirs(out, exist_ok=True)
 def font(size, bold=False):

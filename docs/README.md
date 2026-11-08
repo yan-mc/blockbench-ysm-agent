@@ -1,6 +1,6 @@
 # docs · 分章索引
 
-> 当前版本：**0.9.2**（2026-11-07 复核）。实现状态以 [../ENGINEERING.md](../ENGINEERING.md) 与 [../HANDOVER.md](../HANDOVER.md) 为准。
+> 当前版本：**0.9.4**（2026-11-08 复核）。实现状态以 [../ENGINEERING.md](../ENGINEERING.md) 与 [../HANDOVER.md](../HANDOVER.md) 为准。
 > 历史归档在 [`archive/`](archive/README.md)，测试证据在 [`test-evidence/`](test-evidence/README.md)。
 
 ## 一、系统设计（现行）
@@ -9,7 +9,7 @@
 |---|---|
 | [01-总体架构与数据流](01-总体架构与数据流.md) | 设计目标、事实基线、架构图、进程/生命周期、数据流、ADR、目录规范 |
 | [02-通信协议规范](02-通信协议规范.md) | 传输绑定、JSON-RPC 2.0 扩展、**56 方法 / 7 事件 / 22 错误码**目录、revision/幂等；含 0.5–0.9 新增 17 方法 |
-| [03-Tool-API-清单](03-Tool-API-清单.md) | **43 定义 / 41 暴露**的 `bb_*` 工具参数/返回/错误/Token 预算、工具门控、提示词片段 |
+| [03-Tool-API-清单](03-Tool-API-清单.md) | **44 定义 / 42 暴露**的 `bb_*` 工具参数/返回/错误/Token 预算、工具门控、提示词片段 |
 | [04-闭环状态机](04-闭环状态机.md) | 状态机/正交区域、预算与收敛、VLM 评审协议、缺陷分类、回滚 |
 | [05-工程难点与避坑指南](05-工程难点与避坑指南.md) | 隐藏窗口/WebGL、启动注入、Undo/保存、贴图/UV、YSM 格式、Windows、许可 |
 | [06-实施路线图与验收](06-实施路线图与验收.md) | M0–M6 里程碑、测试策略、DoD、发布（历史计划，现状见 ENGINEERING） |
@@ -65,12 +65,12 @@
 
 ## 六、测试证据
 
-- [test-evidence/README.md](test-evidence/README.md)：0.9.1 全量回归证据（`test-all-0.9.1.log` 6/6 PASSED、`hosttest-result-0.9.1.json` 35 步/41 工具、`e2e-result-0.9.1.json`、`animation-diff-0.9.1.json`、`M0-2026-11-07.md`）。
+- [test-evidence/README.md](test-evidence/README.md)：0.9.1 全量回归证据（历史：`test-all-0.9.1.log`、`hosttest-result-0.9.1.json` 35 步/42 工具、`e2e-result-0.9.1.json`、`animation-diff-0.9.1.json`、`M0-2026-11-07.md`）。
 - 0.4.0 旧证据已移到 `archive/test-evidence-0.4.0/`。
 
 ## 机器可读契约
 
-`../spec/tool-manifest.json`（43 工具）、`../spec/bridge-methods.json`（56 方法 / 7 事件 / 22 错误码），
+`../spec/tool-manifest.json`（44 工具）、`../spec/bridge-methods.json`（56 方法 / 7 事件 / 22 错误码），
 由 `../spec/generate_spec.py` 重生成（手工维护契约源；与 `index.js` 存在已知参数漂移，以 `index.js` 为准）。
 
 ## 研究证据
@@ -86,3 +86,8 @@
 - **要理解为什么这么做**：[20](20-现代YSM语料大规模拆解.md) → [21a](21a-衣服与裙子结构.md) / [21b](21b-身体曲线塑造.md) / [21c](21c-头发与面部.md)
 - **要改插件**：[01](01-总体架构与数据流.md) → [02](02-通信协议规范.md) → [03](03-Tool-API-清单.md) → [05](05-工程难点与避坑指南.md) → `../packages/README.md`
 - **要加新能力**：[04](04-闭环状态机.md) → [13](13-分层能力探测与安装.md)–[16](16-T2完整分层调用.md)
+
+## 发布记录
+
+- [RELEASE-0.9.4.md](RELEASE-0.9.4.md)：当前发布（0.9.4，2026-11-08）
+- [RELEASE-0.9.2.md](RELEASE-0.9.2.md)：历史发布
