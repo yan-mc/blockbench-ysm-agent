@@ -1,13 +1,13 @@
 # 目录地图与维护约定
 
 > 目标：源码、模型、测试、发布物、媒体素材各自独立；大目录不误提交。
-> 现状基线：v0.9.4 / 2026-11-07（`docs/archive/` 为历史归档，不再使用 `_archive/`）。
+> 现状基线：v0.9.4 / 2026-11-08（`docs/archive/` 为历史归档，不再使用 `_archive/`）。
 
 ## 顶层（当前真实布局）
 
 | 路径 | 内容 | 是否提交 | 说明 |
 |---|---|---|---|
-| `README.md` | 仓库门面/快速链接 | ✅ | 封面 + 工程状态 + 历史设计基线 |
+| `README.md` | 仓库门面/快速链接 | ✅ | 封面 + 功能/架构/案例/快速开始（历史设计基线移到 `docs/archive/`） |
 | `MANUAL.md` | 完整使用手册 | ✅ | 安装/命令/44 定义 / 42 暴露/工作流/排障（v0.9.4） |
 | `HANDOVER.md` | 交接班档案（第一手） | ✅ | 接手先读这个 |
 | `ENGINEERING.md` | 工程状态/实测数据/已知限制 | ✅ | 实现状态以此为准 |
@@ -18,14 +18,14 @@
 | `docs/` | 设计文档 01–07/10–18/20/21* + `archive/` + `test-evidence/` + `assets/` | ✅ | 封面在 `docs/assets/`；归档在 `docs/archive/` |
 | `spec/` | tool/bridge 契约 JSON + 生成器 | ✅ | 手工维护契约源；改后跑 `python spec/generate_spec.py`（应 0 diff） |
 | `packages/` | BAE 运行时 + dsh Host 插件 + Skill + 协议骨架 | ✅ | 核心源码（改代码见 HANDOVER §3.3） |
-| `models/` | BAE 工作区根（`workspaceRoot`） | ✅（运行时产物除外） | 当前无测试模型；`<project>` 子目录运行时生成 |
+| `models/` | BAE 工作区根（`workspaceRoot`） | ✅（运行时产物除外） | 当前案例：`togawa-sakiko`（72 骨 / 1182 块） |
 | `material/` | 本地参考语料（约 329.1MB） | ❌（gitignored） | 第三方模型/贴图版权，仅本地研究，不随仓库分发 |
 | `tools/` | 分析脚本 + `ysmparser` 解密器 + `extract_corpus.py` | ✅（二进制除外） | `tools/ysmparser/YSMParser.exe` 为本地二进制 |
 | `research/` | Blockbench/YSM/dsh 研究 | ✅ | 事实依据（677/826/439 非空行） |
 | `media/` | 介绍视频、幻灯片、构建脚本 | ✅（输出视频除外） | 视频输出在 `.gitignore` |
 | `vendor/` | 上游 Blockbench 5.2.2 + YSM-Utils 2.6.0（只读） | ❌ | 体积约 1.54GB，按 SETUP 重建 |
-| `dist/` | 组装后的 BAE（`bb-agent-app`） | ❌ | 由 `assemble.mjs` 生成（2026-11-07 重建：190 文件/36MB） |
-| `release/` | 发布 zip/目录 | ❌ | 由 `package-release.mjs` 生成；当前为空，0.9.4 待重打 |
+| `dist/` | 组装后的 BAE（`bb-agent-app`） | ❌ | 由 `assemble.mjs` 生成（190 文件/36MB；agent 文件已同步 0.9.4） |
+| `release/` | 发布 zip/目录 | ❌ | 由 `package-release.mjs` 生成；0.9.4 已生成（`bb-agent-0.9.4/` + zip） |
 | `workspace/` | 测试脚本临时输出 | ❌ | 已清理；`npm run test` 会重新生成 |
 
 > 已不存在：`prototype/`（早期骨架，已删除）、`game-test/`（隔离游戏验证环境，已删除）、`_archive/`（旧归档方案，已废弃）、`models/deepseek-fish/`（测试模型已清理）。
