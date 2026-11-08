@@ -328,7 +328,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 | 项 | 实测（T2 + v2 + v3 优化后） |
 |---|---|
-| 骨架 / 方块 | **71 bones / 1095 cubes**（217 → 355 → 401 → 510 → 534 → v5 按 T3 重建 1095） |
+| 骨架 / 方块 | **71 bones / 1100 cubes**（217 → 355 → 401 → 510 → 534 → v5 按 T3 重建 1100） |
 | 贴图 | 2 × 512²（default / blue，未改） |
 | 动画 | 303（未触碰） |
 | 校验 | `bb_validate` ok=true、**0 error**；3 warning（512 贴图 ×2、可选 ViewLocator 缺省） |
@@ -343,7 +343,7 @@ tools\ysmparser\YSMParser.exe -i <输入目录> -o <输出目录>
 
 **v3 结构重建（2026-11-08，510 块）**：按 [`docs/23`](docs/23-眼睛头发与角实证分析.md) 的参考模型配方重做三处最大结构问题——角 **旋转轴从 Z（前后轴）改回 X（左右轴）**（2 骨 76 块，26 段参数化螺旋，z 跨度 0.85→3.14，90° 侧视=完整椭圆圈）；眼睛从"金菱形宝石"改为**参考 6 层配方**（平眼白 2.05×1.55×0.30 齐脸 + 金/深金/竖瞳/高光 + 上眼线/眼角/下睑/肤色遮片/深灰紫眉，每眼 16 块）；头发从 2 块大平板改为**底发帽 28 + 刘海 48 + 侧发 12 + 后发 43（含内层填充）+ 双马尾 24 + 发饰 23 = 198 块**，任意角度无露皮。详见 [`MODEL-V3-REFINE.md`](models/togawa-sakiko/MODEL-V3-REFINE.md)。
 
-**v5 按 T3 拆解重建（2026-11-08，1095 块）**：用 Nano Banana Pro（APIYI）以官方立绘 + 局部 + Q 版小人 5 参考图生成 2K turnaround/breakdown（`docs/25`），据此重建服装/下肢（三层短裙 + corset + 泡泡袖 + 腕套 + 丝袜/garter + 厚底靴 + 星空披风）、头发/角/头部（HairBack 150 块 5 层、43 段粗卷角、额饰/耳环/choker）。最终 71 骨 / 1095 块 / 303 动画未动；`bb_validate` 0 error；导出 `exports/v5-final/pack.zip`（506,167 B）。详见 [`V5-FINAL-REPORT.md`](models/togawa-sakiko/V5-FINAL-REPORT.md)。
+**v5 按 T3 拆解重建（2026-11-08，1100 块）**：用 Nano Banana Pro（APIYI）以官方立绘 + 局部 + Q 版小人 5 参考图生成 2K turnaround/breakdown（`docs/25`），据此重建服装/下肢（三层短裙 + corset + 泡泡袖 + 腕套 + 丝袜/garter + 厚底靴 + 星空披风）、头发/角/头部（HairBack 150 块 5 层、43 段粗卷角、额饰/耳环/choker）；R5/R6 修正裁切错误后移除三视图中不存在的披风、后发加宽、背裙改黑并补体积。最终 71 骨 / 1100 块 / 303 动画未动；`bb_validate` 0 error；导出 `exports/v5-final2/pack.zip`（511,459 B）。详见 [`V5-FINAL-REPORT.md`](models/togawa-sakiko/V5-FINAL-REPORT.md)。
 
 **v4 眼睛精修（2026-11-08，534 块）**：按 [`docs/23 §6`](docs/23-眼睛头发与角实证分析.md) 实测——现代模板眼中心 ±1.76（双眼内缘间距 20–24% 脸宽），我们 v3 的 ±2.315（37%）明显偏宽；"多边形眼"靠眼周一圈 0.2–0.8 单位小方块把方形四角遮掉。据此：眼中心 ±2.315→**±1.76**（眼/眉 8 骨 pivot 同步，动画未动）；每眼约 18 块（平板眼白 1.95×1.42 齐脸 / 金环 / 深金内环 / 竖瞳 / 2 高光 / 上眼线 / 外眼角 2 片深色翼 / 内眼角 / 下睑 + **四角 6 片小片沿眼弧排列** + 上下睑压边），四角片用脸皮同色格心；v4.1–v4.4 迭代修掉"四角片在虹膜后无效/紫块/大直角补丁"。**已知未解**：isolate 眼心约 0.4×0.4 淡色块（采样 default 纹理但改 uv 无效，疑极小面 box-UV 混合；正常视距约 1–2px）。详见 [`MODEL-V3-REFINE.md`](models/togawa-sakiko/MODEL-V3-REFINE.md) §12–§16 与模型 README。
 

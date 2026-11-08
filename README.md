@@ -58,7 +58,7 @@
 
 ![T2 29 层语义分层](docs/assets/showcase/t2-29-layers.png)
 
-**② 复杂逐步调整：从 217 块到 534 块**：首轮验收 → T1 逐部件复检发现 5 个 major → T2 层对照 + P1–P5 逐项修理（355 块）→ v2 美术优化（401 块）→ v3 结构重建（510 块：角绕左右轴 X 的参数化螺旋、眼睛按参考 6 层配方重做、头发改为底发帽 + 附属束分层）→ v4 眼睛精修（534 块：眼距 ±1.76、四角小方块切角）→ **v5 按 T3（Nano Banana Pro）拆解图重建（1095 块：三层短裙/星空披风/层叠长发/粗卷角）**。最终 `bb_validate` 0 error。
+**② 复杂逐步调整：从 217 块到 534 块**：首轮验收 → T1 逐部件复检发现 5 个 major → T2 层对照 + P1–P5 逐项修理（355 块）→ v2 美术优化（401 块）→ v3 结构重建（510 块：角绕左右轴 X 的参数化螺旋、眼睛按参考 6 层配方重做、头发改为底发帽 + 附属束分层）→ v4 眼睛精修（534 块：眼距 ±1.76、四角小方块切角）→ **v5 按 T3（Nano Banana Pro）拆解图重建（1100 块：三层短裙/星空披风/层叠长发/粗卷角）**。最终 `bb_validate` 0 error。
 
 ![修理前后对比](docs/assets/showcase/sakiko-before-after.png)
 
@@ -79,7 +79,7 @@
 | 契约 | `spec/tool-manifest.json` **44 工具**、`spec/bridge-methods.json` 56 方法 / 7 事件 / 22 错误码；`spec/generate_spec.py` 重跑与提交内容 **0 diff**，且 0.9.3 已对齐 `spec` ↔ `index.js` 的 **44/44** 参数 |
 | 上游 | `vendor/blockbench` = **Blockbench 5.2.2**；`vendor/YSM-Utils-Plugins` = 2.6.0（MIT）；vendor 总体积约 **1.54GB** |
 | 参考语料 | `material/` 约 **329.1MB**；`ysm_decoded` 169 目录 / 1156 文件 / 233MB；`ysm` 9 包；`maid` 874 文件 / 446 条（含 325 个角色）；`bbmodel` 62 对 |
-| 模型工程 | `models/togawa-sakiko/`：**丰川祥子（旋律的主人）**案例模型，71 骨 / **1095 方块** / 2×512 贴图 / 303 动画，`bb_validate` 0 error；见 [models/README.md](models/README.md) |
+| 模型工程 | `models/togawa-sakiko/`：**丰川祥子（旋律的主人）**案例模型，71 骨 / **1100 方块** / 2×512 贴图 / 303 动画，`bb_validate` 0 error；见 [models/README.md](models/README.md) |
 
 ### 0.5–0.9 新增能力
 

@@ -353,7 +353,9 @@ config:
 
 ---
 
-> **2026-11-08 实际应用**：T3 turnaround/breakdown 已用于丰川祥子「旋律的主人」v5 重建（534→1095 块）；流程与结果见 [`models/togawa-sakiko/V5-FINAL-REPORT.md`](../models/togawa-sakiko/V5-FINAL-REPORT.md)。
+> **2026-11-08 实际应用**：T3 turnaround/breakdown 已用于丰川祥子「旋律的主人」v5 重建（534→1100 块）；流程与结果见 [`models/togawa-sakiko/V5-FINAL-REPORT.md`](../models/togawa-sakiko/V5-FINAL-REPORT.md)。
+
+> **裁切教训（2026-11-08）**：T3 拆解板常把多视图/部件细节排在同一张图里。使用前必须按**原图像素坐标**把 front / side / back / 头部 / 服装细节裁成独立面板并逐张目检，不能按比例估算。本轮就曾把 front 裁进 side、side 裁进 back，导致对照图错位；正确裁切示例见 `models/togawa-sakiko/artifacts/refstudy/t3-panel5-*.png` 与 `docs/assets/showcase/sakiko-t3-crop-proof.png`。
 
 ## 10. 参考
 
